@@ -103,6 +103,52 @@ jobs:
           gh release view "$TAG" > /dev/null 2>&1 || gh release create "$TAG" --title "HoloNet $TAG" --notes "Automated macOS build for $TAG (Rust 1.77.2, macOS 10.15 Catalina compatible)."
           gh release upload "$TAG" dist/*.tar.gz --clobber
 
+  linux:
+    name: Linux (x64, static musl)
+    if: endsWith(github.ref_name, '-linux')
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust 1.77.2 + musl target
+        run: |
+          rustup toolchain install 1.77.2 --profile minimal --no-self-update
+          rustup default 1.77.2
+          rustup target add x86_64-unknown-linux-musl
+          sudo apt-get update && sudo apt-get install -y musl-tools
+      - name: Build
+        run: |
+          cargo build --release --manifest-path engine/Cargo.toml --target x86_64-unknown-linux-musl -p holonetd -p holonetctl
+      - name: Package
+        run: |
+          set -e
+          TAG="${GITHUB_REF_NAME}"
+          VER="${TAG%-linux}"
+          NAME="holonet-$VER-linux-x64"
+          mkdir -p "dist/$NAME"
+          cp engine/target/x86_64-unknown-linux-musl/release/holonetd \
+             engine/target/x86_64-unknown-linux-musl/release/holonetctl \
+             "dist/$NAME/"
+          cp README.md LICENSE ATTRIBUTION.md "dist/$NAME/"
+          printf '%s\n' \
+            'HoloNet engine, static musl build for x86_64 Linux.' \
+            'Unpack and run ./holonetd — no installer, no runtime deps.' \
+            'IPC on 127.0.0.1:7977 (token file: <dataDir>/ipc-token).' \
+            'Live data plane in this release: shadowsocks AEAD.' > "dist/$NAME/README.txt"
+          (cd dist && tar -czf "$NAME.tar.gz" "$NAME")
+          cd dist && sha256sum "$NAME.tar.gz" > SHA256SUMS.txt
+          ls -la
+      - name: Upload to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          TAG="${GITHUB_REF_NAME}"
+          gh release view "$TAG" > /dev/null 2>&1 || gh release create "$TAG" --title "HoloNet $TAG" --notes "Automated Linux engine build for $TAG (Rust 1.77.2, static musl)."
+          gh release upload "$TAG" dist/*.tar.gz dist/SHA256SUMS.txt --clobber
+
   android:
     name: Android (arm64 + armv7 engine, API 24+)
     if: endsWith(github.ref_name, '-android')
