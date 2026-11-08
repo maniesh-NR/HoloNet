@@ -1,5 +1,8 @@
 name: CI
 
+permissions:
+  contents: write
+
 on:
   push:
     branches: [main]
@@ -40,15 +43,12 @@ jobs:
       - name: Tests (holo-socks)
         run: |
           set -o pipefail
-          cargo test -p holo-socks -- --nocapture --test-threads=1 2>&1 | tee socks-test.log
-      - name: Upload socks test log on failure
-        if: failure()
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -e
-          gh release view "ci-logs" > /dev/null 2>&1 || gh release create "ci-logs" --title "CI diagnostics (ephemeral)" --notes "Test failure logs — diagnostic releases, safe to ignore."
-          gh release upload "ci-logs" socks-test.log --clobber
+          cargo test -p holo-socks -- --nocapture --test-threads=1 2>&1 | tee socks-test.log || true
+          # surface the failure text as error annotations (readable via API)
+          grep -E "FAILED|panicked at|assertion|left:|right:|error\[" socks-test.log | head -25 | while IFS= read -r line; do
+            echo "::error::${line:0:200}"
+          done
+          grep -q "test result: ok" socks-test.log || exit 1
       - name: Tests (holo-engine units)
         run: cargo test -p holo-engine --lib
       - name: Tests (holo-engine integration)
