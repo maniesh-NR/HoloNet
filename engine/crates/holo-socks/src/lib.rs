@@ -643,12 +643,23 @@ mod tests {
         c2.read_exact(&mut reply).unwrap();
         assert_eq!(reply[1], 0x05);
 
-        // stats: 1 successful relay (part 2); parts 1+3 are refused
-        std::thread::sleep(std::time::Duration::from_millis(100));
-        let (i, o, conns, refused) = srv.stats.snapshot();
-        assert_eq!(conns, 1, "conns {conns}");
-        assert!(i >= 40_000 && o >= 40_000, "stats i={i} o={o}");
-        assert!(refused >= 2, "refused {refused}");
+        // stats: 1 successful relay (part 2); parts 1+3 are refused.
+        // Poll rather than sleep — slow CI runners may still be draining.
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        let snap = loop {
+            let s = srv.stats.snapshot();
+            if s.2 >= 1 && s.0 >= 40_000 && s.1 >= 40_000 {
+                break s;
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "stats never converged: {s:?}"
+            );
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        };
+        assert_eq!(snap.2, 1, "conns {:?}", snap);
+        assert!(snap.0 >= 40_000 && snap.1 >= 40_000, "stats {:?}", snap);
+        assert!(snap.3 >= 2, "refused {:?}", snap);
         srv.stop.store(true, Ordering::Relaxed);
         let _ = handle;
     }
@@ -693,7 +704,9 @@ mod tests {
             }
         });
         let mut c = TcpStream::connect(&addr).unwrap();
-        c.write_all(&[4, 1]).unwrap(); // wrong version
+        // the bare listener drops sockets immediately — the write may hit
+        // ECONNRESET on Windows/macOS; both outcomes are acceptable
+        let _ = c.write_all(&[4, 1]); // wrong version
         let mut buf = [0u8; 16];
         let r = c.read(&mut buf);
         assert!(r.is_err() || r.unwrap() == 0);

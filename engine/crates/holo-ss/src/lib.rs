@@ -1065,9 +1065,11 @@ mod tests {
         let mut conn = wrong
             .dial(holo_proto::Network::Tcp, &format!("127.0.0.1:{echo_port}"))
             .unwrap();
-        // write succeeds (client doesn't know), but the server can't read
-        // the target — upstream must NOT be dialed
-        conn.write_all(b"hello").unwrap();
+        // write "succeeds" on the client (it cannot know yet) — but on
+        // some OSes the server's earlier close surfaces as ECONNRESET, so
+        // tolerate write errors here; upstream must NOT be dialed either way
+        let _ = conn.write_all(b"hello");
+        let _ = conn.flush();
         std::thread::sleep(Duration::from_millis(120));
         assert!(
             !dialed.load(std::sync::atomic::Ordering::SeqCst),
