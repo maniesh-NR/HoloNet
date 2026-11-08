@@ -109,6 +109,8 @@ impl Lab {
     }
 
     /// Lab at the same hue/chroma but the given tone (L\*).
+    /// Kept for the palette API symmetry (tests and future palettes use it).
+    #[allow(dead_code)]
     fn at_tone(self, tone: f64) -> Lab {
         Lab { l: tone, a: self.a, b: self.b }
     }

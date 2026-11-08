@@ -4,7 +4,6 @@
 use std::io::{BufRead, BufReader, Write};
 use std::net::{TcpListener, TcpStream};
 use std::sync::{mpsc, Arc, Mutex};
-use std::time::Duration;
 
 use holo_config::{Profile, Settings, Store};
 use holo_theme::{scheme_from_seed, Argb, Mode};
@@ -228,7 +227,7 @@ pub fn serve_ipc(
     engine: Arc<Engine>,
     listener: TcpListener,
     token: String,
-    mut events: mpsc::Receiver<String>,
+    events: mpsc::Receiver<String>,
 ) -> std::thread::JoinHandle<()> {
     let clients: Arc<Mutex<Vec<(u64, TcpStream)>>> = Arc::new(Mutex::new(Vec::new()));
     let clients2 = clients.clone();
@@ -238,9 +237,12 @@ pub fn serve_ipc(
                 Ok(e) => e,
                 Err(_) => break,
             };
+            let mut out = String::with_capacity(ev.len() + 1);
+            out.push_str(&ev);
+            out.push('\n');
             clients2.lock().unwrap().retain(|(_, w)| {
                 let mut w = w;
-                w.write_all(ev.as_bytes()).is_ok() && w.write_all(b"\n").is_ok()
+                w.write_all(out.as_bytes()).is_ok()
             });
         }
     });
@@ -250,51 +252,59 @@ pub fn serve_ipc(
             let engine = engine.clone();
             let token = token.clone();
             let clients = clients.clone();
-            std::thread::spawn(move || {
-                let _ = handle_ipc_conn(stream, engine, token, clients);
-            });
+            handle_ipc_conn(stream, engine, token, clients);
         }
     })
 }
 
+static CONN_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+
+/// Register the connection for event broadcasts and spawn its reader loop.
+/// Returns immediately: one short-lived setup on the accept thread, one
+/// reader thread per connection (removed from the broadcast list on EOF).
 fn handle_ipc_conn(
-    mut stream: TcpStream,
+    stream: TcpStream,
     engine: Arc<Engine>,
     token: String,
     clients: Arc<Mutex<Vec<(u64, TcpStream)>>>,
-) -> std::io::Result<()> {
-    let w = stream.try_clone()?;
-    let cid = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.subsec_nanos() as u64)
-        .unwrap_or(1);
+) {
+    // RPC over loopback: send each framed line as soon as it is written.
+    let _ = stream.set_nodelay(true);
+    let w = match stream.try_clone() {
+        Ok(w) => w,
+        Err(_) => return,
+    };
+    let cid = CONN_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let helloed = Arc::new(std::sync::atomic::AtomicBool::new(false));
-    {
-        let helloed = helloed.clone();
-        let mut resp_w = stream.try_clone()?;
-        std::thread::spawn(move || {
-            let mut r = BufReader::new(stream);
-            let mut line = String::new();
-            loop {
-                line.clear();
-                match r.read_line(&mut line) {
-                    Ok(0) | Err(_) => break,
-                    Ok(_) => {
-                        let trimmed = line.trim();
-                        if trimmed.is_empty() { continue; }
-                        let resp = dispatch(trimmed, &engine, &token, &helloed);
-                        if resp_w.write_all(resp.as_bytes()).is_err() || resp_w.write_all(b"\n").is_err() {
-                            break;
-                        }
+    let mut resp_w = match stream.try_clone() {
+        Ok(w) => w,
+        Err(_) => return,
+    };
+    let clients2 = clients.clone();
+    std::thread::spawn(move || {
+        let mut r = BufReader::new(stream);
+        let mut line = String::new();
+        loop {
+            line.clear();
+            match r.read_line(&mut line) {
+                Ok(0) | Err(_) => break,
+                Ok(_) => {
+                    let trimmed = line.trim();
+                    if trimmed.is_empty() { continue; }
+                    let resp = dispatch(trimmed, &engine, &token, &helloed);
+                    let mut out = String::with_capacity(resp.len() + 1);
+                    out.push_str(&resp);
+                    out.push('\n');
+                    if resp_w.write_all(out.as_bytes()).is_err() {
+                        break;
                     }
                 }
             }
-            helloed.store(false, std::sync::atomic::Ordering::Relaxed);
-        });
-    }
+        }
+        // Connection over — deregister from the event broadcast list.
+        clients2.lock().unwrap().retain(|(c, _)| *c != cid);
+    });
     clients.lock().unwrap().push((cid, w));
-    std::thread::sleep(Duration::from_secs(u64::MAX));
-    Ok(())
 }
 
 fn dispatch(line: &str, engine: &Arc<Engine>, token: &str, helloed: &Arc<std::sync::atomic::AtomicBool>) -> String {
@@ -421,13 +431,20 @@ fn dispatch(line: &str, engine: &Arc<Engine>, token: &str, helloed: &Arc<std::sy
 
 pub struct IpcClient {
     pub stream: TcpStream,
+    /// Persistent buffered reader — bytes read past a line MUST survive
+    /// until the next `read_response` call. (A fresh `BufReader` per call
+    /// discards them; when a reply and an event coalesce into one TCP
+    /// segment — Windows coalesces readily — the client deadlocks.)
+    reader: BufReader<TcpStream>,
     pub next_id: u64,
 }
 
 impl IpcClient {
     pub fn connect(addr: &str, token: &str) -> std::io::Result<IpcClient> {
         let stream = TcpStream::connect(addr)?;
-        let mut c = IpcClient { stream, next_id: 1 };
+        let _ = stream.set_nodelay(true);
+        let reader = BufReader::new(stream.try_clone()?);
+        let mut c = IpcClient { stream, reader, next_id: 1 };
         let hello = format!("{{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"hello\",\"params\":{{\"token\":\"{}\"}}}}\n", json_escape(token));
         c.stream.write_all(hello.as_bytes())?;
         let _ = c.read_response()?;
@@ -450,8 +467,13 @@ impl IpcClient {
     fn read_response(&mut self) -> std::io::Result<String> {
         loop {
             let mut line = String::new();
-            let mut r = BufReader::new(&self.stream);
-            r.read_line(&mut line)?;
+            let n = self.reader.read_line(&mut line)?;
+            if n == 0 {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::UnexpectedEof,
+                    "ipc: connection closed by daemon",
+                ));
+            }
             let t = line.trim().to_string();
             if t.is_empty() { continue; }
             if t.contains("\"method\":\"event\"") { continue; }
