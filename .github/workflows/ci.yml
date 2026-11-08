@@ -42,12 +42,12 @@ jobs:
         run: cargo test -p holo-ss
       - name: Tests (holo-socks)
         run: |
-          set -o pipefail
-          cargo test -p holo-socks -- --nocapture --test-threads=1 2>&1 | tee socks-test.log || true
-          # surface the failure text as error annotations (readable via API)
-          grep -E "FAILED|panicked at|assertion|left:|right:|called .Result|Os \{|Custom \{|Connection|TimedOut|WouldBlock|AddrNot|error\[" socks-test.log | head -30 | while IFS= read -r line; do
-            echo "::error::${line:0:200}"
-          done
+          cargo test -p holo-socks -- --nocapture --test-threads=1 > socks-test.log 2>&1 || true
+          echo "=== log size: $(wc -l < socks-test.log) lines"
+          echo "=== HEAD of socks-test.log ==="
+          head -15 socks-test.log | while IFS= read -r line; do echo "::error::HEAD|${line:0:220}"; done
+          echo "=== TAIL of socks-test.log ==="
+          tail -25 socks-test.log | while IFS= read -r line; do echo "::error::TAIL|${line:0:220}"; done
           grep -q "test result: ok" socks-test.log || exit 1
       - name: Tests (holo-engine units)
         run: cargo test -p holo-engine --lib
