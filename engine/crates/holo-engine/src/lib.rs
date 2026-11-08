@@ -470,7 +470,9 @@ mod tests {
         let store = Store::new(&dir);
         let engine = Engine::new(store);
         let token = ensure_token(&dir).unwrap();
-        let ln = TcpListener::bind("127.127.0.1:0").unwrap();
+        // 127.0.0.1:0 — ephemeral port on the one loopback address every OS
+        // has bound (macOS lo0 only carries 127.0.0.1, unlike Linux's 127/8).
+        let ln = TcpListener::bind("127.0.0.1:0").unwrap();
         let addr = ln.local_addr().unwrap().to_string();
         let events = engine.take_event_receiver().unwrap();
         serve_ipc(engine.clone(), ln, token.clone(), events);
