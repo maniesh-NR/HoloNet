@@ -264,6 +264,14 @@ impl SocksServer {
 
     fn handle(&self, sock: TcpStream) {
         let mut sock = sock;
+        // CRITICAL: accepted sockets inherit the listener's nonblocking mode
+        // on Windows and macOS (Linux clears it). The whole handler is
+        // written blocking-style — a nonblocking read_exact returns
+        // WouldBlock the moment the peer hasn't sent yet (exactly the RFC
+        // 1929 auth subnegotiation, where the client waits for our method
+        // choice before sending credentials), which surfaced in CI as
+        // UnexpectedEof / ConnectionAborted(10053) on the client side.
+        sock.set_nonblocking(false).ok();
         sock.set_nodelay(true).ok();
         let _ = sock.set_read_timeout(Some(std::time::Duration::from_secs(300)));
         let _ = sock.set_write_timeout(Some(std::time::Duration::from_secs(300)));
