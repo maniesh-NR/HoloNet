@@ -871,7 +871,7 @@ pub mod gcm {
         let padded = BLOCK - (data.len() % BLOCK);
         let mut d = data.to_vec();
         if padded != BLOCK {
-            d.extend(std::iter::repeat_n(0u8, padded));
+            d.extend(std::iter::repeat(0u8).take(padded));
         }
         d.chunks(BLOCK)
             .map(|c| {

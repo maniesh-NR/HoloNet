@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "holo-config"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "holo-proto",
  "holo-util",
@@ -33,7 +33,7 @@ version = "0.3.0"
 
 [[package]]
 name = "holo-proto"
-version = "0.2.0"
+version = "0.3.0"
 
 [[package]]
 name = "holo-socks"
@@ -56,15 +56,15 @@ dependencies = [
 
 [[package]]
 name = "holo-theme"
-version = "0.2.0"
+version = "0.3.0"
 
 [[package]]
 name = "holo-util"
-version = "0.2.0"
+version = "0.3.0"
 
 [[package]]
 name = "holonetctl"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "holo-config",
  "holo-engine",
@@ -74,7 +74,7 @@ dependencies = [
 
 [[package]]
 name = "holonetd"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "holo-config",
  "holo-engine",
