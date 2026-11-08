@@ -1,0 +1,9 @@
+[package]
+name = "holo-config"
+version = "0.2.0"
+edition = "2021"
+license = "GPL-3.0"
+
+[dependencies]
+holo-util = { path = "../holo-util" }
+holo-proto = { path = "../holo-proto" }

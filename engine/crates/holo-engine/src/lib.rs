@@ -1,0 +1,523 @@
+//! holo-engine — the daemon core: IPC (NDJSON JSON-RPC 2.0 over
+//! 127.0.0.1:7977, token auth) + the Material You theme bridge (`theme.get`
+//! serves the full M3 role set derived from the user's seed color).
+use std::io::{BufRead, BufReader, Write};
+use std::net::{TcpListener, TcpStream};
+use std::sync::{mpsc, Arc, Mutex};
+use std::time::Duration;
+
+use holo_config::{Profile, Settings, Store};
+use holo_theme::{scheme_from_seed, Argb, Mode};
+
+// ---------------------------------------------------------------------------
+// IPC constants
+// ---------------------------------------------------------------------------
+
+pub const CODE_PARSE_ERROR: i64 = -32700;
+pub const CODE_METHOD_NOT_FOUND: i64 = -32601;
+pub const CODE_INVALID_PARAMS: i64 = -32602;
+pub const CODE_INTERNAL_ERROR: i64 = -32603;
+pub const CODE_AUTH_FAILED: i64 = -32001;
+pub const CODE_ENGINE_BUSY: i64 = -32002;
+pub const CODE_PROFILE_MISSING: i64 = -32003;
+pub const DEFAULT_TCP_PORT: u16 = 7977;
+
+#[derive(Debug, Clone)]
+pub struct RpcError {
+    pub code: i64,
+    pub message: String,
+}
+
+impl RpcError {
+    pub fn new(code: i64, msg: &str) -> RpcError {
+        RpcError { code, message: msg.to_string() }
+    }
+    pub fn to_json(&self, id: u64) -> String {
+        format!(
+            "{{\"jsonrpc\":\"2.0\",\"id\":{},\"error\":{{\"code\":{},\"message\":\"{}\"}}}}",
+            id, self.code, json_escape(&self.message)
+        )
+    }
+}
+
+pub fn json_escape(s: &str) -> String {
+    let mut o = String::new();
+    for c in s.chars() {
+        match c {
+            '"' => o.push_str("\\\""),
+            '\\' => o.push_str("\\\\"),
+            '\n' => o.push_str("\\n"),
+            '\r' => o.push_str("\\r"),
+            c if (c as u32) < 0x20 => o.push_str(&format!("\\u{:04x}", c as u32)),
+            c => o.push(c),
+        }
+    }
+    o
+}
+
+pub fn ensure_token(data_dir: &std::path::Path) -> Result<String, String> {
+    let p = data_dir.join("ipc-token");
+    if let Ok(t) = std::fs::read_to_string(&p) {
+        let t = t.trim().to_string();
+        if !t.is_empty() { return Ok(t); }
+    }
+    std::fs::create_dir_all(data_dir).map_err(|e| e.to_string())?;
+    let t = holo_util::rand::hex(24);
+    std::fs::write(&p, &t).map_err(|e| e.to_string())?;
+    Ok(t)
+}
+
+// ---------------------------------------------------------------------------
+// Engine
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EngineState {
+    pub state: String,
+    pub profile_id: String,
+    pub profile_name: String,
+    pub error: String,
+}
+
+impl EngineState {
+    fn disconnected() -> EngineState {
+        EngineState { state: "disconnected".into(), profile_id: String::new(), profile_name: String::new(), error: String::new() }
+    }
+}
+
+pub struct Engine {
+    pub store: Store,
+    pub settings: Mutex<Settings>,
+    state: Mutex<EngineState>,
+    events_tx: mpsc::Sender<String>,
+    events_rx: Mutex<Option<mpsc::Receiver<String>>>,
+}
+
+impl Engine {
+    pub fn new(store: Store) -> Arc<Engine> {
+        let (tx, rx) = mpsc::channel();
+        let settings = store.load_settings();
+        Arc::new(Engine {
+            store,
+            settings: Mutex::new(settings),
+            state: Mutex::new(EngineState::disconnected()),
+            events_tx: tx,
+            events_rx: Mutex::new(Some(rx)),
+        })
+    }
+
+    pub fn take_event_receiver(&self) -> Option<mpsc::Receiver<String>> {
+        self.events_rx.lock().unwrap().take()
+    }
+
+    pub fn state(&self) -> EngineState {
+        self.state.lock().unwrap().clone()
+    }
+
+    fn set_state(&self, st: EngineState) {
+        let payload = state_json(&st);
+        *self.state.lock().unwrap() = st;
+        let _ = self.events_tx.send(format!(
+            "{{\"jsonrpc\":\"2.0\",\"method\":\"event\",\"params\":{{\"name\":\"state.changed\",\"payload\":{}}}}}",
+            payload
+        ));
+    }
+
+    fn emit(&self, name: &str, payload: &str) {
+        let _ = self.events_tx.send(format!(
+            "{{\"jsonrpc\":\"2.0\",\"method\":\"event\",\"params\":{{\"name\":\"{}\",\"payload\":{}}}}}",
+            name, payload
+        ));
+    }
+
+    // -- Material You ------------------------------------------------------
+
+    /// Resolve the *effective* mode: "system" follows the OS preference the
+    /// frontend reports (query param `os_theme=dark|light`), else the
+    /// setting itself. Desktop frontends call `theme.get` on every
+    /// system-theme change.
+    pub fn theme(&self, os_theme: Option<&str>) -> Result<holo_theme::Scheme, String> {
+        let st = self.settings.lock().unwrap();
+        let mode_str = st.get("theme_mode").unwrap_or("system").to_string();
+        let mode = match mode_str.as_str() {
+            "dark" => Mode::Dark,
+            "light" => Mode::Light,
+            _ => Mode::parse(os_theme.unwrap_or("light")), // system → OS-reported
+        };
+        let seed_hex = st.get("seed_color").unwrap_or("#6750A4").to_string();
+        let seed = Argb::from_hex(&seed_hex).unwrap_or(holo_theme::DEFAULT_SEED);
+        Ok(scheme_from_seed(seed, mode))
+    }
+
+    /// The M3 role set as a flat hex map (the cross-platform contract).
+    pub fn theme_hex_map(&self, os_theme: Option<&str>) -> Vec<(String, String)> {
+        let scheme = self.theme(os_theme).ok();
+        let empty: Vec<(String, String)> = Vec::new();
+        let roles = match &scheme {
+            Some(s) => holo_theme::scheme_to_hex_map(s),
+            None => return empty,
+        };
+        roles.into_iter().map(|(k, v)| (k.to_string(), v)).collect()
+    }
+
+    // -- sessions ----------------------------------------------------------
+
+    pub fn connect(self: &Arc<Self>, profile_id: &str) -> Result<EngineState, RpcError> {
+        {
+            let cur = self.state();
+            if cur.state == "connecting" || cur.state == "connected" {
+                return Err(RpcError::new(CODE_ENGINE_BUSY, "engine busy: disconnect first"));
+            }
+        }
+        let profiles = self.store.load_profiles();
+        let profile = profiles
+            .into_iter()
+            .find(|p| p.id == profile_id)
+            .ok_or_else(|| RpcError::new(CODE_PROFILE_MISSING, "profile not found"))?;
+        self.set_state(EngineState {
+            state: "connecting".into(),
+            profile_id: profile.id.clone(),
+            profile_name: profile.name.clone(),
+            error: String::new(),
+        });
+        // The protocol data plane was the v0.1/0.2 engine (see docs/RESTORE.md);
+        // this core reports the state honestly.
+        self.set_state(EngineState {
+            state: "error".into(),
+            profile_id: profile.id.clone(),
+            profile_name: profile.name.clone(),
+            error: "holonet/protocol-drivers: data plane pending restore (docs/RESTORE.md)".into(),
+        });
+        Ok(self.state())
+    }
+
+    pub fn disconnect(&self) -> EngineState {
+        let mut st = self.state();
+        st.state = "disconnected".into();
+        self.set_state(st.clone());
+        st
+    }
+
+    pub fn import(&self, kind: &str, data: &str) -> Result<Vec<Profile>, RpcError> {
+        let _ = kind; // links parser handles share URLs; other formats: RESTORE.md
+        let profiles = holo_config::links::parse(data)
+            .map_err(|e| RpcError::new(CODE_INVALID_PARAMS, &format!("import: {}", e)))?;
+        for p in &profiles {
+            self.store.add_profile(p.clone()).map_err(|e| RpcError::new(CODE_INTERNAL_ERROR, &e))?;
+        }
+        let _ = self.emit("profiles.changed", &format!("{{\"count\":{}}}", profiles.len()));
+        Ok(profiles)
+    }
+}
+
+fn state_json(st: &EngineState) -> String {
+    format!(
+        "{{\"state\":\"{}\",\"profileId\":\"{}\",\"profileName\":\"{}\",\"error\":\"{}\"}}",
+        json_escape(&st.state),
+        json_escape(&st.profile_id),
+        json_escape(&st.profile_name),
+        json_escape(&st.error)
+    )
+}
+
+// ---------------------------------------------------------------------------
+// IPC server
+// ---------------------------------------------------------------------------
+
+pub fn serve_ipc(
+    engine: Arc<Engine>,
+    listener: TcpListener,
+    token: String,
+    mut events: mpsc::Receiver<String>,
+) -> std::thread::JoinHandle<()> {
+    let clients: Arc<Mutex<Vec<(u64, TcpStream)>>> = Arc::new(Mutex::new(Vec::new()));
+    let clients2 = clients.clone();
+    std::thread::spawn(move || {
+        loop {
+            let ev = match events.recv() {
+                Ok(e) => e,
+                Err(_) => break,
+            };
+            clients2.lock().unwrap().retain(|(_, w)| {
+                let mut w = w;
+                w.write_all(ev.as_bytes()).is_ok() && w.write_all(b"\n").is_ok()
+            });
+        }
+    });
+    std::thread::spawn(move || {
+        for s in listener.incoming() {
+            let Ok(stream) = s else { continue };
+            let engine = engine.clone();
+            let token = token.clone();
+            let clients = clients.clone();
+            std::thread::spawn(move || {
+                let _ = handle_ipc_conn(stream, engine, token, clients);
+            });
+        }
+    })
+}
+
+fn handle_ipc_conn(
+    mut stream: TcpStream,
+    engine: Arc<Engine>,
+    token: String,
+    clients: Arc<Mutex<Vec<(u64, TcpStream)>>>,
+) -> std::io::Result<()> {
+    let w = stream.try_clone()?;
+    let cid = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.subsec_nanos() as u64)
+        .unwrap_or(1);
+    let helloed = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    {
+        let helloed = helloed.clone();
+        let mut resp_w = stream.try_clone()?;
+        std::thread::spawn(move || {
+            let mut r = BufReader::new(stream);
+            let mut line = String::new();
+            loop {
+                line.clear();
+                match r.read_line(&mut line) {
+                    Ok(0) | Err(_) => break,
+                    Ok(_) => {
+                        let trimmed = line.trim();
+                        if trimmed.is_empty() { continue; }
+                        let resp = dispatch(trimmed, &engine, &token, &helloed);
+                        if resp_w.write_all(resp.as_bytes()).is_err() || resp_w.write_all(b"\n").is_err() {
+                            break;
+                        }
+                    }
+                }
+            }
+            helloed.store(false, std::sync::atomic::Ordering::Relaxed);
+        });
+    }
+    clients.lock().unwrap().push((cid, w));
+    std::thread::sleep(Duration::from_secs(u64::MAX));
+    Ok(())
+}
+
+fn dispatch(line: &str, engine: &Arc<Engine>, token: &str, helloed: &Arc<std::sync::atomic::AtomicBool>) -> String {
+    use std::sync::atomic::Ordering;
+    let v = match holo_util::json::parse(line) {
+        Ok(v) => v,
+        Err(e) => return RpcError::new(CODE_PARSE_ERROR, &format!("parse: {}", e)).to_json(0),
+    };
+    let id = v.get("id").and_then(|x| x.as_i64()).unwrap_or(0).max(0) as u64;
+    let method = v.get("method").and_then(|x| x.as_str()).unwrap_or("").to_string();
+    let params = v.get("params").cloned().unwrap_or(holo_util::Value::Null);
+
+    if method != "hello" && method != "ping" && !helloed.load(Ordering::Relaxed) {
+        return RpcError::new(CODE_AUTH_FAILED, "authenticate with hello first").to_json(id);
+    }
+    let pstr = |k: &str| params.get(k).and_then(|x| x.as_str()).unwrap_or("").to_string();
+    match method.as_str() {
+        "hello" => {
+            if pstr("token") != token {
+                return RpcError::new(CODE_AUTH_FAILED, "bad token").to_json(id);
+            }
+            helloed.store(true, Ordering::Relaxed);
+            let profiles = engine.store.load_profiles().len();
+            format!(
+                "{{\"jsonrpc\":\"2.0\",\"id\":{},\"result\":{{\"state\":\"{}\",\"profiles\":{},\"capabilities\":[\"theme\",\"import\",\"profiles\",\"events\"]}}}}",
+                id, engine.state().state, profiles
+            )
+        }
+        "ping" => format!("{{\"jsonrpc\":\"2.0\",\"id\":{},\"result\":{{\"pong\":true}}}}", id),
+        "state.get" => format!("{{\"jsonrpc\":\"2.0\",\"id\":{},\"result\":{}}}", id, state_json(&engine.state())),
+        "session.connect" => {
+            match engine.connect(&pstr("profileId")) {
+                Ok(st) => format!("{{\"jsonrpc\":\"2.0\",\"id\":{},\"result\":{}}}", id, state_json(&st)),
+                Err(e) => e.to_json(id),
+            }
+        }
+        "session.disconnect" => {
+            let st = engine.disconnect();
+            format!("{{\"jsonrpc\":\"2.0\",\"id\":{},\"result\":{}}}", id, state_json(&st))
+        }
+        "profiles.list" => {
+            let profiles = engine.store.load_profiles();
+            let arr = holo_util::Value::Arr(profiles.iter().map(|p| p.to_json()).collect());
+            format!("{{\"jsonrpc\":\"2.0\",\"id\":{},\"result\":{{\"profiles\":{}}}}}", id, holo_util::json::to_string(&arr))
+        }
+        "profiles.remove" => {
+            match engine.store.remove_profile(&pstr("id")) {
+                Ok(removed) => format!("{{\"jsonrpc\":\"2.0\",\"id\":{},\"result\":{{\"removed\":{}}}}}", id, removed),
+                Err(e) => RpcError::new(CODE_INTERNAL_ERROR, &e).to_json(id),
+            }
+        }
+        "configs.import" => {
+            match engine.import(&pstr("kind"), &pstr("data")) {
+                Ok(profiles) => {
+                    let arr = holo_util::Value::Arr(profiles.iter().map(|p| p.to_json()).collect());
+                    format!("{{\"jsonrpc\":\"2.0\",\"id\":{},\"result\":{{\"added\":{},\"profiles\":{}}}}}", id, profiles.len(), holo_util::json::to_string(&arr))
+                }
+                Err(e) => e.to_json(id),
+            }
+        }
+        // -- Material You bridge -------------------------------------------
+        "theme.get" => {
+            // params: {osTheme?: "dark"|"light"} — the system theme the
+            // frontend observed; used when theme_mode == "system".
+            let os_theme = params.get("osTheme").and_then(|x| x.as_str()).map(String::from);
+            let roles = engine.theme_hex_map(os_theme.as_deref());
+            let (mode, seed, dynamic) = {
+                let st = engine.settings.lock().unwrap();
+                (
+                    st.get("theme_mode").unwrap_or("system").to_string(),
+                    st.get("seed_color").unwrap_or("#6750A4").to_string(),
+                    st.get("dynamic_color").unwrap_or("true").to_string(),
+                )
+            };
+            let obj: std::collections::BTreeMap<String, holo_util::Value> = roles
+                .into_iter()
+                .map(|(k, v)| (k, holo_util::Value::s(v)))
+                .chain([
+                    ("_mode".to_string(), holo_util::Value::s(mode)),
+                    ("_seed".to_string(), holo_util::Value::s(seed)),
+                    ("_dynamic".to_string(), holo_util::Value::s(dynamic)),
+                ])
+                .collect();
+            format!(
+                "{{\"jsonrpc\":\"2.0\",\"id\":{},\"result\":{}}}",
+                id,
+                holo_util::json::to_string(&holo_util::Value::Obj(obj))
+            )
+        }
+        "settings.get" => {
+            let st = engine.settings.lock().unwrap();
+            format!("{{\"jsonrpc\":\"2.0\",\"id\":{},\"result\":{}}}", id, holo_util::json::to_string(&st.to_json()))
+        }
+        "settings.set" => {
+            let mut st = engine.settings.lock().unwrap();
+            if let Some(holo_util::Value::Obj(m)) = params.get("values") {
+                for (k, val) in m {
+                    if let Some(s) = val.as_str() {
+                        st.set(k.clone(), s);
+                    }
+                }
+            } else if let holo_util::Value::Obj(m) = &params {
+                for (k, val) in m {
+                    if let Some(s) = val.as_str() {
+                        st.set(k.clone(), s);
+                    }
+                }
+            }
+            let snapshot = st.clone();
+            drop(st);
+            let r = engine.store.save_settings(&snapshot);
+            match r {
+                Ok(()) => format!("{{\"jsonrpc\":\"2.0\",\"id\":{},\"result\":{}}}", id, holo_util::json::to_string(&snapshot.to_json())),
+                Err(e) => RpcError::new(CODE_INTERNAL_ERROR, &e).to_json(id),
+            }
+        }
+        _ => RpcError::new(CODE_METHOD_NOT_FOUND, &format!("method {}", method)).to_json(id),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// IPC client (holonetctl + tests)
+// ---------------------------------------------------------------------------
+
+pub struct IpcClient {
+    pub stream: TcpStream,
+    pub next_id: u64,
+}
+
+impl IpcClient {
+    pub fn connect(addr: &str, token: &str) -> std::io::Result<IpcClient> {
+        let stream = TcpStream::connect(addr)?;
+        let mut c = IpcClient { stream, next_id: 1 };
+        let hello = format!("{{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"hello\",\"params\":{{\"token\":\"{}\"}}}}\n", json_escape(token));
+        c.stream.write_all(hello.as_bytes())?;
+        let _ = c.read_response()?;
+        c.next_id = 2;
+        Ok(c)
+    }
+
+    pub fn request(&mut self, method: &str, params_json: &str) -> std::io::Result<String> {
+        let id = self.next_id;
+        self.next_id += 1;
+        let mut line = format!("{{\"jsonrpc\":\"2.0\",\"id\":{},\"method\":\"{}\"", id, json_escape(method));
+        if params_json != "{}" {
+            line.push_str(&format!(",\"params\":{}", params_json));
+        }
+        line.push_str("}\n");
+        self.stream.write_all(line.as_bytes())?;
+        self.read_response()
+    }
+
+    fn read_response(&mut self) -> std::io::Result<String> {
+        loop {
+            let mut line = String::new();
+            let mut r = BufReader::new(&self.stream);
+            r.read_line(&mut line)?;
+            let t = line.trim().to_string();
+            if t.is_empty() { continue; }
+            if t.contains("\"method\":\"event\"") { continue; }
+            return Ok(t);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ipc_roundtrip_auth_state_theme() {
+        let dir = std::env::temp_dir().join(format!("holonet-eng-{}", holo_config::new_id()));
+        let store = Store::new(&dir);
+        let engine = Engine::new(store);
+        let token = ensure_token(&dir).unwrap();
+        let ln = TcpListener::bind("127.127.0.1:0").unwrap();
+        let addr = ln.local_addr().unwrap().to_string();
+        let events = engine.take_event_receiver().unwrap();
+        serve_ipc(engine.clone(), ln, token.clone(), events);
+
+        // Unauthenticated → rejected.
+        let mut c0 = TcpStream::connect(&addr).unwrap();
+        c0.write_all(b"{\"jsonrpc\":\"2.0\",\"id\":9,\"method\":\"state.get\"}\n").unwrap();
+        let mut r = BufReader::new(c0);
+        let mut line = String::new();
+        r.read_line(&mut line).unwrap();
+        assert!(line.contains("authenticate with hello first"), "{}", line);
+
+        // Authenticated: import, list, theme.
+        let mut c = IpcClient::connect(&addr, &token).unwrap();
+        let st = c.request("state.get", "{}").unwrap();
+        assert!(st.contains("disconnected"), "{}", st);
+        let userinfo = holo_util::base64::encode_url(b"aes-256-gcm:pw");
+        let link = format!("ss://{}@example.com:8388#TestNode", userinfo);
+        let imp = c.request("configs.import", &format!("{{\"kind\":\"auto\",\"data\":\"{}\"}}", link)).unwrap();
+        assert!(imp.contains("TestNode"), "{}", imp);
+        let lst = c.request("profiles.list", "{}").unwrap();
+        assert!(lst.contains("TestNode"));
+
+        // theme.get: default seed, dark OS theme.
+        let theme = c.request("theme.get", "{\"osTheme\":\"dark\"}").unwrap();
+        assert!(theme.contains("\"_seed\":\"#6750A4\""), "{}", theme);
+        assert!(theme.contains("\"primary\""), "{}", theme);
+
+        // settings.set: change the seed → theme follows.
+        c.request("settings.set", "{\"values\":{\"seed_color\":\"#B3261E\"}}").unwrap();
+        let theme2 = c.request("theme.get", "{\"osTheme\":\"dark\"}").unwrap();
+        assert!(theme2.contains("\"_seed\":\"#B3261E\""), "{}", theme2);
+        assert_ne!(theme, theme2);
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn theme_light_vs_dark_and_seed_change() {
+        let dir = std::env::temp_dir().join(format!("holonet-eng2-{}", holo_config::new_id()));
+        let store = Store::new(&dir);
+        let engine = Engine::new(store);
+        let light = engine.theme_hex_map(Some("light"));
+        let dark = engine.theme_hex_map(Some("dark"));
+        let lp = light.iter().find(|(k, _)| k == "primary").unwrap();
+        let dp = dark.iter().find(|(k, _)| k == "primary").unwrap();
+        assert_ne!(lp, dp);
+        assert_ne!(light, dark);
+        let _ = std::fs::remove_dir_all(dir);
+    }
+}

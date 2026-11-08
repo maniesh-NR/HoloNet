@@ -1,0 +1,15 @@
+[package]
+name = "holonetd"
+version = "0.2.0"
+edition = "2021"
+license = "GPL-3.0"
+
+[[bin]]
+name = "holonetd"
+path = "src/main.rs"
+
+[dependencies]
+holo-util = { path = "../holo-util" }
+holo-proto = { path = "../holo-proto" }
+holo-config = { path = "../holo-config" }
+holo-engine = { path = "../holo-engine" }
