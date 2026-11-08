@@ -1,0 +1,15 @@
+plugins { id 'com.android.application'; id 'kotlin-android'; id 'dev.flutter.flutter-gradle-plugin' }
+android {
+    namespace 'net.holonet.app'
+    compileSdk 34
+    defaultConfig {
+        applicationId 'net.holonet.app'
+        minSdk 26            // Android 8.0 (Oreo)
+        targetSdk 34
+        versionCode 1
+        versionName '0.2.0'
+        ndk { abiFilters 'armeabi-v7a', 'arm64-v8a' }
+    }
+    buildTypes.release { minifyEnabled false }
+}
+flutter { source '../..' }
