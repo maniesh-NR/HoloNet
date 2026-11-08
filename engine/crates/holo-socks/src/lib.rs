@@ -239,13 +239,24 @@ impl SocksServer {
                         let srv = self.clone();
                         std::thread::spawn(move || srv.handle(sock));
                     }
+                    // WouldBlock: nothing queued. ConnectionAborted/Reset:
+                    // a queued connection died before accept — Windows and
+                    // macOS surface these as accept() errors (and Linux
+                    // does so occasionally as ECONNABORTED); they are
+                    // TRANSIENT and must never kill the accept loop, or
+                    // every later connect to this listener gets refused.
                     Err(ref e)
                         if e.kind() == std::io::ErrorKind::WouldBlock
-                            || e.kind() == std::io::ErrorKind::Interrupted =>
+                            || e.kind() == std::io::ErrorKind::Interrupted
+                            || e.kind() == std::io::ErrorKind::ConnectionAborted
+                            || e.kind() == std::io::ErrorKind::ConnectionReset =>
                     {
+                        std::thread::sleep(std::time::Duration::from_millis(10));
+                    }
+                    Err(e) => {
+                        eprintln!("holo-socks: accept error ({e}) — continuing");
                         std::thread::sleep(std::time::Duration::from_millis(50));
                     }
-                    Err(_) => return,
                 }
             }
         })
