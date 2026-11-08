@@ -23,17 +23,33 @@ jobs:
         run: |
           rustup toolchain install stable --profile minimal --no-self-update
           rustup default stable
-      - name: Tests
+      - name: Tests (holo-crypto)
+        run: cargo test -p holo-crypto
+      - name: Tests (holo-util)
+        run: cargo test -p holo-util
+      - name: Tests (holo-config)
+        run: cargo test -p holo-config
+      - name: Tests (holo-theme)
+        run: cargo test -p holo-theme
+      - name: Tests (holo-proto + holo-net)
         run: |
-          set -o pipefail
-          cargo test --workspace 2>&1 | tee test-output.txt
-      - name: Upload test log on failure
+          cargo test -p holo-proto
+          cargo test -p holo-net
+      - name: Tests (holo-ss)
+        run: cargo test -p holo-ss
+      - name: Tests (holo-socks)
+        run: cargo test -p holo-socks
+      - name: Tests (holo-engine units)
+        run: cargo test -p holo-engine --lib
+      - name: Tests (holo-engine integration)
+        run: cargo test -p holo-engine --test integration
+      - name: Tests (bins)
+        run: cargo test -p holonetctl -p holonetd
+      - name: Diagnostics on failure
         if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-log-${{ matrix.os }}
-          path: engine/test-output.txt
-          if-no-files-found: ignore
+        run: |
+          echo "::error::failing crate identified by which step failed; rerun locally with RUST_BACKTRACE=1 for details"
+          cargo test --workspace --no-run 2>&1 | tail -20
 
   cross-check:
     name: Cross-compile check (musl / Android)
