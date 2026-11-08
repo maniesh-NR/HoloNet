@@ -38,7 +38,17 @@ jobs:
       - name: Tests (holo-ss)
         run: cargo test -p holo-ss
       - name: Tests (holo-socks)
-        run: cargo test -p holo-socks
+        run: |
+          set -o pipefail
+          cargo test -p holo-socks -- --nocapture --test-threads=1 2>&1 | tee socks-test.log
+      - name: Upload socks test log on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          gh release view "ci-logs" > /dev/null 2>&1 || gh release create "ci-logs" --title "CI diagnostics (ephemeral)" --notes "Test failure logs — diagnostic releases, safe to ignore."
+          gh release upload "ci-logs" socks-test.log --clobber
       - name: Tests (holo-engine units)
         run: cargo test -p holo-engine --lib
       - name: Tests (holo-engine integration)
