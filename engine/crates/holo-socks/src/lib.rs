@@ -290,8 +290,11 @@ impl SocksServer {
                     std::io::ErrorKind::Unsupported => 0x07,
                     _ => 0x01,
                 };
-                let _ = write_reply(&mut sock, code);
+                // count BEFORE the client-visible reply — the reply is the
+                // last thing the waiter sees; counting after it lets a
+                // fast poll observe a stale counter (race found under load)
                 self.stats.refused.fetch_add(1, Ordering::Relaxed);
+                let _ = write_reply(&mut sock, code);
                 return;
             }
         };
@@ -659,7 +662,7 @@ mod tests {
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
         let snap = loop {
             let s = srv.stats.snapshot();
-            if s.2 >= 1 && s.0 >= 40_000 && s.1 >= 40_000 {
+            if s.2 >= 1 && s.0 >= 40_000 && s.1 >= 40_000 && s.3 >= 2 {
                 break s;
             }
             assert!(
