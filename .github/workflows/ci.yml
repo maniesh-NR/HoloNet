@@ -43,12 +43,11 @@ jobs:
       - name: Tests (holo-socks)
         run: |
           cargo test -p holo-socks -- --nocapture --test-threads=1 > socks-test.log 2>&1 || true
-          echo "=== log size: $(wc -l < socks-test.log) lines"
-          echo "=== HEAD of socks-test.log ==="
-          head -15 socks-test.log | while IFS= read -r line; do echo "::error::HEAD|${line:0:220}"; done
-          echo "=== TAIL of socks-test.log ==="
-          tail -25 socks-test.log | while IFS= read -r line; do echo "::error::TAIL|${line:0:220}"; done
-          grep -q "test result: ok" socks-test.log || exit 1
+          if ! grep -q "test result: ok" socks-test.log; then
+            echo "socks tests failed — dumping log as annotations"
+            tail -30 socks-test.log | while IFS= read -r line; do echo "::error::${line:0:220}"; done
+            exit 1
+          fi
       - name: Tests (holo-engine units)
         run: cargo test -p holo-engine --lib
       - name: Tests (holo-engine integration)
