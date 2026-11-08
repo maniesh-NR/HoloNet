@@ -1,0 +1,157 @@
+name: Release builds
+
+# Per-OS release binaries, all built with Rust 1.77.2:
+#   - Windows: Windows 7 SP1 compatible (Rust dropped Win7 in 1.78)
+#   - macOS:   10.15 Catalina compatible
+#   - Android: API 24 (Android 8.0) minimum
+# Triggers on the per-OS tags: v<version>-windows / -macos / -android.
+# Each job uploads its artifacts to the release for that tag (created
+# beforehand by the release tooling, or created here as a fallback).
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    name: Windows (x64 + x86, Win7-compatible)
+    if: endsWith(github.ref_name, '-windows')
+    runs-on: windows-2022
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust 1.77.2 (Windows 7 baseline)
+        run: |
+          rustup toolchain install 1.77.2 --profile minimal --no-self-update
+          rustup default 1.77.2
+          rustup target add x86_64-pc-windows-msvc i686-pc-windows-msvc
+      - name: Build
+        run: |
+          cargo build --release --manifest-path engine/Cargo.toml --target x86_64-pc-windows-msvc -p holonetd -p holonetctl
+          cargo build --release --manifest-path engine/Cargo.toml --target i686-pc-windows-msvc -p holonetd -p holonetctl
+      - name: Package
+        run: |
+          set -e
+          TAG="${GITHUB_REF_NAME}"
+          VER="${TAG%-windows}"
+          mkdir -p dist
+          for T in x86_64-pc-windows-msvc i686-pc-windows-msvc; do
+            if [ "$T" = "x86_64-pc-windows-msvc" ]; then ARCH=x64; else ARCH=x86; fi
+            NAME="holonet-$VER-windows-$ARCH"
+            mkdir -p "dist/$NAME"
+            cp "engine/target/$T/release/holonetd.exe" "engine/target/$T/release/holonetctl.exe" "dist/$NAME/"
+            cp README.md LICENSE ATTRIBUTION.md "dist/$NAME/"
+            (cd dist && 7z a "$NAME.zip" "$NAME" > /dev/null)
+          done
+          ls -la dist
+      - name: Upload to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          TAG="${GITHUB_REF_NAME}"
+          gh release view "$TAG" > /dev/null 2>&1 || gh release create "$TAG" --title "HoloNet $TAG" --notes "Automated Windows build for $TAG (Rust 1.77.2, Windows 7 SP1 compatible)."
+          gh release upload "$TAG" dist/*.zip --clobber
+
+  macos:
+    name: macOS (x64 + arm64, Catalina-compatible)
+    if: endsWith(github.ref_name, '-macos')
+    runs-on: macos-latest
+    env:
+      MACOSX_DEPLOYMENT_TARGET: '10.15'
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust 1.77.2 (Catalina baseline)
+        run: |
+          rustup toolchain install 1.77.2 --profile minimal --no-self-update
+          rustup default 1.77.2
+          rustup target add x86_64-apple-darwin aarch64-apple-darwin
+      - name: Build
+        run: |
+          cargo build --release --manifest-path engine/Cargo.toml --target x86_64-apple-darwin -p holonetd -p holonetctl
+          cargo build --release --manifest-path engine/Cargo.toml --target aarch64-apple-darwin -p holonetd -p holonetctl
+      - name: Package
+        run: |
+          set -e
+          TAG="${GITHUB_REF_NAME}"
+          VER="${TAG%-macos}"
+          mkdir -p dist
+          for T in x86_64-apple-darwin aarch64-apple-darwin; do
+            if [ "$T" = "aarch64-apple-darwin" ]; then ARCH=arm64; else ARCH=x64; fi
+            NAME="holonet-$VER-macos-$ARCH"
+            mkdir -p "dist/$NAME"
+            cp "engine/target/$T/release/holonetd" "engine/target/$T/release/holonetctl" "dist/$NAME/"
+            cp README.md LICENSE ATTRIBUTION.md "dist/$NAME/"
+            (cd dist && tar -czf "$NAME.tar.gz" "$NAME")
+          done
+          ls -la dist
+      - name: Upload to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          TAG="${GITHUB_REF_NAME}"
+          gh release view "$TAG" > /dev/null 2>&1 || gh release create "$TAG" --title "HoloNet $TAG" --notes "Automated macOS build for $TAG (Rust 1.77.2, macOS 10.15 Catalina compatible)."
+          gh release upload "$TAG" dist/*.tar.gz --clobber
+
+  android:
+    name: Android (arm64 + armv7 engine, API 24+)
+    if: endsWith(github.ref_name, '-android')
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust 1.77.2 + NDK
+        run: |
+          rustup toolchain install 1.77.2 --profile minimal --no-self-update
+          rustup default 1.77.2
+          rustup target add aarch64-linux-android armv7-linux-androideabi
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;27.0.12077973" > /dev/null
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.0.12077973" >> "$GITHUB_ENV"
+      - name: Build
+        run: |
+          set -e
+          NDKBIN="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$NDKBIN/aarch64-linux-android24-clang"
+          export CARGO_TARGET_ARMV7_LINUX_ANDROIDEABI_LINKER="$NDKBIN/armv7a-linux-androideabi24-clang"
+          cargo build --release --manifest-path engine/Cargo.toml --target aarch64-linux-android -p holonetd -p holonetctl
+          cargo build --release --manifest-path engine/Cargo.toml --target armv7-linux-androideabi -p holonetd -p holonetctl
+      - name: Package
+        run: |
+          set -e
+          TAG="${GITHUB_REF_NAME}"
+          VER="${TAG%-android}"
+          mkdir -p dist
+          for T in aarch64-linux-android armv7-linux-androideabi; do
+            if [ "$T" = "aarch64-linux-android" ]; then ARCH=arm64; else ARCH=armv7; fi
+            NAME="holonet-$VER-android-$ARCH"
+            mkdir -p "dist/$NAME"
+            cp "engine/target/$T/release/holonetd" "engine/target/$T/release/holonetctl" "dist/$NAME/"
+            cp README.md LICENSE ATTRIBUTION.md "dist/$NAME/"
+            printf '%s\n' \
+              'HoloNet engine for Android (API 24+, i.e. Android 8.0+).' \
+              'Run under adb shell / Termux. The Flutter APK (app_flutter/)' \
+              'builds from source with the Flutter SDK — see docs/BUILDING.md.' > "dist/$NAME/README.txt"
+            (cd dist && tar -czf "$NAME.tar.gz" "$NAME")
+          done
+          ls -la dist
+      - name: Upload to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          TAG="${GITHUB_REF_NAME}"
+          gh release view "$TAG" > /dev/null 2>&1 || gh release create "$TAG" --title "HoloNet $TAG" --notes "Automated Android engine build for $TAG (Rust 1.77.2, API 24+)."
+          gh release upload "$TAG" dist/*.tar.gz --clobber

@@ -1,0 +1,53 @@
+# Rust / cargo
+engine/target/
+**/target/
+Cargo.lock.bak
+
+# Build outputs
+dist/
+build/
+out/
+*.app/
+*.dmg/
+*.msi
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Flutter
+.dart_tool/
+.flutter-plugins*
+.packages
+app_flutter/build/
+app_flutter/.idea/
+app_flutter/android/.gradle/
+app_flutter/android/local.properties
+app_flutter/android/key.properties
+*.jks
+*.keystore
+
+# Kotlin / Gradle
+.gradle/
+local.properties
+*.kotlin_metadata
+
+# Qt / CMake
+CMakeFiles/
+CMakeUserPresets.json
+*.user
+*.autosave
+moc_*.cpp
+qrc_*.cpp
+Makefile*
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Local secrets — never commit
+**/ipc-token
+**/*.log
