@@ -45,7 +45,7 @@ jobs:
           set -o pipefail
           cargo test -p holo-socks -- --nocapture --test-threads=1 2>&1 | tee socks-test.log || true
           # surface the failure text as error annotations (readable via API)
-          grep -E "FAILED|panicked at|assertion|left:|right:|error\[" socks-test.log | head -25 | while IFS= read -r line; do
+          grep -E "FAILED|panicked at|assertion|left:|right:|called .Result|Os \{|Custom \{|Connection|TimedOut|WouldBlock|AddrNot|error\[" socks-test.log | head -30 | while IFS= read -r line; do
             echo "::error::${line:0:200}"
           done
           grep -q "test result: ok" socks-test.log || exit 1
