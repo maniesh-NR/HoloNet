@@ -1,0 +1,8 @@
+[package]
+name = "holo-crypto"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "HoloNet crypto: hashes, MACs, KDFs, AEAD — pure std, hand-written with RFC/NIST vectors"
+
+[dependencies]

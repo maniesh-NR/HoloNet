@@ -1,11 +1,19 @@
 [package]
 name = "holo-engine"
-version = "0.2.0"
-edition = "2021"
-license = "GPL-3.0"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "HoloNet daemon core: IPC, Material You bridge, live data-plane sessions"
 
 [dependencies]
-holo-util = { path = "../holo-util" }
-holo-proto = { path = "../holo-proto" }
 holo-config = { path = "../holo-config" }
+holo-proto = { path = "../holo-proto" }
+holo-ss = { path = "../holo-ss" }
+holo-socks = { path = "../holo-socks" }
 holo-theme = { path = "../holo-theme" }
+holo-util = { path = "../holo-util" }
+
+[dev-dependencies]
+holo-net = { path = "../holo-net" }
+holo-ss = { path = "../holo-ss" }
+holo-util = { path = "../holo-util" }

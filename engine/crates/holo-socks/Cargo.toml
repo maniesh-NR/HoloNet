@@ -1,0 +1,11 @@
+[package]
+name = "holo-socks"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "HoloNet local proxy: RFC 1928/1929 SOCKS5 server with DRR-fair shaping and pooled relaying"
+
+[dependencies]
+holo-net = { path = "../holo-net" }
+holo-proto = { path = "../holo-proto" }
+holo-util = { path = "../holo-util" }

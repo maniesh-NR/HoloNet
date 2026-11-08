@@ -2,9 +2,12 @@
 use std::net::TcpListener;
 
 fn main() {
-    println!("HoloNet daemon (holonetd) 0.2.0 — GPL-3.0");
+    println!("HoloNet daemon (holonetd) 0.3.0 — GPL-3.0");
     let data_dir = std::env::var("HOLONET_DATA").unwrap_or_else(|_| {
-        format!("{}/.config/holonet", std::env::var("HOME").unwrap_or_else(|_| ".".to_string()))
+        format!(
+            "{}/.config/holonet",
+            std::env::var("HOME").unwrap_or_else(|_| ".".to_string())
+        )
     });
     let data_dir = std::path::PathBuf::from(data_dir);
     println!("data dir: {}", data_dir.display());
@@ -31,8 +34,10 @@ fn main() {
     let events = engine.take_event_receiver().unwrap();
     holo_engine::serve_ipc(engine.clone(), listener, token, events);
     let st = engine.settings.lock().unwrap();
+    println!("control channel listening on {addr} (token file: <dataDir>/ipc-token)",);
     println!(
-        "control channel listening on {addr} (token file: <dataDir>/ipc-token)",
+        "proxy: {} (live: shadowsocks AEAD; others report milestones)",
+        st.get("proxy_listen").unwrap_or("127.0.0.1:2080"),
     );
     println!(
         "Material You: mode={} seed={} dynamic={}",

@@ -18,7 +18,10 @@ pub fn parse(text: &str) -> Result<Vec<Profile>, String> {
         }
     }
     if out.is_empty() {
-        return Err(format!("links: no profiles parsed ({})", errs.first().cloned().unwrap_or_default()));
+        return Err(format!(
+            "links: no profiles parsed ({})",
+            errs.first().cloned().unwrap_or_default()
+        ));
     }
     Ok(out)
 }
@@ -68,7 +71,9 @@ fn split_url(rest: &str) -> (String, Vec<(String, String)>, String) {
     };
     let mut query = Vec::new();
     for pair in query_str.split('&') {
-        if pair.is_empty() { continue; }
+        if pair.is_empty() {
+            continue;
+        }
         let (k, v) = match pair.find('=') {
             Some(p) => (&pair[..p], &pair[p + 1..]),
             None => (pair, ""),
@@ -95,11 +100,17 @@ fn parse_hostport(s: &str) -> (String, u16) {
     if let Some(rb) = s.rfind(']') {
         // [v6]:port
         let host = s[1..rb].to_string();
-        let port = s[rb + 1..].strip_prefix(':').and_then(|p| p.parse().ok()).unwrap_or(0);
+        let port = s[rb + 1..]
+            .strip_prefix(':')
+            .and_then(|p| p.parse().ok())
+            .unwrap_or(0);
         return (host, port);
     }
     match s.rfind(':') {
-        Some(p) => (s[..p].trim_matches(['[', ']']).to_string(), s[p + 1..].parse().unwrap_or(0)),
+        Some(p) => (
+            s[..p].trim_matches(['[', ']']).to_string(),
+            s[p + 1..].parse().unwrap_or(0),
+        ),
         None => (s.trim_matches(['[', ']']).to_string(), 0),
     }
 }
@@ -124,10 +135,14 @@ fn parse_ss(rest: &str) -> Result<P, String> {
         // Legacy: whole authority is base64(method:password@host:port)
         let decoded = base64::decode(&authority).map_err(|e| format!("links/ss: {}", e))?;
         let text = String::from_utf8_lossy(&decoded).to_string();
-        let at = text.rfind('@').ok_or("links/ss: legacy payload lacks '@'")?;
+        let at = text
+            .rfind('@')
+            .ok_or("links/ss: legacy payload lacks '@'")?;
         let (mp, hp) = (&text[..at], &text[at + 1..]);
         let (h, p) = parse_hostport(hp);
-        let (m, pw) = mp.split_once(':').ok_or("links/ss: no ':' in method:password")?;
+        let (m, pw) = mp
+            .split_once(':')
+            .ok_or("links/ss: no ':' in method:password")?;
         let mut params = Params::new();
         params.insert("method".into(), pct_decode(m));
         params.insert("password".into(), pct_decode(pw));
@@ -139,7 +154,9 @@ fn parse_ss(rest: &str) -> Result<P, String> {
     if let Some(plugin) = qget(&query, "plugin") {
         let mut tokens = plugin.split(';');
         if let Some(n) = tokens.next() {
-            if !n.is_empty() { params.insert("plugin".into(), n.to_string()); }
+            if !n.is_empty() {
+                params.insert("plugin".into(), n.to_string());
+            }
         }
         for t in tokens {
             if let Some(eq) = t.find('=') {
@@ -158,11 +175,29 @@ fn parse_vmess(rest: &str) -> Result<P, String> {
     let text = String::from_utf8_lossy(&decoded).to_string();
     let v = Value::parse(&text).map_err(|e| format!("links/vmess: bad JSON: {}", e))?;
     let host = v.str_or("add", "").to_string();
-    let port: u16 = v.str_or("port", "0").trim().parse().map_err(|_| "links/vmess: bad port")?;
+    let port: u16 = v
+        .str_or("port", "0")
+        .trim()
+        .parse()
+        .map_err(|_| "links/vmess: bad port")?;
     let mut params = Params::new();
-    for (k, dst) in [("id", "uuid"), ("aid", "aid"), ("scy", "scy"), ("net", "network"), ("type", "type"), ("host", "host"), ("path", "path"), ("tls", "tls"), ("sni", "sni"), ("alpn", "alpn"), ("fp", "fp")] {
+    for (k, dst) in [
+        ("id", "uuid"),
+        ("aid", "aid"),
+        ("scy", "scy"),
+        ("net", "network"),
+        ("type", "type"),
+        ("host", "host"),
+        ("path", "path"),
+        ("tls", "tls"),
+        ("sni", "sni"),
+        ("alpn", "alpn"),
+        ("fp", "fp"),
+    ] {
         if let Some(s) = v.get(k).and_then(|x| x.as_str()) {
-            if !s.is_empty() { params.insert(dst.into(), s.to_string()); }
+            if !s.is_empty() {
+                params.insert(dst.into(), s.to_string());
+            }
         }
     }
     if params.get("tls").is_none() {
@@ -178,9 +213,24 @@ fn parse_vless(rest: &str) -> Result<P, String> {
     let uuid = userinfo.ok_or("links/vless: missing uuid")?;
     let mut params = Params::new();
     params.insert("uuid".into(), uuid);
-    for (k, dst) in [("security", "security"), ("sni", "sni"), ("fp", "fp"), ("pbk", "pbk"), ("sid", "sid"), ("spx", "spx"), ("flow", "flow"), ("type", "network"), ("path", "path"), ("host", "host"), ("serviceName", "service_name"), ("encryption", "encryption")] {
+    for (k, dst) in [
+        ("security", "security"),
+        ("sni", "sni"),
+        ("fp", "fp"),
+        ("pbk", "pbk"),
+        ("sid", "sid"),
+        ("spx", "spx"),
+        ("flow", "flow"),
+        ("type", "network"),
+        ("path", "path"),
+        ("host", "host"),
+        ("serviceName", "service_name"),
+        ("encryption", "encryption"),
+    ] {
         if let Some(v) = qget(&query, k) {
-            if !v.is_empty() { params.insert(dst.into(), v); }
+            if !v.is_empty() {
+                params.insert(dst.into(), v);
+            }
         }
     }
     if params.get("security").is_none() {
@@ -195,8 +245,12 @@ fn parse_trojan(rest: &str) -> Result<P, String> {
     let password = userinfo.ok_or("links/trojan: missing password")?;
     let mut params = Params::new();
     params.insert("password".into(), pct_decode(&password));
-    if let Some(sni) = qget(&query, "sni") { params.insert("sni".into(), sni); }
-    if let Some(t) = qget(&query, "type") { params.insert("network".into(), t); }
+    if let Some(sni) = qget(&query, "sni") {
+        params.insert("sni".into(), sni);
+    }
+    if let Some(t) = qget(&query, "type") {
+        params.insert("network".into(), t);
+    }
     Ok(profile("trojan", &host, port, &name, params))
 }
 
@@ -204,12 +258,24 @@ fn parse_hysteria2(rest: &str) -> Result<P, String> {
     let (authority, query, name) = split_url(rest);
     let (userinfo, host, port) = split_authority(&authority);
     let mut params = Params::new();
-    if let Some(auth) = userinfo { params.insert("auth".into(), pct_decode(&auth)); }
-    if let Some(obfs) = qget(&query, "obfs") { params.insert("obfs".into(), obfs); }
-    if let Some(p) = qget(&query, "obfs-password") { params.insert("obfs_password".into(), p); }
-    if let Some(sni) = qget(&query, "sni") { params.insert("sni".into(), sni); }
-    if let Some(i) = qget(&query, "insecure") { params.insert("insecure".into(), i); }
-    if let Some(pin) = qget(&query, "pinSHA256") { params.insert("pin_sha256".into(), pin); }
+    if let Some(auth) = userinfo {
+        params.insert("auth".into(), pct_decode(&auth));
+    }
+    if let Some(obfs) = qget(&query, "obfs") {
+        params.insert("obfs".into(), obfs);
+    }
+    if let Some(p) = qget(&query, "obfs-password") {
+        params.insert("obfs_password".into(), p);
+    }
+    if let Some(sni) = qget(&query, "sni") {
+        params.insert("sni".into(), sni);
+    }
+    if let Some(i) = qget(&query, "insecure") {
+        params.insert("insecure".into(), i);
+    }
+    if let Some(pin) = qget(&query, "pinSHA256") {
+        params.insert("pin_sha256".into(), pin);
+    }
     Ok(profile("hysteria2", &host, port, &name, params))
 }
 
@@ -217,12 +283,22 @@ fn parse_tuic(rest: &str) -> Result<P, String> {
     let (authority, query, name) = split_url(rest);
     let (userinfo, host, port) = split_authority(&authority);
     let creds = userinfo.ok_or("links/tuic: missing uuid:password")?;
-    let (uuid, password) = creds.split_once(':').ok_or("links/tuic: no ':' in credentials")?;
+    let (uuid, password) = creds
+        .split_once(':')
+        .ok_or("links/tuic: no ':' in credentials")?;
     let mut params = Params::new();
     params.insert("uuid".into(), uuid.to_string());
     params.insert("password".into(), pct_decode(password));
-    for (k, dst) in [("congestion_control", "congestion_control"), ("udp_relay_mode", "udp_relay_mode"), ("alpn", "alpn"), ("sni", "sni"), ("allow_insecure", "insecure")] {
-        if let Some(v) = qget(&query, k) { params.insert(dst.into(), v); }
+    for (k, dst) in [
+        ("congestion_control", "congestion_control"),
+        ("udp_relay_mode", "udp_relay_mode"),
+        ("alpn", "alpn"),
+        ("sni", "sni"),
+        ("allow_insecure", "insecure"),
+    ] {
+        if let Some(v) = qget(&query, k) {
+            params.insert(dst.into(), v);
+        }
     }
     Ok(profile("tuic", &host, port, &name, params))
 }
@@ -232,11 +308,21 @@ fn parse_wireguard(rest: &str) -> Result<P, String> {
     let (authority, query, name) = split_url(rest);
     let (userinfo, host, port) = split_authority(&authority);
     let mut params = Params::new();
-    if let Some(pk) = userinfo { params.insert("private_key".into(), pk); }
-    if let Some(a) = qget(&query, "address") { params.insert("address".into(), a); }
-    if let Some(pk) = qget(&query, "public-key") { params.insert("peer_public_key".into(), pk); }
-    if let Some(psk) = qget(&query, "preshared-key") { params.insert("preshared_key".into(), psk); }
-    if let Some(r) = qget(&query, "reserved") { params.insert("reserved".into(), r); }
+    if let Some(pk) = userinfo {
+        params.insert("private_key".into(), pk);
+    }
+    if let Some(a) = qget(&query, "address") {
+        params.insert("address".into(), a);
+    }
+    if let Some(pk) = qget(&query, "public-key") {
+        params.insert("peer_public_key".into(), pk);
+    }
+    if let Some(psk) = qget(&query, "preshared-key") {
+        params.insert("preshared_key".into(), psk);
+    }
+    if let Some(r) = qget(&query, "reserved") {
+        params.insert("reserved".into(), r);
+    }
     Ok(profile("wireguard", &host, port, &name, params))
 }
 
@@ -275,9 +361,15 @@ mod tests {
         let ps = parse_line(link).unwrap();
         let p = &ps[0];
         assert_eq!(p.driver, "vless");
-        assert_eq!(get_or_empty(&p.params, "uuid"), "b831381d-6324-4d53-ad4f-8cda48b30811");
+        assert_eq!(
+            get_or_empty(&p.params, "uuid"),
+            "b831381d-6324-4d53-ad4f-8cda48b30811"
+        );
         assert_eq!(get_or_empty(&p.params, "security"), "reality");
-        assert_eq!(get_or_empty(&p.params, "pbk"), "SbVKOEMjK0sIlbwg4akyBg5mL5KZwwB-ed4eEE7YnRc");
+        assert_eq!(
+            get_or_empty(&p.params, "pbk"),
+            "SbVKOEMjK0sIlbwg4akyBg5mL5KZwwB-ed4eEE7YnRc"
+        );
         assert_eq!(get_or_empty(&p.params, "flow"), "xtls-rprx-vision");
     }
 
@@ -286,7 +378,8 @@ mod tests {
         let ps = parse_line("trojan://s3cret@example.com:443?sni=cdn.example.com#tj").unwrap();
         assert_eq!(get_or_empty(&ps[0].params, "password"), "s3cret");
         assert_eq!(get_or_empty(&ps[0].params, "sni"), "cdn.example.com");
-        let ps = parse_line("hy2://auth@h.example.com:8443?obfs=salamander&obfs-password=xyz#hy").unwrap();
+        let ps = parse_line("hy2://auth@h.example.com:8443?obfs=salamander&obfs-password=xyz#hy")
+            .unwrap();
         assert_eq!(ps[0].driver, "hysteria2");
         assert_eq!(get_or_empty(&ps[0].params, "obfs"), "salamander");
     }
@@ -294,7 +387,10 @@ mod tests {
     #[test]
     fn multiline_subscription() {
         let userinfo = base64::encode_url(b"aes-256-gcm:x");
-        let text = format!("ss://{}@a.com:1#A\nss://{}@b.com:2#B\n# comment", userinfo, userinfo);
+        let text = format!(
+            "ss://{}@a.com:1#A\nss://{}@b.com:2#B\n# comment",
+            userinfo, userinfo
+        );
         let ps = parse(&text).unwrap();
         assert_eq!(ps.len(), 2);
     }

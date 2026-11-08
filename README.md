@@ -7,7 +7,7 @@
 [![Rust](https://img.shields.io/badge/engine-Rust%201.77%2B-orange.svg)](engine/Cargo.toml)
 [![Platforms](https://img.shields.io/badge/platforms-Win7%20%E2%80%93%2011%20%7C%20macOS%2010.15%2B%20%7C%20Linux%20%7C%20Android%208%2B-lightgrey.svg)](#platform-matrix)
 [![Crates](https://img.shields.io/badge/dependencies-0%20third--party%20crates-success.svg)](ATTRIBUTION.md)
-[![Tests](https://img.shields.io/badge/tests-28%2F28%20green-brightgreen.svg)](#status--honesty)
+[![Tests](https://img.shields.io/badge/tests-71%2F71%20green-brightgreen.svg)](#status--honesty)
 
 HoloNet pairs a Rust engine (`holonetd`) with native frontends: Flutter for
 Android, Kotlin Multiplatform (Compose) for macOS, and Qt 6/QML for Windows
@@ -26,7 +26,33 @@ Flutter (Android)   Compose (macOS)   Qt6/QML (Win+Linux)
               holonetd (Rust) — theme.get / settings.set
 ```
 
-## The Material You pipeline (this release's centerpiece)
+## What's new in v0.3.0 — the first live data plane
+
+- **holo-crypto**: hand-written, std-only ChaCha20 / Poly1305 / AEAD /
+  XChaCha20 / AES-256-GCM / SHA-2 / HMAC / HKDF, validated against RFC &
+  NIST vectors (and cross-checked against OpenSSL). Zero dependencies.
+- **holo-net**: transport techniques from the published literature —
+  RFC 6298 RTT/RTO, CUBIC (SIGOPS 2008) + HyStart++ (RFC 9065), BBR (CACM
+  2017, model portion), Deficit Round Robin fair queuing (SIGCOMM '95),
+  CoDel AQM (ACM Queue 2012), token-bucket pacing, traffic-analysis
+  padding, active-probe guard. Validated with deterministic bottleneck-link
+  simulations. Citations and wiring map: [docs/TECHNIQUES.md](docs/TECHNIQUES.md).
+- **holo-ss**: the first live protocol — Shadowsocks AEAD (SIP004, wire
+  format) client dialer + server relay, three ciphers
+  (`chacha20-ietf-poly1305`, `xchacha20-ietf-poly1305`, `aes-256-gcm`),
+  strict-fail anti-probing (opaque errors, oversized-length rejection,
+  per-peer exponential backoff, randomized slow-close).
+- **holo-socks**: RFC 1928/1929 local SOCKS5 entry point whose relay is
+  pooled (steady state allocates nothing: **64 MB relayed → RSS +376 KB**)
+  and DRR-fair under a user-configured rate limit (`relay.max_rate_kbps`).
+- **Engine wiring**: `session.connect` probes the server, starts the local
+  SOCKS listener from `proxy_listen`, and reports honest per-driver
+  milestone errors for every protocol that is not live yet.
+- **71/71 tests green**, including 6 end-to-end integration tests over
+  real loopback TCP (IPC → import → connect → SOCKS → AEAD tunnel → echo →
+  stats → disconnect) plus throughput and memory-bounding regressions.
+
+## The Material You pipeline (v0.2.0's centerpiece)
 
 1. **`engine/crates/holo-theme`** — the reference implementation, tested
    (28 tests): sRGB ↔ CIELAB, chroma gamut mapping, six tonal palettes

@@ -4,7 +4,7 @@ const URL: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz012
 
 pub fn encode_alphabet(data: &[u8], url_safe: bool, pad: bool) -> String {
     let alpha = if url_safe { URL } else { STD };
-    let mut out = String::with_capacity((data.len() + 2) / 3 * 4);
+    let mut out = String::with_capacity(data.len().div_ceil(3) * 4);
     for chunk in data.chunks(3) {
         let b0 = chunk[0] as u32;
         let b1 = *chunk.get(1).unwrap_or(&0) as u32;
@@ -53,11 +53,16 @@ pub fn decode(s: &str) -> Result<Vec<u8>, String> {
     for chunk in vals.chunks(4) {
         match chunk.len() {
             4 => {
-                let n = ((chunk[0] as u32) << 18) | ((chunk[1] as u32) << 12) | ((chunk[2] as u32) << 6) | chunk[3] as u32;
+                let n = ((chunk[0] as u32) << 18)
+                    | ((chunk[1] as u32) << 12)
+                    | ((chunk[2] as u32) << 6)
+                    | chunk[3] as u32;
                 out.extend_from_slice(&[(n >> 16) as u8, (n >> 8) as u8, n as u8]);
             }
             3 => {
-                let n = ((chunk[0] as u32) << 18) | ((chunk[1] as u32) << 12) | ((chunk[2] as u32) << 6);
+                let n = ((chunk[0] as u32) << 18)
+                    | ((chunk[1] as u32) << 12)
+                    | ((chunk[2] as u32) << 6);
                 out.extend_from_slice(&[(n >> 16) as u8, (n >> 8) as u8]);
             }
             2 => {

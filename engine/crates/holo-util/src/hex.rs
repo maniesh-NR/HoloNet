@@ -9,13 +9,17 @@ pub fn encode(data: &[u8]) -> String {
 
 pub fn decode(s: &str) -> Result<Vec<u8>, String> {
     let cleaned: Vec<u8> = s.bytes().filter(|b| !b.is_ascii_whitespace()).collect();
-    if cleaned.len() % 2 != 0 {
+    if !cleaned.len().is_multiple_of(2) {
         return Err("hex: odd length".into());
     }
     (0..cleaned.len() / 2)
         .map(|i| {
-            let hi = (cleaned[2 * i] as char).to_digit(16).ok_or("hex: bad digit")?;
-            let lo = (cleaned[2 * i + 1] as char).to_digit(16).ok_or("hex: bad digit")?;
+            let hi = (cleaned[2 * i] as char)
+                .to_digit(16)
+                .ok_or("hex: bad digit")?;
+            let lo = (cleaned[2 * i + 1] as char)
+                .to_digit(16)
+                .ok_or("hex: bad digit")?;
             Ok(((hi << 4) | lo) as u8)
         })
         .collect()

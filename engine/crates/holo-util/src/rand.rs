@@ -25,7 +25,7 @@ fn next_u64() -> u64 {
         .map(|d| d.as_nanos() as u64)
         .unwrap_or(0)
         ^ (std::process::id() as u64) << 32
-        ^ COUNTER.fetch_add(1, Ordering::Relaxed) as u64;
+        ^ COUNTER.fetch_add(1, Ordering::Relaxed);
     splitmix64(&mut st)
 }
 
@@ -51,7 +51,10 @@ pub fn hex(n: usize) -> String {
 
 pub fn alnum(n: usize) -> String {
     const CS: &[u8] = b"abcdefghijklmnopqrstuvwxyz0123456789";
-    bytes(n).iter().map(|b| CS[(*b as usize) % CS.len()] as char).collect()
+    bytes(n)
+        .iter()
+        .map(|b| CS[(*b as usize) % CS.len()] as char)
+        .collect()
 }
 
 #[cfg(test)]

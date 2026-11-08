@@ -1,0 +1,12 @@
+[package]
+name = "holo-ss"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "HoloNet Shadowsocks AEAD data plane: client dialer + server relay (SIP004 framing, wire-compatible)"
+
+[dependencies]
+holo-crypto = { path = "../holo-crypto" }
+holo-net = { path = "../holo-net" }
+holo-proto = { path = "../holo-proto" }
+holo-util = { path = "../holo-util" }

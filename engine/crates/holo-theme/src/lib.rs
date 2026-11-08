@@ -112,13 +112,21 @@ impl Lab {
     /// Kept for the palette API symmetry (tests and future palettes use it).
     #[allow(dead_code)]
     fn at_tone(self, tone: f64) -> Lab {
-        Lab { l: tone, a: self.a, b: self.b }
+        Lab {
+            l: tone,
+            a: self.a,
+            b: self.b,
+        }
     }
 
     /// Lab at the given hue (degrees) and chroma with tone unchanged.
     fn at_hue_chroma(self, hue_deg: f64, chroma: f64) -> Lab {
         let (s, c) = hue_deg.to_radians().sin_cos();
-        Lab { l: self.l, a: chroma * c, b: chroma * s }
+        Lab {
+            l: self.l,
+            a: chroma * c,
+            b: chroma * s,
+        }
     }
 }
 
@@ -173,10 +181,18 @@ fn lab_to_srgb_clamped(lab: Lab) -> Argb {
     let mut lo = 0.0f64;
     let mut hi = 1.0f64;
     // Squeeze chroma toward neutral until in gamut (24 iterations ≈ exact).
-    let mut best = Lab { a: 0.0, b: 0.0, ..lab };
+    let mut best = Lab {
+        a: 0.0,
+        b: 0.0,
+        ..lab
+    };
     for _ in 0..24 {
         let mid = (lo + hi) / 2.0;
-        let candidate = Lab { a: lab.a * mid, b: lab.b * mid, l: lab.l };
+        let candidate = Lab {
+            a: lab.a * mid,
+            b: lab.b * mid,
+            l: lab.l,
+        };
         if lab_in_gamut(candidate) {
             best = candidate;
             lo = mid;
@@ -251,12 +267,19 @@ pub struct TonalPalette {
 impl TonalPalette {
     /// A palette at `hue` degrees with `chroma`.
     pub fn new(hue: f64, chroma: f64) -> TonalPalette {
-        TonalPalette { hue: hue.rem_euclid(360.0), chroma }
+        TonalPalette {
+            hue: hue.rem_euclid(360.0),
+            chroma,
+        }
     }
 
     /// The palette color at `tone` (0–100 = L\*).
     pub fn tone(&self, tone: f64) -> Argb {
-        let neutral = Lab { l: tone, a: 0.0, b: 0.0 };
+        let neutral = Lab {
+            l: tone,
+            a: 0.0,
+            b: 0.0,
+        };
         let colored = neutral.at_hue_chroma(self.hue, self.chroma);
         lab_to_srgb_clamped(colored)
     }
@@ -358,8 +381,30 @@ pub struct Scheme {
 /// on=T20/container=T30; surfaces on the neutral palette).
 pub fn scheme(p: &Palettes, mode: Mode) -> Scheme {
     let m = match mode {
-        Mode::Light => LightDark { p: 40.0, on: 100.0, c: 90.0, on_c: 10.0, s: 98.0, on_s: 10.0, sv: 90.0, on_sv: 30.0, inv: 20.0, inv_on: 95.0 },
-        Mode::Dark => LightDark { p: 80.0, on: 20.0, c: 30.0, on_c: 90.0, s: 6.0, on_s: 90.0, sv: 30.0, on_sv: 80.0, inv: 90.0, inv_on: 20.0 },
+        Mode::Light => LightDark {
+            p: 40.0,
+            on: 100.0,
+            c: 90.0,
+            on_c: 10.0,
+            s: 98.0,
+            on_s: 10.0,
+            sv: 90.0,
+            on_sv: 30.0,
+            inv: 20.0,
+            inv_on: 95.0,
+        },
+        Mode::Dark => LightDark {
+            p: 80.0,
+            on: 20.0,
+            c: 30.0,
+            on_c: 90.0,
+            s: 6.0,
+            on_s: 90.0,
+            sv: 30.0,
+            on_sv: 80.0,
+            inv: 90.0,
+            inv_on: 20.0,
+        },
     };
     Scheme {
         primary: p.primary.tone(m.p),
@@ -384,13 +429,27 @@ pub fn scheme(p: &Palettes, mode: Mode) -> Scheme {
         on_surface: p.neutral.tone(m.on_s),
         surface_variant: p.neutral_variant.tone(m.sv),
         on_surface_variant: p.neutral_variant.tone(m.on_sv),
-        outline: p.neutral_variant.tone(if mode == Mode::Light { 50.0 } else { 60.0 }),
-        outline_variant: p.neutral_variant.tone(if mode == Mode::Light { 80.0 } else { 30.0 }),
-        surface_container_lowest: p.neutral.tone(if mode == Mode::Light { 100.0 } else { 4.0 }),
-        surface_container_low: p.neutral.tone(if mode == Mode::Light { 96.0 } else { 10.0 }),
-        surface_container: p.neutral.tone(if mode == Mode::Light { 94.0 } else { 12.0 }),
-        surface_container_high: p.neutral.tone(if mode == Mode::Light { 92.0 } else { 17.0 }),
-        surface_container_highest: p.neutral.tone(if mode == Mode::Light { 90.0 } else { 22.0 }),
+        outline: p
+            .neutral_variant
+            .tone(if mode == Mode::Light { 50.0 } else { 60.0 }),
+        outline_variant: p
+            .neutral_variant
+            .tone(if mode == Mode::Light { 80.0 } else { 30.0 }),
+        surface_container_lowest: p
+            .neutral
+            .tone(if mode == Mode::Light { 100.0 } else { 4.0 }),
+        surface_container_low: p
+            .neutral
+            .tone(if mode == Mode::Light { 96.0 } else { 10.0 }),
+        surface_container: p
+            .neutral
+            .tone(if mode == Mode::Light { 94.0 } else { 12.0 }),
+        surface_container_high: p
+            .neutral
+            .tone(if mode == Mode::Light { 92.0 } else { 17.0 }),
+        surface_container_highest: p
+            .neutral
+            .tone(if mode == Mode::Light { 90.0 } else { 22.0 }),
         inverse_surface: p.neutral.tone(m.inv),
         inverse_on_surface: p.neutral.tone(m.inv_on),
         surface_tint: p.primary.tone(m.p),
@@ -448,11 +507,17 @@ pub fn scheme_to_hex_map(s: &Scheme) -> Vec<(&'static str, String)> {
         ("onSurfaceVariant", s.on_surface_variant.to_hex()),
         ("outline", s.outline.to_hex()),
         ("outlineVariant", s.outline_variant.to_hex()),
-        ("surfaceContainerLowest", s.surface_container_lowest.to_hex()),
+        (
+            "surfaceContainerLowest",
+            s.surface_container_lowest.to_hex(),
+        ),
         ("surfaceContainerLow", s.surface_container_low.to_hex()),
         ("surfaceContainer", s.surface_container.to_hex()),
         ("surfaceContainerHigh", s.surface_container_high.to_hex()),
-        ("surfaceContainerHighest", s.surface_container_highest.to_hex()),
+        (
+            "surfaceContainerHighest",
+            s.surface_container_highest.to_hex(),
+        ),
         ("inverseSurface", s.inverse_surface.to_hex()),
         ("inverseOnSurface", s.inverse_on_surface.to_hex()),
         ("surfaceTint", s.surface_tint.to_hex()),
@@ -594,9 +659,9 @@ mod tests {
         let s = scheme_from_seed(DEFAULT_SEED, Mode::Dark);
         let m = scheme_to_hex_map(&s);
         assert_eq!(m.len(), 33);
-        assert!(m.iter().all(|(k, v)| {
-            k.len() > 3 && v.starts_with('#') && v.len() == 7
-        }));
+        assert!(m
+            .iter()
+            .all(|(k, v)| { k.len() > 3 && v.starts_with('#') && v.len() == 7 }));
     }
 
     #[test]
@@ -606,7 +671,9 @@ mod tests {
         let p = Palettes::from_seed(seed);
         let seed_hue = srgb_to_lab(seed).hue_deg();
         let tert_hue = srgb_to_lab(p.tertiary.tone(50.0)).hue_deg();
-        let delta = (tert_hue - seed_hue - 60.0).abs().min(360.0 - (tert_hue - seed_hue - 60.0).abs());
+        let delta = (tert_hue - seed_hue - 60.0)
+            .abs()
+            .min(360.0 - (tert_hue - seed_hue - 60.0).abs());
         assert!(delta < 25.0, "tertiary hue not +60°: {}", delta);
     }
 

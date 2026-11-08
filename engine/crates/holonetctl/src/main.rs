@@ -17,20 +17,28 @@ fn main() {
     let mut it = args.iter();
     while let Some(a) = it.next() {
         if a == "--addr" {
-            if let Some(v) = it.next() { addr = v.clone(); }
+            if let Some(v) = it.next() {
+                addr = v.clone();
+            }
         } else {
             pos.push(a.clone());
         }
     }
 
     let data_dir = std::env::var("HOLONET_DATA").unwrap_or_else(|_| {
-        format!("{}/.config/holonet", std::env::var("HOME").unwrap_or_else(|_| ".".to_string()))
+        format!(
+            "{}/.config/holonet",
+            std::env::var("HOME").unwrap_or_else(|_| ".".to_string())
+        )
     });
     let token = holo_engine::ensure_token(std::path::Path::new(&data_dir)).unwrap_or_default();
     let mut c = match holo_engine::IpcClient::connect(&addr, &token) {
         Ok(c) => c,
         Err(e) => {
-            eprintln!("cannot reach daemon at {addr}: {} (is holonetd running?)", e);
+            eprintln!(
+                "cannot reach daemon at {addr}: {} (is holonetd running?)",
+                e
+            );
             std::process::exit(1);
         }
     };
@@ -55,7 +63,10 @@ fn main() {
         "disconnect" => send(&mut c, "session.disconnect", "{}"),
         "import" => {
             let data = pos.get(1).map(|s| s.as_str()).unwrap_or("");
-            let body = format!("{{\"kind\":\"auto\",\"data\":\"{}\"}}", data.replace('"', "\\\""));
+            let body = format!(
+                "{{\"kind\":\"auto\",\"data\":\"{}\"}}",
+                data.replace('"', "\\\"")
+            );
             send(&mut c, "configs.import", &body);
         }
         other => {

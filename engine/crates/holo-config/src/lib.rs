@@ -36,7 +36,9 @@ impl Profile {
 
     pub fn with_name(mut self, name: impl Into<String>) -> Profile {
         let n: String = name.into();
-        if !n.is_empty() { self.name = n; }
+        if !n.is_empty() {
+            self.name = n;
+        }
         self
     }
 
@@ -47,16 +49,37 @@ impl Profile {
 
     /// Deterministic content fingerprint (dedupe across imports).
     pub fn fingerprint(&self) -> String {
-        let mut kv: Vec<String> = self.params.iter().map(|(k, v)| format!("{}={}", k, v)).collect();
+        let mut kv: Vec<String> = self
+            .params
+            .iter()
+            .map(|(k, v)| format!("{}={}", k, v))
+            .collect();
         kv.sort();
         holo_util::hex_encode(
-            format!("{}|{}|{}|{}", self.driver, self.server, self.port, kv.join(";")).as_bytes(),
+            format!(
+                "{}|{}|{}|{}",
+                self.driver,
+                self.server,
+                self.port,
+                kv.join(";")
+            )
+            .as_bytes(),
         )
     }
 
     pub fn to_json(&self) -> Value {
-        let params = Value::Obj(self.params.iter().map(|(k, v)| (k.clone(), Value::s(v.clone()))).collect());
-        let meta = Value::Obj(self.meta.iter().map(|(k, v)| (k.clone(), Value::s(v.clone()))).collect());
+        let params = Value::Obj(
+            self.params
+                .iter()
+                .map(|(k, v)| (k.clone(), Value::s(v.clone())))
+                .collect(),
+        );
+        let meta = Value::Obj(
+            self.meta
+                .iter()
+                .map(|(k, v)| (k.clone(), Value::s(v.clone())))
+                .collect(),
+        );
         Value::obj(vec![
             ("id", Value::s(self.id.clone())),
             ("name", Value::s(self.name.clone())),
@@ -73,7 +96,10 @@ impl Profile {
         let mut p = Profile::new(
             v.str_or("driver", ""),
             v.str_or("server", ""),
-            v.get("port").and_then(|x| x.as_i64()).unwrap_or(0).clamp(0, 65535) as u16,
+            v.get("port")
+                .and_then(|x| x.as_i64())
+                .unwrap_or(0)
+                .clamp(0, 65535) as u16,
         );
         p.id = v.str_or("id", "").to_string();
         p.name = v.str_or("name", "").to_string();
@@ -83,12 +109,16 @@ impl Profile {
         }
         if let Some(Value::Obj(m)) = v.get("params") {
             for (k, val) in m {
-                if let Some(s) = val.as_str() { p.params.insert(k.clone(), s.to_string()); }
+                if let Some(s) = val.as_str() {
+                    p.params.insert(k.clone(), s.to_string());
+                }
             }
         }
         if let Some(Value::Obj(m)) = v.get("meta") {
             for (k, val) in m {
-                if let Some(s) = val.as_str() { p.meta.insert(k.clone(), s.to_string()); }
+                if let Some(s) = val.as_str() {
+                    p.meta.insert(k.clone(), s.to_string());
+                }
             }
         }
         Ok(p)
@@ -136,11 +166,16 @@ impl Settings {
     }
 
     pub fn to_json(&self) -> Value {
-        Value::Obj(self.values.iter().map(|(k, v)| (k.clone(), Value::s(v.clone()))).collect())
+        Value::Obj(
+            self.values
+                .iter()
+                .map(|(k, v)| (k.clone(), Value::s(v.clone())))
+                .collect(),
+        )
     }
     pub fn from_json(v: &Value) -> Settings {
         let mut s = Settings::default();
-        if let Some(Value::Obj(m)) = v.get("values").or_else(|| match v {
+        if let Some(Value::Obj(m)) = v.get("values").or(match v {
             Value::Obj(_) => Some(v),
             _ => None,
         }) {
@@ -164,7 +199,9 @@ pub struct Store {
 
 impl Store {
     pub fn new(dir: &std::path::Path) -> Store {
-        Store { dir: dir.to_path_buf() }
+        Store {
+            dir: dir.to_path_buf(),
+        }
     }
 
     fn read(&self, name: &str) -> Option<Value> {
@@ -178,13 +215,22 @@ impl Store {
     }
 
     pub fn load_profiles(&self) -> Vec<Profile> {
-        let Some(v) = self.read("profiles.json") else { return Vec::new(); };
-        let Some(arr) = v.as_arr() else { return Vec::new(); };
-        arr.iter().filter_map(|p| Profile::from_json(p).ok()).collect()
+        let Some(v) = self.read("profiles.json") else {
+            return Vec::new();
+        };
+        let Some(arr) = v.as_arr() else {
+            return Vec::new();
+        };
+        arr.iter()
+            .filter_map(|p| Profile::from_json(p).ok())
+            .collect()
     }
 
     pub fn save_profiles(&self, profiles: &[Profile]) -> Result<(), String> {
-        self.write("profiles.json", &Value::Arr(profiles.iter().map(|p| p.to_json()).collect()))
+        self.write(
+            "profiles.json",
+            &Value::Arr(profiles.iter().map(|p| p.to_json()).collect()),
+        )
     }
 
     pub fn add_profile(&self, p: Profile) -> Result<(), String> {
@@ -200,7 +246,9 @@ impl Store {
     pub fn remove_profile(&self, id: &str) -> Result<bool, String> {
         let all = self.load_profiles();
         let filtered: Vec<Profile> = all.iter().filter(|p| p.id != id).cloned().collect();
-        if filtered.len() == all.len() { return Ok(false); }
+        if filtered.len() == all.len() {
+            return Ok(false);
+        }
         self.save_profiles(&filtered)?;
         Ok(true)
     }
@@ -226,14 +274,19 @@ mod tests {
     fn profile_roundtrip_and_store() {
         let dir = std::env::temp_dir().join(format!("holonet-cfg-{}", new_id()));
         let store = Store::new(&dir);
-        let mut p = Profile::new("shadowsocks", "example.com", 8388).with_name("Test").with_source("import:links");
+        let mut p = Profile::new("shadowsocks", "example.com", 8388)
+            .with_name("Test")
+            .with_source("import:links");
         p.params.insert("method".into(), "aes-256-gcm".into());
         p.params.insert("password".into(), "secret".into());
         store.add_profile(p.clone()).unwrap();
         let all = store.load_profiles();
         assert_eq!(all.len(), 1);
         assert_eq!(all[0].name, "Test");
-        assert_eq!(all[0].params.get("method").map(String::as_str), Some("aes-256-gcm"));
+        assert_eq!(
+            all[0].params.get("method").map(String::as_str),
+            Some("aes-256-gcm")
+        );
         assert!(store.remove_profile(&all[0].id).unwrap());
         assert!(store.load_profiles().is_empty());
         let _ = std::fs::remove_dir_all(dir);
@@ -253,6 +306,9 @@ mod tests {
         p.params.insert("password".into(), "x".into());
         assert_eq!(p.fingerprint(), p.fingerprint());
         p.params.insert("k".into(), "v".into());
-        assert_ne!(p.fingerprint(), Profile::new("trojan", "a.com", 443).fingerprint());
+        assert_ne!(
+            p.fingerprint(),
+            Profile::new("trojan", "a.com", 443).fingerprint()
+        );
     }
 }

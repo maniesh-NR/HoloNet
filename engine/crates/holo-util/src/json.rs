@@ -23,29 +23,50 @@ impl Value {
     }
 
     pub fn get(&self, key: &str) -> Option<&Value> {
-        match self { Value::Obj(m) => m.get(key), _ => None }
+        match self {
+            Value::Obj(m) => m.get(key),
+            _ => None,
+        }
     }
     pub fn as_str(&self) -> Option<&str> {
-        match self { Value::Str(s) => Some(s), _ => None }
+        match self {
+            Value::Str(s) => Some(s),
+            _ => None,
+        }
     }
     pub fn as_f64(&self) -> Option<f64> {
-        match self { Value::Num(n) => Some(*n), _ => None }
+        match self {
+            Value::Num(n) => Some(*n),
+            _ => None,
+        }
     }
     pub fn as_i64(&self) -> Option<i64> {
-        match self { Value::Num(n) if n.fract() == 0.0 && n.abs() < 9e18 => Some(*n as i64), _ => None }
+        match self {
+            Value::Num(n) if n.fract() == 0.0 && n.abs() < 9e18 => Some(*n as i64),
+            _ => None,
+        }
     }
     pub fn as_bool(&self) -> Option<bool> {
-        match self { Value::Bool(b) => Some(*b), _ => None }
+        match self {
+            Value::Bool(b) => Some(*b),
+            _ => None,
+        }
     }
     pub fn as_arr(&self) -> Option<&[Value]> {
-        match self { Value::Arr(a) => Some(a), _ => None }
+        match self {
+            Value::Arr(a) => Some(a),
+            _ => None,
+        }
     }
     pub fn str_or<'a>(&'a self, key: &str, def: &'a str) -> &'a str {
         self.get(key).and_then(|v| v.as_str()).unwrap_or(def)
     }
 
     pub fn parse(input: &str) -> Result<Value, String> {
-        let mut p = Parser { b: input.as_bytes(), i: 0 };
+        let mut p = Parser {
+            b: input.as_bytes(),
+            i: 0,
+        };
         p.skip_ws();
         let v = p.value()?;
         p.skip_ws();
@@ -77,7 +98,9 @@ impl Value {
             Value::Arr(a) => {
                 out.push('[');
                 for (i, v) in a.iter().enumerate() {
-                    if i > 0 { out.push(','); }
+                    if i > 0 {
+                        out.push(',');
+                    }
                     v.write(out);
                 }
                 out.push(']');
@@ -85,7 +108,9 @@ impl Value {
             Value::Obj(m) => {
                 out.push('{');
                 for (i, (k, v)) in m.iter().enumerate() {
-                    if i > 0 { out.push(','); }
+                    if i > 0 {
+                        out.push(',');
+                    }
                     write_escaped(k, out);
                     out.push(':');
                     v.write(out);
@@ -114,7 +139,10 @@ fn write_escaped(s: &str, out: &mut String) {
     out.push('"');
 }
 
-struct Parser<'a> { b: &'a [u8], i: usize }
+struct Parser<'a> {
+    b: &'a [u8],
+    i: usize,
+}
 
 impl<'a> Parser<'a> {
     fn skip_ws(&mut self) {
@@ -122,7 +150,9 @@ impl<'a> Parser<'a> {
             self.i += 1;
         }
     }
-    fn peek(&self) -> Option<u8> { self.b.get(self.i).copied() }
+    fn peek(&self) -> Option<u8> {
+        self.b.get(self.i).copied()
+    }
     fn eat(&mut self, lit: &str) -> Result<(), String> {
         if self.b[self.i..].starts_with(lit.as_bytes()) {
             self.i += lit.len();
@@ -134,21 +164,36 @@ impl<'a> Parser<'a> {
     fn value(&mut self) -> Result<Value, String> {
         self.skip_ws();
         match self.peek() {
-            Some(b'n') => { self.eat("null")?; Ok(Value::Null) }
-            Some(b't') => { self.eat("true")?; Ok(Value::Bool(true)) }
-            Some(b'f') => { self.eat("false")?; Ok(Value::Bool(false)) }
+            Some(b'n') => {
+                self.eat("null")?;
+                Ok(Value::Null)
+            }
+            Some(b't') => {
+                self.eat("true")?;
+                Ok(Value::Bool(true))
+            }
+            Some(b'f') => {
+                self.eat("false")?;
+                Ok(Value::Bool(false))
+            }
             Some(b'"') => Ok(Value::Str(self.string()?)),
             Some(b'[') => {
                 self.i += 1;
                 let mut arr = Vec::new();
                 self.skip_ws();
-                if self.peek() == Some(b']') { self.i += 1; return Ok(Value::Arr(arr)); }
+                if self.peek() == Some(b']') {
+                    self.i += 1;
+                    return Ok(Value::Arr(arr));
+                }
                 loop {
                     arr.push(self.value()?);
                     self.skip_ws();
                     match self.peek() {
                         Some(b',') => self.i += 1,
-                        Some(b']') => { self.i += 1; return Ok(Value::Arr(arr)); }
+                        Some(b']') => {
+                            self.i += 1;
+                            return Ok(Value::Arr(arr));
+                        }
                         _ => return Err(format!("json: expected , or ] at byte {}", self.i)),
                     }
                 }
@@ -157,7 +202,10 @@ impl<'a> Parser<'a> {
                 self.i += 1;
                 let mut m = BTreeMap::new();
                 self.skip_ws();
-                if self.peek() == Some(b'}') { self.i += 1; return Ok(Value::Obj(m)); }
+                if self.peek() == Some(b'}') {
+                    self.i += 1;
+                    return Ok(Value::Obj(m));
+                }
                 loop {
                     self.skip_ws();
                     let key = self.string()?;
@@ -171,7 +219,10 @@ impl<'a> Parser<'a> {
                     self.skip_ws();
                     match self.peek() {
                         Some(b',') => self.i += 1,
-                        Some(b'}') => { self.i += 1; return Ok(Value::Obj(m)); }
+                        Some(b'}') => {
+                            self.i += 1;
+                            return Ok(Value::Obj(m));
+                        }
                         _ => return Err(format!("json: expected , or }} at byte {}", self.i)),
                     }
                 }
@@ -182,12 +233,20 @@ impl<'a> Parser<'a> {
     }
     fn number(&mut self) -> Result<Value, String> {
         let start = self.i;
-        if self.peek() == Some(b'-') { self.i += 1; }
-        while self.peek().map(|c| c.is_ascii_digit() || matches!(c, b'.' | b'e' | b'E' | b'+' | b'-')).unwrap_or(false) {
+        if self.peek() == Some(b'-') {
+            self.i += 1;
+        }
+        while self
+            .peek()
+            .map(|c| c.is_ascii_digit() || matches!(c, b'.' | b'e' | b'E' | b'+' | b'-'))
+            .unwrap_or(false)
+        {
             self.i += 1;
         }
         let s = std::str::from_utf8(&self.b[start..self.i]).unwrap();
-        s.parse::<f64>().map(Value::Num).map_err(|_| format!("json: bad number {:?}", s))
+        s.parse::<f64>()
+            .map(Value::Num)
+            .map_err(|_| format!("json: bad number {:?}", s))
     }
     fn string(&mut self) -> Result<String, String> {
         if self.peek() != Some(b'"') {
@@ -198,18 +257,45 @@ impl<'a> Parser<'a> {
         loop {
             match self.peek() {
                 None => return Err("json: unterminated string".into()),
-                Some(b'"') => { self.i += 1; return Ok(out); }
+                Some(b'"') => {
+                    self.i += 1;
+                    return Ok(out);
+                }
                 Some(b'\\') => {
                     self.i += 1;
                     match self.peek() {
-                        Some(b'"') => { out.push('"'); self.i += 1; }
-                        Some(b'\\') => { out.push('\\'); self.i += 1; }
-                        Some(b'/') => { out.push('/'); self.i += 1; }
-                        Some(b'b') => { out.push('\x08'); self.i += 1; }
-                        Some(b'f') => { out.push('\x0c'); self.i += 1; }
-                        Some(b'n') => { out.push('\n'); self.i += 1; }
-                        Some(b'r') => { out.push('\r'); self.i += 1; }
-                        Some(b't') => { out.push('\t'); self.i += 1; }
+                        Some(b'"') => {
+                            out.push('"');
+                            self.i += 1;
+                        }
+                        Some(b'\\') => {
+                            out.push('\\');
+                            self.i += 1;
+                        }
+                        Some(b'/') => {
+                            out.push('/');
+                            self.i += 1;
+                        }
+                        Some(b'b') => {
+                            out.push('\x08');
+                            self.i += 1;
+                        }
+                        Some(b'f') => {
+                            out.push('\x0c');
+                            self.i += 1;
+                        }
+                        Some(b'n') => {
+                            out.push('\n');
+                            self.i += 1;
+                        }
+                        Some(b'r') => {
+                            out.push('\r');
+                            self.i += 1;
+                        }
+                        Some(b't') => {
+                            out.push('\t');
+                            self.i += 1;
+                        }
                         Some(b'u') => {
                             self.i += 1;
                             let cp = self.hex4()?;
@@ -217,8 +303,11 @@ impl<'a> Parser<'a> {
                                 if self.b[self.i..].starts_with(b"\\u") {
                                     self.i += 2;
                                     let lo = self.hex4()?;
-                                    char::from_u32(0x10000 + ((cp - 0xd800) << 10) + (lo - 0xdc00)).unwrap_or('\u{fffd}')
-                                } else { '\u{fffd}' }
+                                    char::from_u32(0x10000 + ((cp - 0xd800) << 10) + (lo - 0xdc00))
+                                        .unwrap_or('\u{fffd}')
+                                } else {
+                                    '\u{fffd}'
+                                }
                             } else {
                                 char::from_u32(cp).unwrap_or('\u{fffd}')
                             };
@@ -228,7 +317,8 @@ impl<'a> Parser<'a> {
                     }
                 }
                 Some(_) => {
-                    let rest = std::str::from_utf8(&self.b[self.i..]).map_err(|_| "json: invalid utf-8".to_string())?;
+                    let rest = std::str::from_utf8(&self.b[self.i..])
+                        .map_err(|_| "json: invalid utf-8".to_string())?;
                     let c = rest.chars().next().unwrap();
                     out.push(c);
                     self.i += c.len_utf8();
@@ -237,7 +327,9 @@ impl<'a> Parser<'a> {
         }
     }
     fn hex4(&mut self) -> Result<u32, String> {
-        if self.i + 4 > self.b.len() { return Err("json: truncated \\u escape".into()); }
+        if self.i + 4 > self.b.len() {
+            return Err("json: truncated \\u escape".into());
+        }
         let s = std::str::from_utf8(&self.b[self.i..self.i + 4]).unwrap();
         let v = u32::from_str_radix(s, 16).map_err(|_| "json: bad \\u escape".to_string())?;
         self.i += 4;
@@ -261,7 +353,10 @@ mod tests {
         let src = r#"{"a":1,"b":[true,false,null,"x\ny"],"c":{"d":-2.5,"e":1e2}}"#;
         let v = parse(src).unwrap();
         assert_eq!(v.get("a").and_then(|v| v.as_i64()), Some(1));
-        assert_eq!(v.get("b").unwrap().as_arr().unwrap()[3].as_str(), Some("x\ny"));
+        assert_eq!(
+            v.get("b").unwrap().as_arr().unwrap()[3].as_str(),
+            Some("x\ny")
+        );
         let re = parse(&v.to_json()).unwrap();
         assert_eq!(v, re);
     }
