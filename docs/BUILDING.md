@@ -9,7 +9,7 @@ binaries run on Windows 7 SP1 and the macOS binaries on 10.15 Catalina
 
 ```bash
 cd engine
-cargo test --workspace                 # 28 tests
+cargo test --workspace                 # 75 tests (crypto, transport, ss, socks, theme, core, integration)
 cargo build --release -p holonetd -p holonetctl
 # → engine/target/release/{holonetd,holonetctl}
 ```

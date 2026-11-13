@@ -718,20 +718,45 @@ mod tests {
 
     #[test]
     fn socks_greeting_requires_v5() {
-        let ln = TcpListener::bind("127.0.0.1:0").unwrap();
-        let addr = ln.local_addr().unwrap().to_string();
-        std::thread::spawn(move || {
-            for s in ln.incoming().flatten() {
-                let _ = s;
+        // A REAL SocksServer must reject a v4 greeting itself (not rely on
+        // TCP noise), count it as refused, and never dial upstream.
+        // (Rewritten at gate 0001 per review A1-C5: the old test dialed a
+        // bare TcpListener that dropped sockets — it tested nothing.)
+        struct NoDial;
+        impl holo_proto::Dialer for NoDial {
+            fn dial(
+                &self,
+                _n: holo_proto::Network,
+                _t: &str,
+            ) -> std::io::Result<holo_proto::BoxTunnel> {
+                unreachable!("greeting rejection must happen before any dial")
             }
-        });
+        }
+        let dialer = Arc::new(NoDial);
+        let shaper = Arc::new(Shaper::new(0));
+        let srv = Arc::new(SocksServer::bind("127.0.0.1:0", dialer, shaper).unwrap());
+        let addr = srv.local_addr().unwrap().to_string();
+        let handle = srv.clone().serve();
         let mut c = TcpStream::connect(&addr).unwrap();
-        // the bare listener drops sockets immediately — the write may hit
-        // ECONNRESET on Windows/macOS; both outcomes are acceptable
-        let _ = c.write_all(&[4, 1]); // wrong version
+        c.write_all(&[4, 1]).unwrap(); // SOCKS version 4 = wrong
         let mut buf = [0u8; 16];
+        // the server must close the connection (v4 is never answered)
         let r = c.read(&mut buf);
-        assert!(r.is_err() || r.unwrap() == 0);
+        assert!(
+            r.is_err() || r.unwrap() == 0,
+            "v4 greeting must be closed by the server"
+        );
+        // and it must be counted as a refused connection
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while srv.stats.snapshot().3 == 0 {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "v4 greeting was never counted as refused"
+            );
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        srv.stop.store(true, Ordering::Relaxed);
+        let _ = handle;
     }
 
     #[test]

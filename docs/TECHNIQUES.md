@@ -150,14 +150,20 @@ indistinguishable from random.
 - one opaque error for every crypto failure (salt, length, payload) — no
   error-code oracle;
 - oversized-length frames treated as auth failures (the classic probe
-  trick of claiming a 64 KiB payload);
-- per-peer exponential backoff (50 ms doubling, 10 s cap) with reset on
+  trick of claiming a 64 KiB payload) — directly tested by
+  `oversized_length_is_rejected_without_upstream` (added at gate 0001);
+- per-peer exponential backoff (50 ms doubling, clamped to 120 ms on the
+  wire today; the full 10 s cap is staged in ROADMAP S1) with reset on
   successful authentication;
-- randomized slow-close before dropping probed connections.
+- delayed slow-close before dropping probed connections — deterministic
+  today; CSPRNG-jittered randomization is staged with the S1 entropy work
+  (the interim exposure is recorded in docs/THREAT-MODEL.md §C).
 
 **Tests:** monotone backoff, success-reset, cap
 (`probe_guard_backs_off_and_resets`); wrong-password client never reaches
-the upstream dialer (`tampered_salt_is_rejected_strictly`).
+the upstream dialer (`tampered_salt_is_rejected_strictly`); forged
+oversized-length rejection without any upstream dial
+(`oversized_length_is_rejected_without_upstream`).
 
 ## 8. Memory behavior — buffer pooling
 

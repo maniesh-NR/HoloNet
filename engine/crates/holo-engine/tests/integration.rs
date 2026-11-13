@@ -432,9 +432,12 @@ fn memory_stays_bounded_under_sustained_relay() {
     let growth = rss_after.saturating_sub(rss_before);
     eprintln!("mem: rss {rss_before} → {rss_after} KB (+{growth} KB) over 64MB relayed");
     // pooled relays allocate nothing per-chunk: growth must stay far below
-    // the 64MB transferred (generous 48MB ceiling absorbs allocator noise)
+    // the 64MB transferred. Observed in practice: +88..376 KB; the 2MB
+    // ceiling sits 5-20x above observed noise while still catching any
+    // per-chunk allocation regression (tightened at gate 0001 per A1-C3;
+    // Linux-only test, documented in harness/memory/STATE.md).
     assert!(
-        growth < 48 * 1024,
+        growth < 2 * 1024,
         "RSS grew {growth} KB — pooling/regression failure"
     );
     drop(conn);

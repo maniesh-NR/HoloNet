@@ -5,7 +5,8 @@ Android (Flutter), macOS (Compose), Windows/Linux (Qt) and the daemon.
 
 ## The contract
 
-- **Engine**: `engine/crates/holo-theme` (Rust, 28 tests) is the reference.
+- **Engine**: `engine/crates/holo-theme` (Rust, 10 tests + golden hex
+  vectors for cross-language port validation) is the reference.
   Color model: CIELAB with tone = L\*, hue = atan2(b\*, a\*), chroma = C\*
   (documented deviation from Google's HCT), chroma gamut-mapped by binary
   search. Six palettes from the seed — primary (chroma ≥ 48), secondary

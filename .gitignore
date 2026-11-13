@@ -8,7 +8,10 @@ dist/
 build/
 out/
 *.app/
-*.dmg/
+*.dmg
+*.ipa
+*.apk
+*.aab
 *.msi
 *.exe
 *.dll
@@ -48,6 +51,13 @@ Makefile*
 .DS_Store
 Thumbs.db
 
-# Local secrets — never commit
+# Local secrets — never commit (hardened at gate 0001: A2-F8/A4-C3 —
+# `git add -A` in backup.sh must never sweep credential-shaped files)
 **/ipc-token
 **/*.log
+*.env
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*

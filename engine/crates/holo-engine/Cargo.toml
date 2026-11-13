@@ -7,6 +7,7 @@ description = "HoloNet daemon core: IPC, Material You bridge, live data-plane se
 
 [dependencies]
 holo-config = { path = "../holo-config" }
+holo-crypto = { path = "../holo-crypto" }
 holo-proto = { path = "../holo-proto" }
 holo-ss = { path = "../holo-ss" }
 holo-socks = { path = "../holo-socks" }

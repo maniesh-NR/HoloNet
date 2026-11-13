@@ -66,13 +66,44 @@ pub fn ensure_token(data_dir: &std::path::Path) -> Result<String, String> {
     if let Ok(t) = std::fs::read_to_string(&p) {
         let t = t.trim().to_string();
         if !t.is_empty() {
+            tighten_private(&p);
             return Ok(t);
         }
     }
     std::fs::create_dir_all(data_dir).map_err(|e| e.to_string())?;
-    let t = holo_util::rand::hex(24);
+    // SECURITY material: fail-closed OS entropy (gate-0001 A2) — never the
+    // splitmix fallback, never a silent weak token.
+    let t = holo_util::rand::os_hex(24)
+        .map_err(|e| format!("ipc token: os entropy unavailable: {e}"))?;
     std::fs::write(&p, &t).map_err(|e| e.to_string())?;
+    set_private(&p)?;
     Ok(t)
+}
+
+/// Secrets at rest readable by the owner only — best effort on every load
+/// (defends files created before hardening existed), strict on creation.
+fn tighten_private(p: &std::path::Path) {
+    #[cfg(target_family = "unix")]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let _ = std::fs::set_permissions(p, std::fs::Permissions::from_mode(0o600));
+    }
+    #[cfg(not(target_family = "unix"))]
+    let _ = p;
+}
+
+fn set_private(p: &std::path::Path) -> Result<(), String> {
+    #[cfg(target_family = "unix")]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(p, std::fs::Permissions::from_mode(0o600))
+            .map_err(|e| e.to_string())
+    }
+    #[cfg(not(target_family = "unix"))]
+    {
+        let _ = p;
+        Ok(())
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -482,7 +513,12 @@ fn dispatch(
     };
     match method.as_str() {
         "hello" => {
-            if pstr("token") != token {
+            // auth material — constant-time compare (gate-0001 A2-F4);
+            // length itself is public knowledge, only the bytes must not leak
+            let supplied = pstr("token");
+            if supplied.len() != token.len()
+                || !holo_crypto::ct_eq(supplied.as_bytes(), token.as_bytes())
+            {
                 return RpcError::new(CODE_AUTH_FAILED, "bad token").to_json(id);
             }
             helloed.store(true, Ordering::Relaxed);

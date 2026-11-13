@@ -10,8 +10,11 @@
 //! - first chunk payload = SOCKS5 target address (+ optional user payload)
 //!
 //! Anti-probing: any AEAD tag failure closes the connection after a
-//! randomized slow-close (holo_net::ProbeGuard), never leaking whether the
-//! failure was salt, length, or payload.
+//! delayed slow-close with per-peer exponential backoff
+//! (holo_net::ProbeGuard). The error VALUE never leaks whether the failure
+//! was salt, length, or payload. The close delay is deterministic today;
+//! CSPRNG-jittered randomization lands with the S1 entropy work
+//! (docs/THREAT-MODEL.md records the accepted interim exposure).
 //!
 //! Supported ciphers: chacha20-ietf-poly1305, xchacha20-ietf-poly1305,
 //! aes-256-gcm — all 32-byte keys, 16-byte tags.
@@ -328,7 +331,8 @@ impl ClientConn {
         let addr = resolve(server)?;
         let sock = TcpStream::connect_timeout(&addr, connect_timeout)?;
         sock.set_nodelay(true).ok();
-        let salt = random_salt();
+        // security material: fail-closed OS entropy (A2/gate-0001)
+        let salt = random_salt()?;
         let write = Direction::new(method, master, &salt);
         let mut c = ClientConn {
             sock,
@@ -606,7 +610,7 @@ impl ServerConn {
         // 2. send OUR salt BEFORE decrypting anything — a wrong-password
         //    client would otherwise block forever waiting for a salt that
         //    never comes (deadlock found by the tampered-salt test)
-        let out_salt = random_salt();
+        let out_salt = random_salt()?;
         sock.write_all(&out_salt)?;
         // 3. first chunk: target address (decrypt failures surface here)
         let first = Framing::read_chunk(&mut sock, &mut read)?.ok_or_else(|| {
@@ -902,10 +906,17 @@ impl Write for ServerWriteHalf {
 // helpers
 // ---------------------------------------------------------------------------
 
-pub(crate) fn random_salt() -> [u8; 32] {
+/// Session salt — security material, so it comes from fail-closed OS
+/// entropy (never the splitmix fallback).
+pub(crate) fn random_salt() -> std::io::Result<[u8; 32]> {
     let mut s = [0u8; 32];
-    holo_util::rand::fill(&mut s);
-    s
+    holo_util::rand::os_fill(&mut s).map_err(|_| {
+        std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "ss: os entropy unavailable — refusing weak randomness (fail-closed)",
+        )
+    })?;
+    Ok(s)
 }
 
 // ---------------------------------------------------------------------------
@@ -1074,6 +1085,47 @@ mod tests {
         assert!(
             !dialed.load(std::sync::atomic::Ordering::SeqCst),
             "wrong-password client must never reach upstream"
+        );
+    }
+
+    #[test]
+    fn oversized_length_is_rejected_without_upstream() {
+        // Forged but VALIDLY-encrypted length > MAX_PAYLOAD (the classic
+        // prober trick) must be treated as an auth failure with NO upstream
+        // dial — the same strict-fail guarantee as a wrong password.
+        // (Added at gate 0001 per review A1-C4: the rejection path existed
+        // at read_chunk but had no direct test.)
+        let echo_port = spawn_echo();
+        let ln = TcpListener::bind("127.0.0.1:0").unwrap();
+        let ss_port = ln.local_addr().unwrap().port();
+        let dialed = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let d2 = dialed.clone();
+        let guard = Mutex::new(holo_net::ProbeGuard::new());
+        let guard = std::sync::Arc::new(guard);
+        std::thread::spawn(move || {
+            if let Ok(sock) = ln.incoming().next().unwrap() {
+                let master = master_key("correct-pw");
+                let _ = serve_conn(sock, &master, Method::ChaCha20IetfPoly1305, &guard, |_t| {
+                    d2.store(true, std::sync::atomic::Ordering::SeqCst);
+                    TcpStream::connect(("127.0.0.1", echo_port))
+                });
+            }
+        });
+        // Act as a client with the CORRECT password but forge the first
+        // length frame to claim MAX_PAYLOAD + 1.
+        let master = master_key("correct-pw");
+        let salt = random_salt().unwrap();
+        let mut d = Direction::new(Method::ChaCha20IetfPoly1305, &master, &salt);
+        let mut c = TcpStream::connect(("127.0.0.1", ss_port)).unwrap();
+        c.write_all(&salt).unwrap();
+        let forged = d.seal(&[], &((MAX_PAYLOAD + 1) as u16).to_be_bytes());
+        c.write_all(&forged).unwrap();
+        let _ = c.flush();
+        // serve_conn applies backoff before closing; wait past that window
+        std::thread::sleep(Duration::from_millis(150));
+        assert!(
+            !dialed.load(std::sync::atomic::Ordering::SeqCst),
+            "oversized length must never reach upstream"
         );
     }
 

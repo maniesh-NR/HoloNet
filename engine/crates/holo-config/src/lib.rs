@@ -211,7 +211,17 @@ impl Store {
 
     fn write(&self, name: &str, v: &Value) -> Result<(), String> {
         std::fs::create_dir_all(&self.dir).map_err(|e| e.to_string())?;
-        std::fs::write(self.dir.join(name), v.to_json()).map_err(|e| e.to_string())
+        let p = self.dir.join(name);
+        std::fs::write(&p, v.to_json()).map_err(|e| e.to_string())?;
+        // profiles.json carries credentials (incl. WireGuard private keys):
+        // owner-only at rest — gate-0001 A2-F6
+        #[cfg(target_family = "unix")]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o600))
+                .map_err(|e| e.to_string())?;
+        }
+        Ok(())
     }
 
     pub fn load_profiles(&self) -> Vec<Profile> {
@@ -310,5 +320,23 @@ mod tests {
             p.fingerprint(),
             Profile::new("trojan", "a.com", 443).fingerprint()
         );
+    }
+
+    #[cfg(target_family = "unix")]
+    #[test]
+    fn secrets_at_rest_are_owner_only() {
+        // gate-0001 A2-F6: written stores must be 0600 on unix
+        use std::os::unix::fs::PermissionsExt;
+        let dir = std::env::temp_dir().join(format!("holonet-cfg-perm-{}", new_id()));
+        let store = Store::new(&dir);
+        let mut p = Profile::new("shadowsocks", "example.com", 8388);
+        p.params.insert("password".into(), "secret".into());
+        store.add_profile(p).unwrap();
+        let mode = std::fs::metadata(dir.join("profiles.json"))
+            .unwrap()
+            .permissions()
+            .mode();
+        assert_eq!(mode & 0o777, 0o600, "profiles.json must be owner-only");
+        let _ = std::fs::remove_dir_all(dir);
     }
 }

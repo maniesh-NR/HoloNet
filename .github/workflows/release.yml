@@ -49,6 +49,8 @@ jobs:
             cp README.md LICENSE ATTRIBUTION.md "dist/$NAME/"
             (cd dist && 7z a "$NAME.zip" "$NAME" > /dev/null)
           done
+          # checksums for every asset — verify-before-run story (gate-0001 A2-C3)
+          (cd dist && sha256sum *.zip > SHA256SUMS.txt)
           ls -la dist
       - name: Upload to release
         env:
@@ -57,7 +59,7 @@ jobs:
           set -e
           TAG="${GITHUB_REF_NAME}"
           gh release view "$TAG" > /dev/null 2>&1 || gh release create "$TAG" --title "HoloNet $TAG" --notes "Automated Windows build for $TAG (Rust 1.77.2, Windows 7 SP1 compatible)."
-          gh release upload "$TAG" dist/*.zip --clobber
+          gh release upload "$TAG" dist/*.zip dist/SHA256SUMS.txt --clobber
 
   macos:
     name: macOS (x64 + arm64, Catalina-compatible)
@@ -93,6 +95,8 @@ jobs:
             cp README.md LICENSE ATTRIBUTION.md "dist/$NAME/"
             (cd dist && tar -czf "$NAME.tar.gz" "$NAME")
           done
+          # checksums for every asset — verify-before-run story (gate-0001 A2-C3)
+          (cd dist && sha256sum *.tar.gz > SHA256SUMS.txt)
           ls -la dist
       - name: Upload to release
         env:
@@ -101,7 +105,7 @@ jobs:
           set -e
           TAG="${GITHUB_REF_NAME}"
           gh release view "$TAG" > /dev/null 2>&1 || gh release create "$TAG" --title "HoloNet $TAG" --notes "Automated macOS build for $TAG (Rust 1.77.2, macOS 10.15 Catalina compatible)."
-          gh release upload "$TAG" dist/*.tar.gz --clobber
+          gh release upload "$TAG" dist/*.tar.gz dist/SHA256SUMS.txt --clobber
 
   linux:
     name: Linux (x64, static musl)
@@ -201,6 +205,8 @@ jobs:
               'builds from source with the Flutter SDK — see docs/BUILDING.md.' > "dist/$NAME/README.txt"
             (cd dist && tar -czf "$NAME.tar.gz" "$NAME")
           done
+          # checksums for every asset — verify-before-run story (gate-0001 A2-C3)
+          (cd dist && sha256sum *.tar.gz > SHA256SUMS.txt)
           ls -la dist
       - name: Upload to release
         env:
@@ -209,4 +215,4 @@ jobs:
           set -e
           TAG="${GITHUB_REF_NAME}"
           gh release view "$TAG" > /dev/null 2>&1 || gh release create "$TAG" --title "HoloNet $TAG" --notes "Automated Android engine build for $TAG (Rust 1.77.2, API 24+)."
-          gh release upload "$TAG" dist/*.tar.gz --clobber
+          gh release upload "$TAG" dist/*.tar.gz dist/SHA256SUMS.txt --clobber

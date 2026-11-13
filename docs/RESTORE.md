@@ -34,7 +34,8 @@ plane — 71 workspace tests, all green:
    `stats.get`, honest per-driver milestone errors for everything else.
    6 end-to-end integration tests over real loopback TCP (import →
    connect → SOCKS → AEAD tunnel → echo → stats → disconnect), including
-   throughput and memory-bounding (64 MB relayed, RSS +376 KB).
+   throughput and memory-bounding (64 MB relayed; RSS growth observed
+   +88–376 KB, asserted bound < 2 MB — tightened at gate 0001).
 
 The pieces below are the REST of the original engine, captured in detail
 for future sessions — each was debugged to green in the earlier sessions,
