@@ -1,7 +1,7 @@
 name: CI
 
 permissions:
-  contents: write
+  contents: read
 
 on:
   push:
@@ -79,6 +79,31 @@ jobs:
           cargo check --workspace --target x86_64-unknown-linux-musl
           cargo check --workspace --target aarch64-linux-android
           cargo check --workspace --target armv7-linux-androideabi
+
+  harness-audit:
+    name: Harness audit (gate-record ↔ backup-log tie-in)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: gate records must land with a BACKUPS.md line quoting their SHA-256
+        run: |
+          set -e
+          # WORKFLOW.md §2.5 tie-in, machine-checked (gate-0001 A4-C6)
+          if git diff --quiet HEAD~1 HEAD -- harness/adversarial/verdicts/; then
+            echo "no gate-record changes in this commit: nothing to audit"
+            exit 0
+          fi
+          if git diff --quiet HEAD~1 HEAD -- harness/memory/BACKUPS.md; then
+            echo "::error::gate record pushed without a BACKUPS.md line"
+            exit 1
+          fi
+          if ! git diff HEAD~1 HEAD -- harness/memory/BACKUPS.md | grep '^+' | grep -qE '[0-9a-f]{64}'; then
+            echo "::error::BACKUPS.md line does not quote the record SHA-256"
+            exit 1
+          fi
+          echo "tie-in OK: gate record + BACKUPS.md line with record hash"
 
   legacy-toolchain:
     name: Rust 1.77.2 compatibility (Win7 / Catalina baseline)

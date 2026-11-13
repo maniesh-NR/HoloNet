@@ -22,24 +22,39 @@ Flutter (Android)   Compose (macOS)   Qt6/QML (Win+Linux)
 
 ```
 engine/crates/
-  holo-util/     hex, base64, JSON model, randomness
+  holo-util/     hex, base64, JSON model, randomness (fail-closed os_fill
+                 + non-security splitmix; entropy policy D-0008)
+  holo-crypto/   ChaCha20/Poly1305/AEAD/XChaCha20/AES-256-GCM/SHA-2/HMAC/
+                 HKDF/EVP_BytesToKey — RFC/NIST vectors (17 tests)
   holo-theme/    Material You color engine (reference, 10 tests + goldens)
   holo-proto/    driver SPI: Params, Conn/Dialer/Driver/Registry
-  holo-config/   Profile/Settings/Store + share-link importer (9 tests)
-  holo-engine/   IPC server/client, theme bridge, sessions (4 tests)
+  holo-config/   Profile/Settings/Store + share-link importer for all 7
+                 schemes, 0600 at rest (10 tests)
+  holo-net/      RTT/RTO, token bucket, DRR, CoDel, CUBIC+HyStart++, BBR-
+                 model, padding, ProbeGuard, BufferPool (9 tests)
+  holo-ss/       Shadowsocks AEAD SIP004 data plane + anti-probing (7)
+  holo-socks/    RFC 1928/1929 SOCKS5 relay, DRR shaping (5 tests)
+  holo-engine/   IPC server/client, theme bridge, live SS session wiring,
+                 milestone errors (2 unit + 6 integration tests)
   holonetd/      daemon binary
   holonetctl/    CLI (state/list/import/theme/seed/connect)
 app_flutter/     Android: material_you.dart + M3 UI + Monet channel
 app_kmp/         macOS: MaterialYou.kt + Compose M3 UI
 app_qt/          Win/Linux: materialyou.{h,cpp} + QML M3 UI
-docs/            MATERIAL_YOU.md · RESTORE.md · this file
+harness/         binding workflow, adversarial gates, memory, backups
+docs/            MATERIAL_YOU.md · RESTORE.md · TECHNIQUES.md ·
+                 THREAT-MODEL.md · BUILDING.md · this file
 ```
 
-The protocol data planes (crypto, TLS 1.3, QUIC, WireGuard, Shadowsocks,
-providers, bonding…) were built and tested to 197 tests in earlier
-sessions and lost to a sandbox recycle; `docs/RESTORE.md` captures their
-debugged designs for a fast rebuild. The connect path honestly reports
-the pending restore — nothing fakes success.
+The first data plane is LIVE: `session.connect` → reachability probe →
+local SOCKS5 → Shadowsocks AEAD tunnel (end-to-end integration tests
+over real loopback TCP; 75 tests green on Linux — 74 macOS / 72
+Windows, platform-gated). The remaining planes (TLS 1.3, QUIC,
+provider-fed profiles, system crates) are staged in
+`harness/memory/ROADMAP.md`; every not-yet-live protocol honestly
+reports a per-driver milestone error at connect — nothing fakes
+success. Windows data-plane material fails CLOSED until the S1 entropy
+FFI lands (D-0008).
 
 ## Material You data flow
 

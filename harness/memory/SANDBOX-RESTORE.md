@@ -10,8 +10,10 @@ cold restore and update this estimate with the real figure.
 
        git clone https://github.com/maniesh-NR/HoloNet.git \
          /home/z/my-project/download/HoloNet
-       # or, for the exact last backup state:
-       git checkout sandbox/latest   # rolling tag, force-updated by backup.sh
+       # or, for the exact last backup state (use -B to RECREATE the main
+       # branch — a bare checkout leaves detached HEAD, which backup.sh's
+       # main-only guard would refuse):
+       git checkout -B main sandbox/latest   # rolling tag, force-updated by backup.sh
 
 2. **Toolchain** (fresh sandbox has none):
 
@@ -42,8 +44,9 @@ cold restore and update this estimate with the real figure.
 6. **Resume** at the stage allowed by the latest gate record. Write an
    execution plan whose FINAL step is always:
 
-       HOLO_GITHUB_TOKEN=<token> bash harness/scripts/backup.sh "<summary>"
+       bash harness/scripts/backup.sh "<summary>"
 
-   The token arrives out-of-band (env var only) — never in a file.
-   Backups fire at the END of every execution plan and every prompt
-   output, never on a timer.
+   The token must ALREADY be in the environment — provided out-of-band by
+   the orchestrator or owner (env var only; never typed into a command
+   line, never in a file — WORKFLOW §3.3). Backups fire at the END of
+   every execution plan and every prompt output, never on a timer.

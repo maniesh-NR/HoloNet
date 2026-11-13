@@ -83,19 +83,43 @@ Acceptance criteria (all measurable):
 - Fail-closed entropy: failure-injection test green
   (`os_entropy_fails_closed_on_unreadable_source`); Windows entropy FFI
   merged with tests; provenance current in THREAT-MODEL.md §G.
+- Windows enforceability (A3-C3): the FULL workspace suite — including
+  the 5 engine integration tests — green on `windows-latest` CI (today
+  that job is honestly red: fail-closed entropy aborts token/salt
+  generation on Windows; turning it green IS the visible pass condition
+  for the FFI); a Windows 1.77.2 compile check (windows-latest pinned to
+  1.77.2 or `cargo check --target x86_64-pc-windows-msvc` in the legacy
+  job); a Windows FFI failure-injection seam analogous to `os_fill_at`.
+- Windows FFI specifics (A2-C1): (a) all `unsafe` confined to
+  `holo-util/src/rand.rs` — verifiable by `grep -rn "unsafe"
+  engine/crates/` returning zero hits outside that file; (b) explicit
+  fail-closed error on syscall failure with a test; (c) RtlGenRandom
+  chosen for the Windows 7 SP1 floor (BCryptGenRandom alone is Win8+);
+  (d) THREAT-MODEL §G updated from "interim fail-closed" to the shipped
+  provenance.
 - RFC 7693 official vectors for BLAKE2s/b (keyed and unkeyed) pass.
 - RFC 7748 §5.2 test vectors (including iteration counts) pass; the
   all-zero shared secret is rejected as an error, not silently accepted.
 - NIST SP 800-38A CFB128 vectors pass.
-- ExpandLabel vectors from RFC 8446 §7.1 (and its test-vector appendix)
-  pass.
-- RSA/bignum: CIOS Montgomery and PKCS#1 v1.5 + PSS verify pass official
-  vectors (RSA-2048 self-test cert).
+- ExpandLabel: RFC 8446 §7.1 defines the construction; the recorded
+  key-schedule vectors come from RFC 8448 (Simple 1-RTT handshake) —
+  port those, plus in-crate loopback transcripts (A3-C4 citation fix).
+- RSA/bignum: CIOS Montgomery verified against published Montgomery
+  test vectors; PKCS#1 v1.5 verify against RFC 8017 §9.2 vectors; PSS
+  against RFC 8017 §9.1.2 vectors; PLUS an in-crate RSA-2048 self-test
+  cert (self-made, labeled as such — NOT an official vector set).
+- Server-path hardening, named tests (A3-C2, gate 0002 checks them):
+  ProbeGuard map bounded under N distinct failing peers (decay/eviction
+  test); CSPRNG-jittered slow-close seeded from `os_fill` (two peers with
+  identical failure counts get different delays); close-vs-hang
+  uniformity for length-rejected vs length-valid frames.
 - OpenSSL cross-checks during development, recorded in the session
   journal (process evidence, not an in-tree artifact — stated per A1-F10).
 - No new third-party crates; the ONLY permitted unsafe is the chartered
-  Windows entropy FFI (D-0008); workspace test count grows monotonically
-  from the post-gate-0001 baseline of 75.
+  Windows entropy FFI (D-0008); workspace test count grows
+  monotonically per platform from the post-gate-0001 baselines
+  (Linux 75 / macOS 74 / Windows 72 — cfg-gated tests count differently
+  per OS, A1-C5).
 - Gate 0002 (S1 → S2) required before starting TLS.
 
 ## S2 — holo-tls: from-scratch TLS 1.3 client (RFC 8446)
@@ -118,13 +142,18 @@ recovery over a lossy simulated link; interop-observable framing only
 
 ## S4 — holo-config importers
 
+Share-LINK import for all seven schemes is ALREADY live and tested
+(`holo-config/src/links.rs`: ss SIP002+legacy, vmess, vless-reality,
+trojan, hy2, tuic, wg — imported profiles report honest milestone errors
+at connect until their drivers exist). S4 delivers the remaining formats:
+
 Clash YAML (reality-opts, ws-opts; inline `[IPv6]:443` is a scalar, not a
 flow list), V2Ray/sing-box JSON (incl. classic wireguard `local_address`),
-share links (ss SIP002 + legacy, vmess b64 JSON, vless reality, trojan,
-hy2, tuic, wg), WireGuard/AmneziaWG INI (Jc/Jmin/Jmax → amneziawg), base64
-subscriptions. ~40 tests. Acceptance: every importer round-trips into the
-flat driver parameter registry (ARCHITECTURE §6) and feeds a live driver
-end-to-end where that driver exists (SS today; others as they land).
+WireGuard/AmneziaWG INI (Jc/Jmin/Jmax → amneziawg), base64 subscriptions.
+~30 new tests. Acceptance: every importer round-trips into the flat
+driver parameter registry (holo-proto `Params`; docs/ARCHITECTURE.md
+"driver SPI") and feeds a live driver end-to-end where that driver
+exists (SS today; others as they land).
 
 ## S5 — holo-provider
 
@@ -157,3 +186,52 @@ from a clean checkout.
 If a stage overruns, cut breadth before cutting honesty: v1.0 may ship
 with fewer live protocols (SS + one TLS/QUIC-based protocol) and honest
 milestone errors for the rest — never a fake or half-validated plane.
+
+## Binding conditions carried from gate 0001
+
+Checked at gate 0002 unless a later stage is named. Provenance: round-2
+verdicts of A1/A2/A3/A4, archived verbatim in
+`harness/adversarial/verdicts/0001-*.md`.
+
+1. **Driver-layer chartering (A3-C1, before gate 0002)**: S2–S5 must
+   name the Registry driver factories each stage registers (S2 delivers
+   one TLS-based driver wired into `session.connect`; a WireGuard driver
+   stage precedes/accompanies warp_wg); the descope rule must NAME the
+   v1.0 TLS/QUIC-based protocol.
+2. **Cross-service integration (A3-C6, S5/S6 charters)**: S5 adds a
+   provider-fixture → registry → live-dial chain test; S6 adds a
+   real-kernel killswitch/nftables Linux CI test or an explicit
+   "unverified on real kernel" THREAT-MODEL marker.
+3. **v1.0 operationalization + terminal gate 0008 (A3-C5)**: state
+   whether TUN/killswitch/packaging are v1.0-blocking; define the
+   descope tripwire (stage exceeding N recorded sessions triggers the
+   decision); charter the terminal gate (S7 completion + release
+   assessment).
+4. **backup.sh `--interim` push milestone (A3-C7)**: optional interim
+   push after remediation-complete and before panel launches; recorded
+   as a DECISIONS entry when added.
+5. **Artifact signing (A2-C5, S7 charter)**: minisign/cosign-style
+   detached signatures, or a recorded owner decision not to sign.
+6. **Off-loopback proxy_listen refusal (A2-C6; S6 otherwise)**: refuse
+   non-loopback binds unless an explicit override is set.
+7. **Mechanical rand-split enforcement (A2-C3, with the S1 FFI work)**:
+   grep-audit test or module gating so `fill/bytes/hex/alnum` cannot be
+   called for security material by mistake.
+8. **XChaCha20 standard compliance (A1-C2, in S1)**: switch holo-ss to
+   holo-crypto's standard `aead_xchacha20poly1305_*` (24-byte nonce)
+   with draft-irtf-cfrg-xchacha vectors, or de-scope the cipher with an
+   honest non-interop note; remove the dead `n24` store
+   (holo-ss/src/lib.rs:97-98).
+9. **Bookkeeping refresh at every gate (A3-C4)**: STATE.md and
+   ARCHITECTURE.md "Current workspace" re-checked against the tree
+   (partially done this run).
+
+Applied THIS run (verified, not carried): backup.sh FAILED-marker commit
++ message sanitization (A4-C1/C2), restore fast path `-B main` + token
+invocation wording (A4-C3/C4), WORKFLOW §1.3 durability scoping (A4-C5),
+.gitignore id_ed25519/id_ecdsa (A4-C6), harness-audit CI job (A4-C6),
+ci.yml permissions narrowed to read (A1-F8), holonetctl honest entropy
+error (A1-C6), stale "randomized" comments fixed (A2-C2), published-
+releases disclosure + D-0009 (A1-C1/C4), per-platform test baselines
+(A1-C5), links-importer scope corrected (A3-F3), ARCHITECTURE refresh
+(A3-F3/C4), RFC 8448/8017 citations fixed (A3-F8).

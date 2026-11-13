@@ -18,9 +18,12 @@ cannot be silently amended: changes to it are entries in
 3. A plan is COMPLETE only when `backup.sh` exits 0: `main` is pushed.
    The rolling tag `sandbox/latest` is advanced best-effort, and any
    tag-push failure is logged in `BACKUPS.md`; a failed `main` push
-   appends a FAILED marker line to `BACKUPS.md` and exits 1 (gate-0001
-   A4-C1/C2). If the tree is clean, the script still pushes and refreshes
-   the tag — a no-op backup is still a backup.
+   appends a FAILED marker line to `BACKUPS.md` — committed locally
+   immediately, reaching the remote only with the NEXT successful backup
+   (a pushed log with no FAILED line therefore proves nothing about runs
+   that died unpushed; the unpushed gap is the out-of-band signal) — and
+   exits 1 (gate-0001 A4-C1/C2/C5). If the tree is clean, the script
+   still pushes and refreshes the tag — a no-op backup is still a backup.
 4. If the push fails (network, auth), the run is NOT complete. Report the
    failure honestly; do not claim success. If the push is rejected as
    non-fast-forward (another sandbox pushed concurrently): `git fetch

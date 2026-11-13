@@ -49,3 +49,17 @@
   audited FFI exception (RtlGenRandom / BCryptGenRandom) scoped to
   `holo-util/src/rand.rs` ONLY, staged as ROADMAP S1 item 0, re-reviewed
   at every gate. Documented in `docs/THREAT-MODEL.md` §G.
+- **D-0009 (2026-11-13, gate 0001 A1-C1 — ESCALATED TO OWNER)**: the
+  PUBLISHED v0.2.0/v0.3.0 release binaries predate the fail-closed
+  entropy hardening — on Windows, their AEAD salts and IPC tokens come
+  from the predictable splitmix64 fallback. Disclosed in THREAT-MODEL
+  §G. The owner must decide at the next session: publish a security
+  advisory, or cut a v0.3.1 re-release from the hardened tree (all four
+  release jobs now emit SHA256SUMS.txt). Until decided: treat Windows
+  binaries from v0.2.0/v0.3.0 as unsuitable for adversarial use.
+- **D-0010 (2026-11-13, gate 0001 — consensus decision)**: gate 0001
+  (S0 → S1) PASSED on unanimous non-BLOCK round-2 verdicts from all four
+  active reviewers after remediation; record at
+  `harness/adversarial/verdicts/0001-S1-gate.md`. S1 may start in the
+  next run, under its amended charter and the binding conditions listed
+  in ROADMAP.

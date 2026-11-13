@@ -742,8 +742,9 @@ fn resolve(server: &str) -> std::io::Result<std::net::SocketAddr> {
 /// Server-side relay loop for one accepted client socket.
 ///
 /// `upstream_dial` dials the real target; bytes are then pumped in both
-/// directions with pooled buffers. Auth failures get a randomized
-/// slow-close (anti-probing) and never reach the dialer.
+/// directions with pooled buffers. Auth failures get a delayed slow-close
+/// (anti-probing; deterministic today — CSPRNG jitter is staged in S1,
+/// see ROADMAP) and never reach the dialer.
 pub fn serve_conn<F>(
     sock: TcpStream,
     master: &[u8; 32],
@@ -761,7 +762,8 @@ where
     let sc = match ServerConn::accept(sock, master, method) {
         Ok(sc) => sc,
         Err(e) => {
-            // auth/probe failure: slow close (randomized), no details out
+            // auth/probe failure: slow close (deterministic backoff today;
+            // CSPRNG jitter staged in S1), no details out
             let mut g = guard.lock().unwrap();
             let delay = g.on_failure(peer);
             std::thread::sleep(delay.min(Duration::from_millis(120)));

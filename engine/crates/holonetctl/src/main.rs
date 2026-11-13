@@ -31,7 +31,16 @@ fn main() {
             std::env::var("HOME").unwrap_or_else(|_| ".".to_string())
         )
     });
-    let token = holo_engine::ensure_token(std::path::Path::new(&data_dir)).unwrap_or_default();
+    // fail-closed entropy must stay VISIBLE on the CLI too (gate-0001
+    // A1-C6): unwrap_or_default() would turn an entropy failure into a
+    // misleading "bad token" auth error one step later
+    let token = match holo_engine::ensure_token(std::path::Path::new(&data_dir)) {
+        Ok(t) => t,
+        Err(e) => {
+            eprintln!("holonetctl: cannot read/create IPC token in {data_dir}: {e}");
+            std::process::exit(1);
+        }
+    };
     let mut c = match holo_engine::IpcClient::connect(&addr, &token) {
         Ok(c) => c,
         Err(e) => {

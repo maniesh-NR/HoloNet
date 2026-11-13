@@ -79,6 +79,7 @@ pitfalls included.
 
 ## Reference material still valid
 
-- docs/ARCHITECTURE.md §6 driver parameter registry (flat string maps)
+- the holo-proto Params flat string-map registry (docs/ARCHITECTURE.md,
+  "driver SPI") — the importers' target format
 - The Material You settings keys are already wired: `theme_mode`,
   `seed_color`, `dynamic_color` (holo-config Settings + theme.get).

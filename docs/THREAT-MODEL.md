@@ -32,6 +32,10 @@ Accepted limits (honest):
   transiently visible in process argv during a backup — accepted
   single-user-sandbox tradeoff (documented; a credential-helper flow is
   the backlog alternative).
+- Secret files (`ipc-token`, `profiles.json`) are created with the
+  default umask and tightened to 0600 immediately after — std Rust
+  cannot create-with-mode, so a brief window exists (accepted interim,
+  gate-0001 A1-F7); FFI-based restrictive-create is the S6 backlog.
 
 ### B. On-path DPI censor (middlebox)
 
@@ -84,7 +88,10 @@ stages (S5 providers, chain modes) widen the choice set only.
 In scope, partially:
 - EVERY release job (linux, windows, macos, android) publishes
   `SHA256SUMS.txt` next to its archives — verify with
-  `sha256sum -c SHA256SUMS.txt` before running anything.
+  `sha256sum -c SHA256SUMS.txt` before running anything. (The checksum
+  steps were added in the gate-0001 run; the PUBLISHED v0.2.0/v0.3.0
+  release assets predate them and carry no checksum files — the first
+  checksummed release will be the next tag push.)
 - Zero third-party crates (D-0002) keeps the dependency attack surface
   empty; CI pins the Rust 1.77.2 legacy floor and cross-checks
   musl/Android builds.
@@ -122,6 +129,13 @@ ONLY from `holo_util::rand::os_fill` — **fail-closed**:
   `engine/crates/holo-util/src/rand.rs` ONLY, re-reviewed at every gate.
 - `splitmix64` remains for NON-security uses only (IDs, jitter, test
   data) and is documented as such at the source.
+- **Disclosure (gate 0001, A1-C1):** the PUBLISHED v0.2.0/v0.3.0
+  binaries predate this hardening — at those tags, Windows builds
+  generated AEAD salts and the IPC token from the splitmix64 fallback
+  (time/pid-seeded, predictable). The fail-closed behavior above
+  applies from the gate-0001 remediation commit (53ff229) onward.
+  Owner decision required (D-0009): publish an advisory or cut a
+  v0.3.1 re-release from the hardened tree.
 
 ## Revision history
 
