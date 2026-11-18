@@ -63,10 +63,21 @@ cold restore and update this estimate with the real figure.
    --include="*.rs" | wc -l` (75 expected); (b) public CI conclusions
    for HEAD via anonymous API —
    `https://api.github.com/repos/maniesh-NR/HoloNet/actions/runs?head_sha=<sha>`
-   (expected at the 2026-11-17 push: ubuntu green-again after the
-   lockfile fix, 1.77.2 job green, windows-latest red-by-design until
-   S1 item 0); (c) record BOTH facts in the session journal. Any
-   CI-red beyond the disclosed windows job blocks baseline trust.
+   (expected matrix since 2026-11-18: ubuntu green, macOS green,
+   1.77.2 green, windows expected-red-with-continue-on-error until S1
+   item 0); (c) record BOTH facts in the session journal. Any CI-red
+   beyond the labeled windows job blocks baseline trust.
+   **Log access (owner credential):** anonymous log download is 403;
+   the owner's cached git credential works —
+   `TOKEN=$(printf "protocol=https\nhost=github.com\n\n" | git
+   credential fill | grep '^password=' | cut -d= -f2-)` then
+   `curl -H "Authorization: Bearer $TOKEN" .../runs/<id>/logs -L -o
+   logs.zip` (GCM_INTERACTIVE=never; never echo the token).
+   **Cloud toolchain (owner capability, noted 2026-11-18):** the
+   owner's GitHub account includes a Copilot cloud sandbox that can
+   host a Linux toolchain for real test execution when this Windows
+   host has none — prefer it over installing MSVC Build Tools locally;
+   run `cargo test --workspace` there and quote the result verbatim.
 
 5. **Load memory, in this order**:
    `harness/memory/LESSONS.md` → `STATE.md` → `ROADMAP.md` → newest

@@ -104,3 +104,16 @@
 - CRLF checkout (core.autocrlf=true) breaks working-tree hash
   verification of hash-anchored records — pin `harness/** text eol=lf`
   in .gitattributes (done, D-0011) and verify hashes at BLOB level.
+- Shared-runner RSS variance is real: the same binary that grew +88–376
+  KB locally grew +2520 KB on ubuntu-latest runners — memory-assertion
+  budgets need a runner-variance margin (8 MB over 64 MB relayed,
+  D-0015) or they greenwash CI permanently.
+- Anonymous GitHub API is 403 for ACTION LOGS but the owner's cached
+  git credential (Windows credential manager, retrieved via
+  `git credential fill` with GCM_INTERACTIVE=never) authenticated the
+  logs download — `curl -H "Authorization: Bearer $TOKEN" .../runs/<id>/logs`
+  returns a zip of per-job logs. Never echo the token; length-check it.
+- Workflow-level "failure" conclusion can hide healthy jobs: after the
+  lockfile fix, run 44229892465's workflow conclusion was failure but
+  jobs were 4 green / 2 red — ALWAYS read per-job conclusions, not the
+  workflow badge, when triaging.

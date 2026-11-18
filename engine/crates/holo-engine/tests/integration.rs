@@ -432,12 +432,19 @@ fn memory_stays_bounded_under_sustained_relay() {
     let growth = rss_after.saturating_sub(rss_before);
     eprintln!("mem: rss {rss_before} → {rss_after} KB (+{growth} KB) over 64MB relayed");
     // pooled relays allocate nothing per-chunk: growth must stay far below
-    // the 64MB transferred. Observed in practice: +88..376 KB; the 2MB
-    // ceiling sits 5-20x above observed noise while still catching any
-    // per-chunk allocation regression (tightened at gate 0001 per A1-C3;
-    // Linux-only test, documented in harness/memory/STATE.md).
+    // the 64MB transferred. Local reference: +88..376 KB. Budget history:
+    // tightened to 2MB at gate 0001 (A1-C3), but that fails on shared CI
+    // runners — the 2026-11-13/18 ubuntu runs observed +2520 KB purely
+    // from runner allocator/page-accounting variance (progress review
+    // 0002 A1-C1 diagnosis, named from the authenticated CI logs). The
+    // regression's purpose is catching PER-CHUNK allocation: a pooling
+    // failure relaying 64MB in 16KB chunks would grow tens of MB, so an
+    // 8MB ceiling (12.5% of the relayed volume) still fails
+    // catastrophically wrong code while tolerating runner variance.
+    // Linux-only test, documented in harness/memory/STATE.md; budget
+    // decision: D-0015.
     assert!(
-        growth < 2 * 1024,
+        growth < 8 * 1024,
         "RSS grew {growth} KB — pooling/regression failure"
     );
     drop(conn);
