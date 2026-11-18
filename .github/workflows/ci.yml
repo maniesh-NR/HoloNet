@@ -10,29 +10,28 @@ on:
 
 jobs:
   test:
-    name: Test (${{ matrix.os }})${{ matrix.os == 'windows-latest' && '; expected-red until S1 item 0 (D-0008)' || '' }}
+    name: Test (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        include:
-          - os: windows-latest
-            expected-red: true
     runs-on: ${{ matrix.os }}
-    continue-on-error: ${{ matrix.expected-red == true }}
+    continue-on-error: ${{ matrix.os == 'windows-latest' }}
     # windows-latest is honestly RED until the S1 Windows entropy FFI
     # lands (D-0008): fail-closed entropy aborts holo-ss token/salt
-    # generation. continue-on-error + the display-name suffix (A3-C3,
-    # progress review 0002) keep the matrix readable during the red
-    # window — a NEW Windows regression is no longer indistinguishable
-    # from the known one. Flip both off at item-0 completion.
-    runs-on: ${{ matrix.os }}
+    # generation. continue-on-error keeps the matrix readable during the
+    # red window (A3-C3, progress review 0002) — a NEW Windows regression
+    # is no longer indistinguishable from the known one. Flip off at
+    # item-0 completion.
     defaults:
       run:
         shell: bash
         working-directory: engine
     steps:
       - uses: actions/checkout@v4
+      - name: Expected-red window notice (D-0008)
+        if: runner.os == 'Windows'
+        run: echo "::warning title=Expected red::Windows tests are expected to fail until S1 item 0 (D-0008 entropy FFI) lands. A failure here is the KNOWN red, not a new regression."
       - name: Install Rust (stable)
         run: |
           rustup toolchain install stable --profile minimal --no-self-update
