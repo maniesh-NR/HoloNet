@@ -51,6 +51,15 @@ cannot be silently amended: changes to it are entries in
    and are immutable once pushed. Corrections are NEW records referencing
    the old. The run that pushes a record quotes its SHA-256 in its
    `BACKUPS.md` line, tying the log to the record.
+6. Record numbers are SEQUENCE numbers of the verdicts directory, not
+   gate identities; a gate is identified by its stage transition (e.g.
+   "the S1→S2 gate"). A PROGRESS REVIEW (adversarial assessment without
+   a stage transition) may occupy a record number; it has NO transition
+   authority and must say so in its header (D-0011, gate-0002 review
+   A3-C1/A4-C5). Record hashes are SHA-256 of the committed BLOB
+   content — verify with `git show HEAD:<path> | sha256sum`, never by
+   hashing the working-tree file, which CRLF checkouts can alter
+   (D-0011, A4-C1; see also .gitattributes).
 
 ## 3. Honesty rules
 

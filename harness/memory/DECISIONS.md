@@ -63,3 +63,50 @@
   `harness/adversarial/verdicts/0001-S1-gate.md`. S1 may start in the
   next run, under its amended charter and the binding conditions listed
   in ROADMAP.
+- **D-0011 (2026-11-17, progress review 0002 A3-C1/A4-C1/C5)**: (a)
+  Verdict-record numbers are directory SEQUENCE numbers, not gate
+  identities; gates are identified by stage transition ("the S1→S2
+  gate"). (b) PROGRESS REVIEWS (adversarial assessment with no stage
+  transition) are an authorized record type; they state "no transition
+  authority" in their header. (c) Record/archive hashes are SHA-256 of
+  committed BLOB content — verify via `git show HEAD:<path> |
+  sha256sum`, never by hashing working-tree files (CRLF checkouts
+  differ); `.gitattributes` now pins `harness/**` (and scripts) to LF
+  so fresh checkouts hash identically. ROADMAP's hardcoded "gate 0002"
+  labels rewritten to stage-transition form. WORKFLOW §2.6 added.
+- **D-0012 (2026-11-17, progress review 0002 — consensus decision)**:
+  progress review 0002 PASSED: 4/4 PROCEED_WITH_CONDITIONS, 0 BLOCK,
+  verdicts archived verbatim in
+  `harness/adversarial/verdicts/0002-progress-review.md` (chain:
+  5bbc465c…ab4f4 → this run's record). Its 21 aggregated binding
+  conditions are copied into ROADMAP (S1 amendments, S2/S5/S6
+  annotations, descope/tripwire/terminal-gate sections). Orchestrator
+  incidents (concurrency-limit sequential resumes, one role-mislabel
+  corrected mid-run) are recorded in the record header, not smoothed
+  over. STATE.md re-verify wording is now per-host (A4-C4).
+- **D-0013 (2026-11-17, re-escalation of D-0009 with reconciled facts —
+  A1-C3/C5, A2-C3, A3-C7):** API-verified release surface: the
+  pre-hardening WINDOWS binaries (predictable splitmix salts/IPC token)
+  named in D-0009 are NO LONGER publicly downloadable (only
+  v0.2.0-linux, empty v0.2.0, and source-only v0.3.0 are visible);
+  downloads-before-removal are unknowable. The owner decision is now:
+  (a) publish a short advisory anyway + cut a CHECKSUMMED, SIGNED
+  v0.3.1 from the hardened tree and republish the per-OS binaries
+  (which also fixes the invisible-releases defect), or (b) record a
+  dated decision not to. DEADLINE: before S1 is marked DONE; if v0.3.1
+  is chosen it must be cut BEFORE the S1 XChaCha20 wire change lands
+  (binding condition 8) so the re-release does not break its own wire
+  protocol. Also reconcile: v0.2.0/v0.3.0 per-OS release runs concluded
+  "success" but produced no public releases (drafts/deleted?) —
+  republish or delete explicitly.
+- **D-0014 (2026-11-17, progress review 0002 A3-C2 — PROPOSED DEFAULT,
+  owner may override at the next session):** the descope rule NAMES the
+  v1.0 TLS/QUIC-based protocol: **trojan over the S2 holo-tls client**
+  (smallest delta from the shipped SS plane; exercises all S1/S2
+  deliverables; Green-R2 analysis), with hy2/tuic as named alternates
+  iff S3 completes on schedule. Descope tripwire N=4 session journals;
+  terminal gate = S7 completion + release assessment (per-platform
+  green, signatures, D-0009/D-0013 status, THREAT-MODEL re-review,
+  descope conformance). Closes gate-0001 A3-C5's requirements one cycle
+  late — the panel's warning about slipped binding conditions is on
+  record (A3 dissent).

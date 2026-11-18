@@ -30,9 +30,11 @@ Flutter (Android)   Compose (macOS)   Qt6/QML (Win+Linux)
 
 - **holo-crypto**: hand-written, std-only ChaCha20 / Poly1305 / AEAD /
   XChaCha20 / AES-256-GCM / SHA-2 / HMAC / HKDF, validated against RFC &
-  NIST vectors (OpenSSL cross-checks were run during development and are
-  recorded in the harness session journals — process evidence, not an
-  in-tree artifact). Zero dependencies.
+  NIST vectors (OpenSSL CLI cross-checks were also run during development,
+  but those session journals were lost to a sandbox recycle before the
+  harness existed — they stand as recollection, not recorded evidence;
+  re-running them as recorded process evidence is charted in ROADMAP S1).
+  Zero dependencies.
 - **holo-net**: transport techniques from the published literature —
   RFC 6298 RTT/RTO, CUBIC (SIGOPS 2008) + HyStart++ (RFC 9065), BBR (CACM
   2017, model portion), Deficit Round Robin fair queuing (SIGCOMM '95),
@@ -76,25 +78,35 @@ Flutter (Android)   Compose (macOS)   Qt6/QML (Win+Linux)
 
 ## Releases
 
-Prebuilt engine binaries — `holonetd` + `holonetctl`, all built with
-Rust 1.77.2 — are published on the
-[releases page](https://github.com/maniesh-NR/HoloNet/releases) for every
-targeted operating system:
+**Release-surface status (progress review 0002, 2026-11-17 — verified
+against the GitHub API):** only three releases are publicly visible today —
+`v0.2.0` (empty), `v0.2.0-linux` (static musl tarball + `SHA256SUMS.txt`),
+and `v0.3.0` (source tarball only). The per-OS releases the v0.2.0/v0.3.0
+release workflows built successfully on 2026-11-08 (`v0.2.0-windows`,
+`v0.2.0-macos`, `v0.2.0-android`, all `v0.3.0-*`) are **not publicly
+downloadable** — their workflow runs concluded "success" but no public
+release exists for those tags (unpublished drafts or deleted; reconciliation
+and a re-publish decision are open owner items, tracked with D-0009 in
+`harness/memory/DECISIONS.md`). Until that lands, treat
+`v0.2.0-linux` as the only prebuilt binary release, and note it predates
+the fail-closed entropy hardening on non-CSPRNG platforms (not applicable
+to Linux, which used `/dev/urandom`; see
+[docs/THREAT-MODEL.md](docs/THREAT-MODEL.md) §G).
 
-| Release | Assets | Runs on |
+Intended release matrix (what `release.yml` builds per tag push):
+
+| Tag | Assets | Runs on |
 |---|---|---|
-| `v0.2.0-linux` | static musl tarball (x64) | any x86_64 Linux — Mint 20/21/22 and newer |
-| `v0.2.0-windows` | x64 + x86 zip | Windows 7 SP1 – 11 |
-| `v0.2.0-macos` | x64 + arm64 tarballs | macOS 10.15 Catalina + |
-| `v0.2.0-android` | arm64 + armv7 engine tarballs | Android 8.0+ (engine; APK from source) |
+| `*-linux` | static musl tarball (x64) | any x86_64 Linux — Mint 20/21/22 and newer |
+| `*-windows` | x64 + x86 zip | Windows 7 SP1 – 11 |
+| `*-macos` | x64 + arm64 tarballs | macOS 10.15 Catalina + |
+| `*-android` | arm64 + armv7 engine tarballs | Android 8.0+ (engine; APK from source) |
 
-Binaries are **portable**: unpack and run, no installer. Every release job
-publishes `SHA256SUMS.txt` next to its archives — verify downloads before
-running anything (`sha256sum -c SHA256SUMS.txt`); Windows/macOS/Android
-checksum coverage was added in the gate-0001 hardening run. The GUI
-frontends build from source — see [docs/BUILDING.md](docs/BUILDING.md).
-Tag pushes rebuild everything via
-[`.github/workflows/release.yml`](.github/workflows/release.yml).
+Binaries are **portable**: unpack and run, no installer. Release jobs
+publish `SHA256SUMS.txt` next to their archives — verify downloads before
+running anything (`sha256sum -c SHA256SUMS.txt`). The GUI frontends build
+from source — see [docs/BUILDING.md](docs/BUILDING.md). Tag pushes rebuild
+everything via [`.github/workflows/release.yml`](.github/workflows/release.yml).
 
 ## Quick start
 

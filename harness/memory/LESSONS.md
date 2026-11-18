@@ -65,3 +65,42 @@
 - `git add -A` sweeps whatever is not explicitly ignored — the ignore
   list must cover credential-shaped files (*.pem, *.key, *.env, id_rsa,
   *.p12) or a backup will commit secrets (gate 0001 A2-F8/A4-C3).
+
+## Multi-agent orchestration (progress review 0002 run, 2026-11-17)
+
+- Host agent-concurrency limits are real: a 7-agent parallel batch was
+  cut mid-run; sequential/limited-concurrency resumes preserved the
+  protocol (blindness intact — no reviewer saw another's output).
+  Launch multi-agent panels in waves of ≤2–3, or accept resume churn.
+- Agents that die near completion ("exceed quota limit", backend
+  stream errors) usually resume cleanly from their own context — do
+  NOT restart from scratch; the ADVERSARIAL re-launch rule exists for
+  true non-responses.
+- Orchestrator resume messages are a failure point: VERIFY agent IDs
+  against their ORIGINAL prompts before sending role-narratives — this
+  run mislabeled four agents (positional mix-up), caught and corrected
+  mid-run; two reviewers recorded it in their dissents. Cheap
+  prevention: address resumes by quoted original role text.
+- Anonymous GitHub API (no token) suffices for run/job conclusions and
+  release inventories but NOT logs (403) — plan diagnosis paths
+  accordingly (repo-access run needed for log reading).
+
+## CI / evidence (progress review 0002 run)
+
+- CI state must be CHECKED AT THE PUSH COMMIT immediately after every
+  push: the 2026-11-13 backup pushed green-locally while the same
+  commit's ubuntu CI failed 25 s later — unnoticed for 4 days (A1-F1).
+  "Locally green" and "CI green" are different claims; quote both or
+  neither.
+- `cargo test` with a MODERN cargo silently rewrites Cargo.lock
+  version 3 → 4 (53ff229 did it AGAIN after 3f22323 fixed it) —
+  cargo 1.77.2 then cannot parse the lockfile and the legacy job fails.
+  Rule: after ANY cargo invocation, `git diff engine/Cargo.lock` and
+  restore `version = 3` before committing.
+- Release-workflow "success" ≠ public release: per-OS releases built
+  on 2026-11-08 are invisible today (drafts or deleted). Verify the
+  RELEASES API, not workflow conclusions, when claiming published
+  artifacts.
+- CRLF checkout (core.autocrlf=true) breaks working-tree hash
+  verification of hash-anchored records — pin `harness/** text eol=lf`
+  in .gitattributes (done, D-0011) and verify hashes at BLOB level.

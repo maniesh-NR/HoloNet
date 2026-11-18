@@ -25,9 +25,12 @@ Accepted limits (honest):
 - Root/ptrace, memory inspection, and keyloggers are OUT of scope — no
   client-only software defends those.
 - The local SOCKS listener binds without its own auth; `proxy_listen`
-  must stay a loopback address. Binding it off-loopback is an
-  open-relay footgun the user must avoid (hardening staged with the S6
-  killswitch/split-tunnel work).
+  must stay a loopback address. Consequence TODAY (progress review 0002,
+  A2-F10): while it is loopback, ANY local process can ride the tunnel
+  and blend its traffic with the user's — loopback is a co-location
+  boundary, not an authentication boundary. Binding off-loopback would
+  additionally create an unauthenticated open proxy; refusal (unless
+  explicitly overridden) is chartered in S1 (A3-C4), not deferred to S6.
 - `harness/scripts/backup.sh` passes the GitHub token in a push URL,
   transiently visible in process argv during a backup — accepted
   single-user-sandbox tradeoff (documented; a credential-helper flow is
@@ -67,11 +70,22 @@ Defenses (shipped, tested):
 - Per-peer exponential backoff, reset on success (`holo_net::ProbeGuard`).
 
 Accepted limits (staged in ROADMAP S1, "server-path hardening"):
+- **Salt REPLAY is not defended (progress review 0002, A2-F2 — raised
+  from omission to explicit limit):** the server keeps NO seen-salt
+  cache, so a censor who captures a genuine client handshake (salt +
+  first chunk) can replay it; the server will accept, re-dial the
+  recorded target, and behave observably differently from
+  reference implementations that reject replays — a known active-probe
+  fingerprint (IMC '20). A bounded exact-match salt cache with
+  opaque-path rejection (identical behavior to garbage — no new
+  oracle, no Bloom filter per SIP022's false-positive prohibition) is
+  chartered in S1 (A2-C1).
 - Close-vs-hang timing can distinguish "length decrypted and in-range"
   from "length rejected" — uniformization staged.
 - The slow-close delay is deterministic today (50ms·2^n clamped to
   120 ms on the wire); CSPRNG-jittered randomization staged with the S1
-  entropy work.
+  entropy work (the deterministic delay is itself a fingerprint —
+  NDSS '20 "Detecting Probe-resistant Proxies").
 - ProbeGuard maps have no decay/eviction yet — unbounded growth under
   many distinct failing peers (memory DoS on a long-running server);
   staged.
@@ -92,6 +106,12 @@ In scope, partially:
   steps were added in the gate-0001 run; the PUBLISHED v0.2.0/v0.3.0
   release assets predate them and carry no checksum files — the first
   checksummed release will be the next tag push.)
+- **Release-surface reality (progress review 0002, A1-F3, API-verified
+  2026-11-17):** only `v0.2.0` (empty), `v0.2.0-linux` (tarball +
+  SHA256SUMS.txt), and `v0.3.0` (source only) are publicly visible. The
+  per-OS v0.2.0/v0.3.0 binaries the workflows built are NOT currently
+  downloadable; the D-0009 exposure list must be read against this
+  reality (see DECISIONS D-0013).
 - Zero third-party crates (D-0002) keeps the dependency attack surface
   empty; CI pins the Rust 1.77.2 legacy floor and cross-checks
   musl/Android builds.
@@ -129,6 +149,15 @@ ONLY from `holo_util::rand::os_fill` — **fail-closed**:
   `engine/crates/holo-util/src/rand.rs` ONLY, re-reviewed at every gate.
 - `splitmix64` remains for NON-security uses only (IDs, jitter, test
   data) and is documented as such at the source.
+- **Windows secret-at-rest (progress review 0002, A2-F4/C2):** the
+  0600 owner-only writes are unix-only (`#[cfg(unix)]`); std Rust has
+  no Windows ACL API, and the daemon's data dir falls back
+  `HOME` → `"."` (relative CWD) — on Windows `HOME` is usually unset.
+  Today this is masked (fail-closed entropy aborts before any write);
+  the S1 Windows FFI acceptance therefore ALSO requires: data-dir
+  fallback to `USERPROFILE`, hard error when neither `HOLONET_DATA`
+  nor `HOME`/`USERPROFILE` resolves (never CWD), and a recorded
+  Windows ACL decision for `ipc-token`/`profiles.json`.
 - **Disclosure (gate 0001, A1-C1):** the PUBLISHED v0.2.0/v0.3.0
   binaries predate this hardening — at those tags, Windows builds
   generated AEAD salts and the IPC token from the splitmix64 fallback
@@ -141,3 +170,9 @@ ONLY from `holo_util::rand::os_fill` — **fail-closed**:
 
 - 2026-11-13 — created at gate 0001 (A2-C2), including the D-0008
   entropy decision recorded in `harness/memory/DECISIONS.md`.
+- 2026-11-17 — progress review 0002 amendments: §A local-SOCKS-hop
+  consequence made explicit (A2-F10); §C salt-replay omission raised to
+  an explicit accepted limit with the S1 cache charter (A2-C1/F2), slow-
+  close fingerprint citation added; §E public release-surface reality
+  recorded (A1-F3); §G Windows secret-at-rest gap and S1 acceptance
+  additions (A2-F4/C2).

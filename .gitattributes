@@ -1,0 +1,11 @@
+# Hash-anchored files must round-trip byte-identically on every platform
+# (gate-0002 review A4-C1): records quote SHA-256 of committed blob
+# content, and CRLF checkouts (core.autocrlf=true on Windows hosts)
+# made working-tree hashes unverifiable. Pin LF for the harness.
+harness/** text eol=lf
+*.sh text eol=lf
+*.md text
+*.rs text
+*.toml text
+*.yml text
+*.lock text
