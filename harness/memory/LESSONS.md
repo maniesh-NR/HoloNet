@@ -117,3 +117,13 @@
   lockfile fix, run 44229892465's workflow conclusion was failure but
   jobs were 4 green / 2 red — ALWAYS read per-job conclusions, not the
   workflow badge, when triaging.
+- Invalid workflow YAML = a run with `conclusion: failure` and
+  `total_count: 0` jobs whose `name` is the FILE PATH (not the
+  `name:` key) — and NO check-run annotations; the error text is
+  UI-only. Diagnose by validating the YAML locally (this run's bug:
+  a duplicated `runs-on:` mapping key from a bad string replacement).
+- Keep GitHub Actions job-level expressions CONSERVATIVE: simple
+  `${{ matrix.os }}` interpolation and a documented
+  `continue-on-error: ${{ matrix.os == '...' }}` pattern work;
+  put honesty markers in step-level `::warning` annotations rather
+  than compound `&&/||` name expressions (costs a CI cycle to learn).

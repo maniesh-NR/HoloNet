@@ -121,3 +121,16 @@
   catastrophically wrong code). Chosen remediation path per A1-C1:
   fix to green rather than accepted-risk disclosure. The holo-ss side
   of the gate-0001 tightening (per-chunk bound) is untouched.
+- **D-0016 (2026-11-19, owner instruction — pstack protocol adopted)**:
+  a token-efficiency OPERATIONAL layer is added on top of the harness:
+  (a) `PROJECT_MEMORY.md` (repo root) = compressed single-source
+  operational view (tech-stack invariants, active playbook, verification
+  contracts, key facts) — it POINTS INTO the harness memory but never
+  replaces it; on conflict the harness files are authoritative and both
+  get updated. (b) Zero-noise rule: no raw history dumps in context or
+  memory files; `update_memory.py` (repo root) appends only STAT
+  summaries of the last 3 commits (HOLO_MEMORY_FULL_DIFF=1 opts into
+  patches) and replaces its section idempotently; run at session start
+  or as pre-/post-commit hook. (c) Investigation before code + explicit
+  verification contracts per task. This changes no binding workflow
+  rule — backup.sh remains the final step of every run.
