@@ -68,8 +68,9 @@ Windows FFI + windows-latest green before any crypto-extension item).
    uniformity, XChaCha standard switch, rand-split enforcement,
    BLAKE2s (BLAKE2b cut unless justified), X25519 (1M-vector execution
    mode decided first), AES-CFB, ExpandLabel, bignum/RSA.
-6. [dev, next code run] A4-C2 harness-audit equality+range checks;
-   A4-C3 backup.sh rebase guard + WARN durability.
+6. [dev] ~~A4-C2 harness-audit~~ DONE 2026-11-19 (full-tree integrity
+   audit, D-0017); ~~A4-C3 backup.sh guards~~ DONE (rebase/unmerged
+   refusal + WARN durability, negative-tested).
 7. [research→charter] R-01..R-15 / C-01..C-15 backlog in ROADMAP.
 
 ## Key facts snapshot (2026-11-19)
@@ -85,7 +86,7 @@ Windows FFI + windows-latest green before any crypto-extension item).
 ## Recent Progress & Git Activity
 
 ```text
+### Commit: 4aecfca - backup: pstack protocol adopted (D-0016): PROJECT_MEMORY.md operational layer + zero-noise update_memory.py; CI-diagnosis verified closed (run 44234338593 all green except expected-red windows); session journ (maniesh-NR, 2026-11-19)
 ### Commit: fc9b889 - ci: fix duplicate runs-on key (previous push produced an invalid-workflow run with 0 jobs); conservative expected-red form — continue-on-error via matrix comparison + step-level D-0008 warning annotation (maniesh-NR, 2026-11-18)
 ### Commit: b90b15c - ci-diagnosis: A1-C1 closed — ubuntu failure = memory_stays_bounded runner variance (+2520KB vs 2MB assert; logs read via owner credential); mem budget 2MB->8MB (D-0015); windows job continue-on-error + expected-red label (A3-C3); windows failure confirmed = disclosed fail-closed entropy red (maniesh-NR, 2026-11-18)
-### Commit: 26b48c9 - backup: record 0002 tie-in: sha256=72d8858d012b4a2d8477fd96af33c7aabcf0e7dda0d659ebd138c37ace3c05c5 (maniesh-NR, 2026-11-18)
 ```

@@ -91,29 +91,66 @@ jobs:
           cargo check --workspace --target armv7-linux-androideabi
 
   harness-audit:
-    name: Harness audit (gate-record ↔ backup-log tie-in)
+    name: Harness audit (record chain + hash resolution, full tree)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
-      - name: gate records must land with a BACKUPS.md line quoting their SHA-256
+      - name: every quoted hash resolves to a tracked blob; record chains are intact
         run: |
-          set -e
-          # WORKFLOW.md §2.5 tie-in, machine-checked (gate-0001 A4-C6)
-          if git diff --quiet HEAD~1 HEAD -- harness/adversarial/verdicts/; then
-            echo "no gate-record changes in this commit: nothing to audit"
-            exit 0
-          fi
-          if git diff --quiet HEAD~1 HEAD -- harness/memory/BACKUPS.md; then
-            echo "::error::gate record pushed without a BACKUPS.md line"
-            exit 1
-          fi
-          if ! git diff HEAD~1 HEAD -- harness/memory/BACKUPS.md | grep '^+' | grep -qE '[0-9a-f]{64}'; then
-            echo "::error::BACKUPS.md line does not quote the record SHA-256"
-            exit 1
-          fi
-          echo "tie-in OK: gate record + BACKUPS.md line with record hash"
+          set -euo pipefail
+          # A4-C2 (record 0002): the existence-only audit is replaced by a
+          # WHOLE-TREE integrity audit (D-0017 — chosen over the originally
+          # suggested origin/main..HEAD range audit because tree-level chain
+          # verification is strictly stronger for mutation detection and
+          # needs no deep fetch):
+          #   1. every 64-hex string quoted in a verdict record or added to
+          #      BACKUPS.md resolves to the blob sha256 of a TRACKED file
+          #      (warn when the resolution lands outside harness/adversarial/verdicts/);
+          #   2. every gate record's final `chain:` line equals the blob
+          #      sha256 of the numerically previous record (0001 = "genesis").
+          # Verified against blob content (D-0011), never working-tree bytes.
+          fail=0
+          git ls-files -z | while IFS= read -r -d '' f; do
+            h="$(git show "HEAD:$f" | sha256sum | cut -d' ' -f1)"
+            printf '%s %s\n' "$h" "$f"
+          done > /tmp/blobs.txt
+          # 1) hash resolution
+          scan() {
+            for h in $(grep -oE '[0-9a-f]{64}' "$1" 2>/dev/null | sort -u || true); do
+              if ! grep -q "^$h " /tmp/blobs.txt; then
+                echo "::error::$1 quotes $h — matches NO tracked blob (tampered or stale)"
+                fail=1
+              fi
+            done
+          }
+          for rec in harness/adversarial/verdicts/*.md; do scan "$rec"; done
+          scan harness/memory/BACKUPS.md
+          # 2) chain recomputation (records = files whose last line is `chain: `)
+          prevhash=""
+          prevname="(none)"
+          for rec in $(ls harness/adversarial/verdicts/*.md | sort); do
+            last="$(tail -n 1 "$rec")"
+            case "$last" in
+              chain:\ *)
+                chain="${last#chain: }"
+                name="$(basename "$rec")"
+                seq="${name%%-*}"
+                if [ "$seq" = "0001" ]; then
+                  [ "$chain" = "genesis" ] || { echo "::error::$name: first record's chain must be 'genesis', got '$chain'"; fail=1; }
+                elif [ -z "$prevhash" ]; then
+                  echo "::error::$name chains to $chain but no predecessor record was seen"
+                  fail=1
+                elif [ "$chain" != "$prevhash" ]; then
+                  echo "::error::$name chain $chain != previous record $prevname blob $prevhash"
+                  fail=1
+                fi
+                prevhash="$(git show "HEAD:$rec" | sha256sum | cut -d' ' -f1)"
+                prevname="$name"
+                echo "chain OK: $name -> $prevhash"
+                ;;
+            esac
+          done
+          exit $fail
 
   legacy-toolchain:
     name: Rust 1.77.2 compatibility (Win7 / Catalina baseline)

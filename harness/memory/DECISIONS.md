@@ -134,3 +134,22 @@
   or as pre-/post-commit hook. (c) Investigation before code + explicit
   verification contracts per task. This changes no binding workflow
   rule — backup.sh remains the final step of every run.
+- **D-0017 (2026-11-19, A4-C2 implementation — audit-scope choice)**: the
+  harness-audit CI job is reimplemented as a WHOLE-TREE integrity audit
+  instead of the suggested per-commit `origin/main..HEAD` range audit:
+  (1) every 64-hex string quoted in any verdict record or in BACKUPS.md
+  must resolve to the blob sha256 of a TRACKED file (warn-only when the
+  resolution lands outside `harness/adversarial/verdicts/`); (2) every
+  gate record's final `chain:` line must equal the blob sha256 of the
+  numerically previous record (0001 = "genesis"). Rationale: tree-level
+  verification is strictly stronger against post-push mutation (it runs
+  at EVERY push over ALL records, needs no deep fetch, and cannot be
+  skipped by mid-history landings as the HEAD~1..HEAD diff was). Tradeoff
+  honestly recorded: the per-commit form proved "record landed in the
+  same push as its BACKUPS.md line"; the tree form proves integrity at
+  every pushed state but not landing-coincidence — accepted (the
+  BACKUPS.md tie-in quote IS covered by rule 1, which fails if a record
+  hash is quoted but the record itself is absent/tampered). Verified
+  locally: chain 0001=genesis, 0002=0001-blob, 85 blobs all resolve;
+  backup.sh guards negative-tested (rebase sentinel → refusal with
+  recovery commands printed, zero BACKUPS.md mutation).

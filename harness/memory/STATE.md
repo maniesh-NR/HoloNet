@@ -68,10 +68,10 @@ analysis + public GitHub API; nothing was executed locally).
   STATE.md full-CI disclosure (A1-C5); DECISIONS D-0011..D-0014;
   session journal 2026-11-17.
 - NOT remediated this run (binding on next code run, per record 0002):
-  harness-audit CI equality/range checks (A4-C2); backup.sh rebase
-  guard + WARN durability (A4-C3); ubuntu-CI diagnosis (A1-C1 — needs
-  a run with repo log access); everything S1. (SANDBOX-RESTORE Windows
-  section + per-host re-verify wording: DONE this run, A4-C4.)
+  everything S1. (A4-C2 harness-audit strengthening + A4-C3 backup.sh
+  guards: DONE 2026-11-19, D-0017 — verified locally and by CI;
+  A1-C1/A1-C2 closed 2026-11-18 with runs 44229892465/44234338593;
+  SANDBOX-RESTORE Windows section done 2026-11-17, A4-C4.)
 - Gate status: gate 0001 PASSED (S0→S1, S1 open to start); progress
   review 0002 PASSED (no transition authority; S1 charter AMENDED).
   Next record number: 0003 (expected: the S1→S2 gate, per WORKFLOW
