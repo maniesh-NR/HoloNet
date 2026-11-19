@@ -86,7 +86,7 @@ Windows FFI + windows-latest green before any crypto-extension item).
 ## Recent Progress & Git Activity
 
 ```text
+### Commit: 00772a4 - harness: A4-C2 harness-audit reimplemented as full-tree integrity audit (hash resolution + chain recomputation, D-0017); A4-C3 backup.sh hardening (rebase/unmerged refusal with recovery commands, WARN durability + error capture) — locally simulated + negative-tested (maniesh-NR, 2026-11-19)
 ### Commit: 4aecfca - backup: pstack protocol adopted (D-0016): PROJECT_MEMORY.md operational layer + zero-noise update_memory.py; CI-diagnosis verified closed (run 44234338593 all green except expected-red windows); session journ (maniesh-NR, 2026-11-19)
 ### Commit: fc9b889 - ci: fix duplicate runs-on key (previous push produced an invalid-workflow run with 0 jobs); conservative expected-red form — continue-on-error via matrix comparison + step-level D-0008 warning annotation (maniesh-NR, 2026-11-18)
-### Commit: b90b15c - ci-diagnosis: A1-C1 closed — ubuntu failure = memory_stays_bounded runner variance (+2520KB vs 2MB assert; logs read via owner credential); mem budget 2MB->8MB (D-0015); windows job continue-on-error + expected-red label (A3-C3); windows failure confirmed = disclosed fail-closed entropy red (maniesh-NR, 2026-11-18)
 ```
