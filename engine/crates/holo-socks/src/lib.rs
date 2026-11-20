@@ -198,13 +198,53 @@ pub struct SocksServer {
     pub stop: Arc<AtomicBool>,
 }
 
+/// A2-C6/A3-C4 (pulled into S1 at progress review 0002): refuse
+/// non-loopback listen addresses. Resolves `addr` and requires EVERY
+/// resolved IP to be loopback (0.0.0.0 / :: / 8.8.8.8 all fail); a name
+/// that resolves to nothing fails closed. Pure check — the explicit
+/// operator override (`HOLONET_PROXY_LISTEN_ANY=1`) lives in `bind` so
+/// this function stays deterministic and test-friendly.
+fn require_loopback_listen(addr: &str) -> std::io::Result<()> {
+    use std::net::ToSocketAddrs;
+    let mut saw_one = false;
+    for sa in addr.to_socket_addrs()? {
+        saw_one = true;
+        if !sa.ip().is_loopback() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!(
+                    "refusing non-loopback listen {addr} (open-proxy footgun; \
+                     set HOLONET_PROXY_LISTEN_ANY=1 to override)"
+                ),
+            ));
+        }
+    }
+    if !saw_one {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            format!("listen address {addr} resolves to nothing (fail closed)"),
+        ));
+    }
+    Ok(())
+}
+
 impl SocksServer {
     /// Bind and return the server handle (does not accept yet).
+    ///
+    /// Loopback-only by default (S1 hardening, A3-C4 pulled in from S6):
+    /// a non-loopback proxy_listen is an open-proxy footgun on the LAN.
+    /// Binding 0.0.0.0 / :: / any non-loopback address is refused with
+    /// InvalidInput unless the operator explicitly sets
+    /// `HOLONET_PROXY_LISTEN_ANY=1` in the environment BEFORE the daemon
+    /// starts (read once here, at bind time).
     pub fn bind(
         addr: &str,
         dialer: Arc<dyn Dialer>,
         shaper: Arc<Shaper>,
     ) -> std::io::Result<SocksServer> {
+        if std::env::var("HOLONET_PROXY_LISTEN_ANY").ok().as_deref() != Some("1") {
+            require_loopback_listen(addr)?;
+        }
         let listener = TcpListener::bind(addr)?;
         Ok(SocksServer {
             listener,
@@ -764,5 +804,92 @@ mod tests {
         let s = Stats::default();
         let (i, o, c, r) = s.snapshot();
         assert_eq!((i, o, c, r), (0, 0, 0, 0));
+    }
+
+    /// Serialize every test that touches the HOLONET_PROXY_LISTEN_ANY env
+    /// var (bind-refusal + override tests): the var is process-global, and
+    /// a parallel refusal test would see the override window. The pure
+    /// policy-table test never reads env, so it needs no lock.
+    static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    #[test]
+    fn loopback_policy_table() {
+        // pure check — no bind, no env dependence, no DNS (all literals)
+        assert!(require_loopback_listen("127.0.0.1:2080").is_ok());
+        assert!(require_loopback_listen("[::1]:2080").is_ok());
+        assert!(require_loopback_listen("127.77.4.3:0").is_ok()); // whole 127/8
+        for bad in ["0.0.0.0:0", "[::]:0", "192.0.2.1:0", "8.8.8.8:53"] {
+            let e = require_loopback_listen(bad)
+                .err()
+                .unwrap_or_else(|| panic!("{bad} must be refused"));
+            assert_eq!(e.kind(), std::io::ErrorKind::InvalidInput, "{bad}");
+            assert!(e.to_string().contains("HOLONET_PROXY_LISTEN_ANY"), "{bad}");
+        }
+    }
+
+    #[test]
+    fn non_loopback_bind_refused_ipv4_any() {
+        let _g = ENV_LOCK.lock().unwrap();
+        let dialer = Arc::new(EchoDialer {
+            echo_port: 1,
+            refuse: false,
+        });
+        let shaper = Arc::new(Shaper::new(0));
+        let e = SocksServer::bind("0.0.0.0:0", dialer, shaper)
+            .err()
+            .expect("0.0.0.0 bind must be refused without override");
+        assert_eq!(e.kind(), std::io::ErrorKind::InvalidInput);
+        assert!(e.to_string().contains("HOLONET_PROXY_LISTEN_ANY"), "{e}");
+    }
+
+    #[test]
+    fn non_loopback_bind_refused_ipv6_any() {
+        let _g = ENV_LOCK.lock().unwrap();
+        let dialer = Arc::new(EchoDialer {
+            echo_port: 1,
+            refuse: false,
+        });
+        let shaper = Arc::new(Shaper::new(0));
+        let e = SocksServer::bind("[::]:0", dialer, shaper)
+            .err()
+            .expect(":: bind must be refused without override");
+        assert_eq!(e.kind(), std::io::ErrorKind::InvalidInput);
+        assert!(e.to_string().contains("HOLONET_PROXY_LISTEN_ANY"), "{e}");
+    }
+
+    #[test]
+    fn non_loopback_bind_refused_literal_before_os() {
+        let _g = ENV_LOCK.lock().unwrap();
+        // TEST-NET-1 (RFC 5737): the POLICY refusal fires before the OS
+        // bind (whose error text for this address would differ) — proving
+        // the check precedes the socket syscall.
+        let dialer = Arc::new(EchoDialer {
+            echo_port: 1,
+            refuse: false,
+        });
+        let shaper = Arc::new(Shaper::new(0));
+        let e = SocksServer::bind("192.0.2.1:0", dialer, shaper)
+            .err()
+            .expect("non-loopback literal must be refused");
+        assert_eq!(e.kind(), std::io::ErrorKind::InvalidInput);
+        assert!(e.to_string().contains("open-proxy footgun"), "{e}");
+    }
+
+    #[test]
+    fn env_override_allows_non_loopback_bind() {
+        let _g = ENV_LOCK.lock().unwrap();
+        std::env::set_var("HOLONET_PROXY_LISTEN_ANY", "1");
+        let dialer = Arc::new(EchoDialer {
+            echo_port: 1,
+            refuse: false,
+        });
+        let shaper = Arc::new(Shaper::new(0));
+        let r = SocksServer::bind("0.0.0.0:0", dialer, shaper);
+        std::env::remove_var("HOLONET_PROXY_LISTEN_ANY");
+        // Momentary any-interface bind: serve() is never called, so no
+        // accept loop ever runs; the socket closes when srv drops.
+        let srv = r.expect("override must be honored");
+        assert!(srv.local_addr().unwrap().ip().is_unspecified());
+        drop(srv);
     }
 }

@@ -140,6 +140,14 @@ Server-path hardening backlog (A2-F5; **lands in S1** — tightened from
   override is set; named test: 0.0.0.0/:: bind refused without override.
   The v0.3.0 data plane binds today; deferral to S6 was a sequencing
   failure, not scoping discipline.
+  **DONE 2026-11-20 run 4:** `SocksServer::bind` enforces loopback-only
+  via `require_loopback_listen` (every resolved IP must be loopback;
+  unresolvable names fail closed; the check precedes the OS bind) with
+  the explicit operator override `HOLONET_PROXY_LISTEN_ANY=1`; named
+  tests `non_loopback_bind_refused_ipv4_any` / `..._ipv6_any` /
+  `..._literal_before_os` + `env_override_allows_non_loopback_bind`
+  (env-mutating tests serialized on a lock) + pure `loopback_policy_table`;
+  local suite 83-green (CI verification rides the next push).
 
 Acceptance criteria (all measurable):
 - **Internal ordering (progress review 0002, A3-C3): item 0 merges
@@ -184,9 +192,18 @@ Acceptance criteria (all measurable):
   against RFC 8017 §9.1.2 vectors; PLUS an in-crate RSA-2048 self-test
   cert (self-made, labeled as such — NOT an official vector set).
 - Server-path hardening, named tests (A3-C2, checked at the S1→S2 gate):
-  **salt-replay cache rejects a replayed salt+first-chunk connection
-  (progress review 0002, A2-C1); off-loopback proxy_listen bind refused
-  without explicit override (A3-C4);**
+  **~~salt-replay cache rejects a replayed salt+first-chunk connection
+  (progress review 0002, A2-C1)~~ DONE 2026-11-20 run 4 — `SaltCache`
+  (bounded FIFO, cap 1024, `SALT_CACHE_CAPACITY`) admitted in
+  `ServerConn::accept` BEFORE any crypto; replay returns the SAME opaque
+  `auth_failed()` as a wrong password; named test
+  `salt_cache_rejects_replayed_prefix` (original tunnels end to end,
+  byte-identical replay refused, upstream never dialed for the replay) +
+  `salt_cache_admit_and_evict_semantics` (bounded FIFO, aged-out
+  re-admission — the honest capacity limit); serve_conn/accept gained a
+  `&Mutex<SaltCache>` param, all call sites updated; ~~off-loopback
+  proxy_listen bind refused without explicit override (A3-C4)~~ DONE
+  2026-11-20 run 4 (see the S1 backlog annotation above);**
   ProbeGuard map bounded under 1024 distinct failing peers (decay/eviction
   test — N pinned at 1024, record-0003 A1-F8); CSPRNG-jittered
   slow-close seeded from `os_fill` through an injected-seam pattern
@@ -206,8 +223,10 @@ Acceptance criteria (all measurable):
   Windows entropy FFI (D-0008) — containment now compile-time-enforced
   by `#![forbid(unsafe_code)]` on every crate except holo-util
   (D-0018); workspace test count grows monotonically per platform from
-  the CURRENT baselines (Linux 76 / macOS 75 / Windows 75 — the item-0
-  ledger, D-0018; supersedes the post-gate-0001 75/74/72 figures;
+  the CURRENT baselines (Linux 83 / macOS 75+ / Windows 75+ — run 4
+  added 7 Linux-runnable tests: +5 holo-socks, +2 holo-ss; Linux count
+  locally verified 2026-11-20, per-OS ledger rides the next CI-verified
+  push; supersedes the item-0 ledger 76/75/75, D-0018;
   cfg-gated tests count differently per OS, A1-C5).
 - Gate: the S1→S2 gate (record number assigned sequentially — see
   WORKFLOW §2.6, D-0011; do NOT hardcode record numbers) required

@@ -53,12 +53,16 @@ fn spawn_ss_server(method: holo_ss::Method, password: &'static str, _upstream: u
     let ln = TcpListener::bind("127.0.0.1:0").unwrap();
     let port = ln.local_addr().unwrap().port();
     let guard = Arc::new(Mutex::new(holo_net::ProbeGuard::new()));
+    let salts = Arc::new(Mutex::new(holo_ss::SaltCache::new(
+        holo_ss::SALT_CACHE_CAPACITY,
+    )));
     std::thread::spawn(move || {
         for sock in ln.incoming().flatten() {
             let master = holo_ss::master_key(password);
             let guard = guard.clone();
+            let salts = salts.clone();
             std::thread::spawn(move || {
-                let _ = holo_ss::serve_conn(sock, &master, method, &guard, |target| {
+                let _ = holo_ss::serve_conn(sock, &master, method, &guard, &salts, |target| {
                     let t = target.to_string();
                     let addr = t
                         .rsplit_once(':')

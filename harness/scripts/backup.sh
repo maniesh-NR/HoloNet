@@ -77,12 +77,18 @@ fi
 # Record-0003 A4-C1/F3: the 2026-11-20 panel found origin/main had moved
 # ahead of the local tree while the run believed "local == origin/main"
 # from a stale tracking ref. Verify against the LIVE remote before pushing;
-# refuse on divergence with the §1.4 recovery commands. If the query itself
-# fails (offline), continue — the push will surface the truth honestly.
+# refuse on divergence with the §1.4 recovery commands. DIVERGENCE means
+# the remote has commits local lacks (parallel session pushed) — local
+# AHEAD of the remote is NOT divergence: it is exactly the
+# retry-after-failed-push state (the 2026-11-20 run 3 push auth-failed,
+# leaving FAILED-marker commits locally), the push is a pure fast-forward,
+# and refusing it would deadlock every retry forever (found and fixed
+# 2026-11-20 run 4, D-0022). If the query itself fails (offline),
+# continue — the push will surface the truth honestly.
 if REMOTE_HEAD="$(git ls-remote origin refs/heads/main 2>/dev/null | cut -f1)" && [ -n "$REMOTE_HEAD" ]; then
   LOCAL_HEAD="$(git rev-parse HEAD)"
-  if [ "$REMOTE_HEAD" != "$LOCAL_HEAD" ]; then
-    echo "backup: REFUSING — local HEAD != origin/main (live check, record-0003 A4-C2):" >&2
+  if ! git merge-base --is-ancestor "$REMOTE_HEAD" "$LOCAL_HEAD"; then
+    echo "backup: REFUSING — origin/main has commits local lacks (live check, record-0003 A4-C2):" >&2
     echo "  local  = $LOCAL_HEAD" >&2
     echo "  remote = $REMOTE_HEAD" >&2
     echo "  Reconcile first (WORKFLOW §1.4; keep BOTH BACKUPS.md lines on conflict):" >&2

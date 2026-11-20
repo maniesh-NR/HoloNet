@@ -1,21 +1,41 @@
 # HoloNet State Snapshot
 
-Last updated: 2026-11-20 (UTC, third run of the day — pstack re-affirm,
-memory hooks D-0021, lockfile-v3 regression fixed). Run 3 changed no
-Rust code: owner re-sent the pstack framework (already adopted D-0016;
-the HOOK gap is now closed — update_memory.py --check gate +
+Last updated: 2026-11-20 (UTC, fourth run of the day — S1 server-path
+hardening shipped). Run 4: toolchain REINSTALLED via rustup (rustc
+1.100.0; recycle had wiped it); baseline re-verified 76/76 green
+BEFORE any change; **A2-C1 SALT-REPLAY CACHE SHIPPED** (holo-ss
+SaltCache, bounded FIFO cap 1024, admitted in ServerConn::accept
+before any crypto, replay = the same opaque auth_failed(); named test
+`salt_cache_rejects_replayed_prefix` + `salt_cache_admit_and_evict_
+semantics`; serve_conn/accept gained &Mutex<SaltCache>, all call
+sites updated); **A3-C4 OFF-LOOPBACK BIND REFUSAL SHIPPED** (holo-socks
+require_loopback_listen: every resolved IP must be loopback, names
+fail closed, check precedes the OS bind; override env
+HOLONET_PROXY_LISTEN_ANY=1; 5 new tests incl. the two named refusal
+tests). **Local suite 83 green** (76 + 7: +5 holo-socks, +2 holo-ss);
+static count 85; Cargo.lock v3 invariant HELD post-run (verified — no
+Cargo.toml change → no regeneration; lesson refined accordingly).
+Harness: **D-0022 backup.sh retry-deadlock fixed** (guard now refuses
+only when the remote has commits local lacks; local-ahead =
+fast-forward allowed; scenarios A–E negative/positive-tested in a
+throwaway repo). ROADMAP/THREAT-MODEL §A/§C annotated/flipped with
+local evidence; per-OS ledger + README counts ride the next
+CI-verified push (push auth still absent — see BACKUPS.md tail).
+
+Previous-run state, preserved below (run 3 — pstack re-affirm,
+memory hooks D-0021, lockfile-v3 regression fixed; changed no Rust
+code: owner re-sent the pstack framework (already adopted D-0016;
+the HOOK gap closed — update_memory.py --check gate +
 --install-hooks, pre-commit refresh+stage / post-commit read-only);
 warm-restore 0/0b done (reconciliation MATCH at ef19a6f; 94 phantom
 exec-bit mods cleared, 0 content). FOUND+FIXED live regression:
 Cargo.lock had been silently rewritten v3→v4 by the 0003 run's
 modern-cargo test re-run (violates the v3 invariant; breaks the
-1.77.2 CI job) — v3 restored this run BEFORE any push. Toolchain
-ABSENT after recycle → 4W fallback (static 78; anonymous API
+1.77.2 CI job) — v3 restored that run BEFORE any push. Toolchain
+was ABSENT after recycle → 4W fallback (static 78; anonymous API
 rate-limited — CI not re-fetched; engine diff vs CI-verified 2dae1ce
 = Cargo.toml hygiene + the lockfile line only). Backup push outcome:
-BACKUPS.md tail (HOLO_GITHUB_TOKEN absent).
-
-Previous-run state, preserved verbatim below: cross-validation
+BACKUPS.md tail (HOLO_GITHUB_TOKEN absent).) Cross-validation
 progress review 0003 (independent adversarial panel, 4×
 PROCEED_WITH_CONDITIONS, 0 BLOCK; record
 `harness/adversarial/verdicts/0003-cross-validation.md`). Linux sandbox

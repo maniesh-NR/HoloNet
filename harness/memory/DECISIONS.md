@@ -224,3 +224,20 @@
   real RAG consumer exists). Same run, remediation (not a new
   decision): Cargo.lock v3 restored after the 0003-era v4 silent
   rewrite was found live on origin/main.
+- **D-0022 (2026-11-20 run 4, harness bug fix — backup.sh retry
+  deadlock):** the record-0003 A4-C2 live-remote guard refused on ANY
+  HEAD≠remote mismatch, including local-AHEAD — which is exactly the
+  state after an auth-failed push leaves FAILED-marker commits behind;
+  every subsequent retry would refuse forever (a deadlock: the only way
+  forward is a push, and the guard blocks all pushes). Found at run 4's
+  session start (local 203f965 vs remote ef19a6f after run 3's honest
+  push failure). Fix: refusal condition is now `! git merge-base
+  --is-ancestor $REMOTE_HEAD $LOCAL_HEAD` — refuse ONLY when the remote
+  has commits local lacks (true divergence / parallel-session push);
+  local-ahead-or-equal is a safe fast-forward and allowed. Verified in a
+  throwaway repo pair (guard_test scenarios A–E: equal ALLOW, local-ahead
+  ALLOW, remote-ahead REFUSE, diverged REFUSE, unseen-remote REFUSE
+  fail-closed) + bash -n syntax check. SANDBOX-RESTORE step 0 wording
+  amended to match. Same run (context): S1 server-path hardening items
+  A2-C1 (SaltCache) and A3-C4 (loopback-only bind) shipped — see
+  ROADMAP/THREAT-MODEL annotations and the run-4 journal.

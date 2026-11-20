@@ -20,6 +20,7 @@
 //! aes-256-gcm — all 32-byte keys, 16-byte tags.
 #![forbid(unsafe_code)]
 
+use std::collections::{HashSet, VecDeque};
 use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::sync::Mutex;
@@ -583,6 +584,56 @@ impl Write for ClientConn {
 // server-side connection
 // ---------------------------------------------------------------------------
 
+/// Bounded FIFO cache of recently admitted client salts (S1 server-path
+/// hardening, progress review 0002 A2-C1 — named acceptance: a replayed
+/// salt+first-chunk connection is refused). A replayed captured prefix
+/// gets the SAME opaque auth failure as a wrong password: same error,
+/// same slow-close, no oracle for probers.
+///
+/// Honest limits: capacity-bounded FIFO — an attacker able to push
+/// `capacity` fresh connections after capturing a prefix can age its
+/// salt back out; an unbounded cache would instead be the DoS vector.
+/// 1024 mirrors the ProbeGuard peer bound rationale (ROADMAP S1).
+pub struct SaltCache {
+    ring: VecDeque<[u8; SALT_LEN]>,
+    index: HashSet<[u8; SALT_LEN]>,
+    capacity: usize,
+}
+
+/// Default bound for server-side salt tracking (see SaltCache docs).
+pub const SALT_CACHE_CAPACITY: usize = 1024;
+
+impl SaltCache {
+    pub fn new(capacity: usize) -> SaltCache {
+        SaltCache {
+            ring: VecDeque::new(),
+            index: HashSet::new(),
+            capacity,
+        }
+    }
+
+    /// Record `salt`; returns false when it was already admitted and is
+    /// still tracked — that connection is a replay and must be refused
+    /// exactly like any other auth failure.
+    pub fn admit(&mut self, salt: &[u8; SALT_LEN]) -> bool {
+        if self.index.contains(salt) {
+            return false;
+        }
+        self.index.insert(*salt);
+        self.ring.push_back(*salt);
+        if self.ring.len() > self.capacity {
+            if let Some(old) = self.ring.pop_front() {
+                self.index.remove(&old);
+            }
+        }
+        true
+    }
+
+    fn len(&self) -> usize {
+        self.ring.len()
+    }
+}
+
 /// Server-side tunnel endpoint: reads the client's salt + target from the
 /// first chunk, exposes the target, and turns raw reads into framed writes
 /// back (server's own salt sent on construction).
@@ -596,16 +647,24 @@ pub struct ServerConn {
 
 impl ServerConn {
     /// Wrap an accepted server-side socket. Returns the target address.
+    /// `salts` is the shared replay cache — a duplicate salt is refused
+    /// with the opaque auth failure (A2-C1) before any crypto work.
     pub fn accept(
         mut sock: TcpStream,
         master: &[u8; 32],
         method: Method,
+        salts: &Mutex<SaltCache>,
     ) -> std::io::Result<ServerConn> {
         sock.set_nodelay(true).ok();
         // 1. client salt
         let salt_bytes = Framing::read_exact(&mut sock, SALT_LEN)?;
         let mut salt = [0u8; 32];
         salt.copy_from_slice(&salt_bytes);
+        // 1b. salt-replay refusal (A2-C1): a captured prefix re-sent gets
+        // the SAME opaque auth error as a wrong password — no oracle
+        if !salts.lock().unwrap().admit(&salt) {
+            return Err(auth_failed());
+        }
         let mut read = Direction::new(method, master, &salt);
         // 2. send OUR salt BEFORE decrypting anything — a wrong-password
         //    client would otherwise block forever waiting for a salt that
@@ -744,12 +803,14 @@ fn resolve(server: &str) -> std::io::Result<std::net::SocketAddr> {
 /// `upstream_dial` dials the real target; bytes are then pumped in both
 /// directions with pooled buffers. Auth failures get a delayed slow-close
 /// (anti-probing; deterministic today — CSPRNG jitter is staged in S1,
-/// see ROADMAP) and never reach the dialer.
+/// see ROADMAP) and never reach the dialer. Replayed salts (A2-C1) are
+/// refused through the same opaque path via the shared `salts` cache.
 pub fn serve_conn<F>(
     sock: TcpStream,
     master: &[u8; 32],
     method: Method,
     guard: &Mutex<holo_net::ProbeGuard>,
+    salts: &Mutex<SaltCache>,
     upstream_dial: F,
 ) -> std::io::Result<u64>
 where
@@ -759,7 +820,7 @@ where
         .peer_addr()
         .map(|a| a.ip())
         .unwrap_or_else(|_| "0.0.0.0".parse().unwrap());
-    let sc = match ServerConn::accept(sock, master, method) {
+    let sc = match ServerConn::accept(sock, master, method, salts) {
         Ok(sc) => sc,
         Err(e) => {
             // auth/probe failure: slow close (deterministic backoff today;
@@ -953,14 +1014,17 @@ mod tests {
         let t2 = targets.clone();
         let guard = Mutex::new(holo_net::ProbeGuard::new());
         let guard = std::sync::Arc::new(guard);
+        let salts =
+            std::sync::Arc::new(Mutex::new(SaltCache::new(SALT_CACHE_CAPACITY)));
         std::thread::spawn(move || {
             for sock in ln.incoming() {
                 let Ok(sock) = sock else { continue };
                 let master = master_key(password);
                 let t2 = t2.clone();
                 let guard = guard.clone();
+                let salts = salts.clone();
                 std::thread::spawn(move || {
-                    let _ = serve_conn(sock, &master, method, &guard, |target| {
+                    let _ = serve_conn(sock, &master, method, &guard, &salts, |target| {
                         t2.lock().unwrap().push(target.to_string());
                         TcpStream::connect(("127.0.0.1", upstream))
                     });
@@ -1060,10 +1124,12 @@ mod tests {
         let d2 = dialed.clone();
         let guard = Mutex::new(holo_net::ProbeGuard::new());
         let guard = std::sync::Arc::new(guard);
+        let salts =
+            std::sync::Arc::new(Mutex::new(SaltCache::new(SALT_CACHE_CAPACITY)));
         std::thread::spawn(move || {
             if let Ok(sock) = ln.incoming().next().unwrap() {
                 let master = master_key("correct-pw");
-                let _ = serve_conn(sock, &master, Method::Aes256Gcm, &guard, |_t| {
+                let _ = serve_conn(sock, &master, Method::Aes256Gcm, &guard, &salts, |_t| {
                     d2.store(true, std::sync::atomic::Ordering::SeqCst);
                     TcpStream::connect(("127.0.0.1", echo_port))
                 });
@@ -1104,13 +1170,22 @@ mod tests {
         let d2 = dialed.clone();
         let guard = Mutex::new(holo_net::ProbeGuard::new());
         let guard = std::sync::Arc::new(guard);
+        let salts =
+            std::sync::Arc::new(Mutex::new(SaltCache::new(SALT_CACHE_CAPACITY)));
         std::thread::spawn(move || {
             if let Ok(sock) = ln.incoming().next().unwrap() {
                 let master = master_key("correct-pw");
-                let _ = serve_conn(sock, &master, Method::ChaCha20IetfPoly1305, &guard, |_t| {
-                    d2.store(true, std::sync::atomic::Ordering::SeqCst);
-                    TcpStream::connect(("127.0.0.1", echo_port))
-                });
+                let _ = serve_conn(
+                    sock,
+                    &master,
+                    Method::ChaCha20IetfPoly1305,
+                    &guard,
+                    &salts,
+                    |_t| {
+                        d2.store(true, std::sync::atomic::Ordering::SeqCst);
+                        TcpStream::connect(("127.0.0.1", echo_port))
+                    },
+                );
             }
         });
         // Act as a client with the CORRECT password but forge the first
@@ -1153,5 +1228,141 @@ mod tests {
         }
         assert_eq!(Method::parse("rc4"), None);
         assert_eq!(Method::parse(""), None);
+    }
+
+    #[test]
+    fn salt_cache_admit_and_evict_semantics() {
+        let mut c = SaltCache::new(2);
+        let a = [1u8; 32];
+        let b = [2u8; 32];
+        let d = [3u8; 32];
+        assert!(c.admit(&a), "first admit");
+        assert!(!c.admit(&a), "tracked salt is refused");
+        assert!(c.admit(&b));
+        assert_eq!(c.len(), 2);
+        assert!(c.admit(&d), "evicts the oldest, admits the new");
+        assert_eq!(c.len(), 2, "ring stays capacity-bounded");
+        // a was aged out by d's insertion — it re-admits (documented bound)
+        assert!(c.admit(&a), "aged-out salt re-admits (bounded FIFO)");
+        assert!(!c.admit(&a));
+        // zero capacity degrades to NO protection (immediate eviction):
+        // honest — a 0-capacity cache simply never refuses
+        let mut z = SaltCache::new(0);
+        assert!(z.admit(&a), "cap=0 admits the first sight");
+        assert!(z.admit(&a), "cap=0 tracks nothing — no protection");
+    }
+
+    /// A2-C1 named acceptance test (ROADMAP S1 server-path hardening):
+    /// a byte-identical replay of a captured prefix (salt + first chunk)
+    /// is refused with the SAME opaque auth error as a wrong password,
+    /// never reaches the upstream dialer, while the original connection
+    /// tunnels successfully end to end.
+    #[test]
+    fn salt_cache_rejects_replayed_prefix() {
+        let echo_port = spawn_echo();
+        let ln = TcpListener::bind("127.0.0.1:0").unwrap();
+        let ss_port = ln.local_addr().unwrap().port();
+        let dialed = std::sync::Arc::new(std::sync::atomic::AtomicIsize::new(0));
+        let d2 = dialed.clone();
+        let guard = Mutex::new(holo_net::ProbeGuard::new());
+        let guard = std::sync::Arc::new(guard);
+        let salts =
+            std::sync::Arc::new(Mutex::new(SaltCache::new(SALT_CACHE_CAPACITY)));
+        let results: std::sync::Arc<Mutex<Vec<Result<u64, std::io::Error>>>> =
+            std::sync::Arc::new(Mutex::new(Vec::new()));
+        let r2 = results.clone();
+        std::thread::spawn(move || {
+            for sock in ln.incoming().flatten() {
+                let master = master_key("pw");
+                let res = serve_conn(
+                    sock,
+                    &master,
+                    Method::ChaCha20IetfPoly1305,
+                    &guard,
+                    &salts,
+                    |_target| {
+                        d2.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                        TcpStream::connect(("127.0.0.1", echo_port))
+                    },
+                );
+                let done = {
+                    let mut g = r2.lock().unwrap();
+                    g.push(res);
+                    g.len() == 2
+                };
+                if done {
+                    break;
+                }
+            }
+        });
+        // craft a valid prefix ONCE: salt || encrypted target chunk
+        let master = master_key("pw");
+        let salt = [0xA5u8; 32];
+        let target = Target::parse(&format!("127.0.0.1:{echo_port}")).unwrap();
+        let mut d = Direction::new(Method::ChaCha20IetfPoly1305, &master, &salt);
+        let mut prefix = Vec::new();
+        prefix.extend_from_slice(&salt);
+        Framing::write_chunk(&mut prefix, &mut d, &target.encode()).unwrap();
+
+        // connection 1: the original — full tunnel, echo a payload back
+        let mut c1 = TcpStream::connect(("127.0.0.1", ss_port)).unwrap();
+        c1.write_all(&prefix).unwrap();
+        Framing::write_chunk(&mut c1, &mut d, b"replay-test").unwrap();
+        c1.flush().unwrap();
+        // read the server's random out-salt, then the echoed chunk under
+        // the subkey it derives (exactly what ClientConn does internally)
+        let out_salt = Framing::read_exact(&mut c1, SALT_LEN).unwrap();
+        let mut os = [0u8; 32];
+        os.copy_from_slice(&out_salt);
+        let mut rd = Direction::new(Method::ChaCha20IetfPoly1305, &master, &os);
+        match Framing::read_chunk(&mut c1, &mut rd).unwrap() {
+            Some(pt) => assert_eq!(pt, b"replay-test".to_vec(), "echo body"),
+            None => panic!("no echoed chunk on the original connection"),
+        }
+        drop(c1); // clean EOF for both relay halves
+
+        // wait for serve_conn #1 to finish before replaying (sequential is
+        // the point: the replayed salt must be already admitted)
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        while results.lock().unwrap().is_empty() {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "original connection never completed"
+            );
+            std::thread::sleep(Duration::from_millis(20));
+        }
+
+        // connection 2: byte-identical prefix = the captured replay
+        let mut c2 = TcpStream::connect(("127.0.0.1", ss_port)).unwrap();
+        c2.write_all(&prefix).unwrap();
+        c2.flush().unwrap();
+        drop(c2);
+
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        while results.lock().unwrap().len() < 2 {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "replayed connection never handled"
+            );
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        let r = results.lock().unwrap();
+        assert!(
+            r[0].is_ok(),
+            "original connection must succeed: {:?}",
+            r[0]
+        );
+        let err = r[1].as_ref().err().expect("replay must be refused");
+        assert_eq!(err.kind(), std::io::ErrorKind::InvalidData);
+        assert_eq!(
+            err.to_string(),
+            "ss: auth failed",
+            "replay refusal is opaque (same value as wrong password)"
+        );
+        assert_eq!(
+            dialed.load(std::sync::atomic::Ordering::SeqCst),
+            1,
+            "the replay must never reach upstream"
+        );
     }
 }

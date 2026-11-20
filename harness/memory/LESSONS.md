@@ -184,3 +184,25 @@
   re-verified honestly; fall back to local evidence (static counts +
   engine diff vs the last CI-verified SHA) and say so verbatim in the
   journal.
+
+## Run 4 additions (2026-11-20 S1 hardening)
+
+- A "remote differs" guard written as `local != remote` conflates
+  divergence with the legitimate local-ahead state (unpushed backups
+  after a failed push) — and since the recovery for a failed push IS a
+  retry push, equality-checking guards deadlock the recovery path
+  forever. Refusal conditions must name the DANGEROUS direction only:
+  `! git merge-base --is-ancestor $REMOTE $LOCAL` (remote has commits
+  local lacks). Test the guard against all four states + the
+  unseen-remote fail-closed path (D-0022; scenarios A–E in the run-4
+  journal).
+- The lockfile-v4 rewrite hazard (run 3) only fires when the lockfile
+  is REGENERATED (a Cargo.toml dep change in the tree); a
+  verification-only `cargo test --workspace` with an unchanged tree
+  left version = 3 untouched — but the post-run invariant check stays
+  mandatory anyway (cheap, and the one time it is skipped is the one
+  time it bites).
+- Writing a cache-capacity edge test BEFORE tracing the code path
+  caught a wrong expectation: cap=0 evicts immediately, so the index
+  never contains the salt — every admit returns true (no protection),
+  not "refuse duplicates". Trace edge semantics first, then assert.

@@ -25,12 +25,15 @@ Accepted limits (honest):
 - Root/ptrace, memory inspection, and keyloggers are OUT of scope — no
   client-only software defends those.
 - The local SOCKS listener binds without its own auth; `proxy_listen`
-  must stay a loopback address. Consequence TODAY (progress review 0002,
+  must stay a loopback address — ENFORCED since 2026-11-20 (S1 run 4,
+  A3-C4): `SocksServer::bind` refuses 0.0.0.0/::/any non-loopback
+  address with InvalidInput before the OS bind, overridable only by the
+  explicit operator env var `HOLONET_PROXY_LISTEN_ANY=1` (named tests:
+  `non_loopback_bind_refused_ipv4_any` / `..._ipv6_any` /
+  `..._literal_before_os`). Consequence (progress review 0002,
   A2-F10): while it is loopback, ANY local process can ride the tunnel
   and blend its traffic with the user's — loopback is a co-location
-  boundary, not an authentication boundary. Binding off-loopback would
-  additionally create an unauthenticated open proxy; refusal (unless
-  explicitly overridden) is chartered in S1 (A3-C4), not deferred to S6.
+  boundary, not an authentication boundary.
 - `harness/scripts/backup.sh` passes the GitHub token in a push URL,
   transiently visible in process argv during a backup — accepted
   single-user-sandbox tradeoff (documented; a credential-helper flow is
@@ -68,18 +71,27 @@ Defenses (shipped, tested):
 - A wrong-password client provably never reaches the upstream dialer
   (`tampered_salt_is_rejected_strictly`).
 - Per-peer exponential backoff, reset on success (`holo_net::ProbeGuard`).
+- Salt REPLAY is refused (S1 run 4, 2026-11-20 — closes the A2-F2
+  limit below): `SaltCache` (bounded FIFO, capacity 1024) admits salts
+  in `ServerConn::accept` BEFORE any crypto; a replayed captured prefix
+  (salt + first chunk) gets the SAME opaque `auth_failed()` as a wrong
+  password — no new oracle, no Bloom filter (SIP022 prohibition honored);
+  named test `salt_cache_rejects_replayed_prefix` (replay never dials
+  upstream) + `salt_cache_admit_and_evict_semantics`.
 
 Accepted limits (staged in ROADMAP S1, "server-path hardening"):
-- **Salt REPLAY is not defended (progress review 0002, A2-F2 — raised
+- ~~**Salt REPLAY is not defended (progress review 0002, A2-F2 — raised
   from omission to explicit limit):** the server keeps NO seen-salt
   cache, so a censor who captures a genuine client handshake (salt +
   first chunk) can replay it; the server will accept, re-dial the
   recorded target, and behave observably differently from
   reference implementations that reject replays — a known active-probe
-  fingerprint (IMC '20). A bounded exact-match salt cache with
-  opaque-path rejection (identical behavior to garbage — no new
-  oracle, no Bloom filter per SIP022's false-positive prohibition) is
-  chartered in S1 (A2-C1).
+  fingerprint (IMC '20).~~ DEFENDED since 2026-11-20 (S1 run 4):
+  `SaltCache` exact-match bounded FIFO (cap 1024 — matches SIP004
+  reference behavior of a bounded seen-salt window). RESIDUAL, honestly:
+  an attacker able to push 1024 fresh connections after capturing a
+  prefix can age its salt back out of the FIFO and replay then — the
+  accepted bound traded against the unbounded-cache memory DoS.
 - Close-vs-hang timing can distinguish "length decrypted and in-range"
   from "length rejected" — uniformization staged.
 - The slow-close delay is deterministic today (50ms·2^n clamped to

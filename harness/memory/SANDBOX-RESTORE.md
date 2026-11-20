@@ -19,8 +19,9 @@ cold restore and update this estimate with the real figure.
    On mismatch: STOP. `git fetch origin`, then fast-forward
    (`git merge --ff-only origin/main`) or reconcile per WORKFLOW §1.4.
    Record the result in the session journal: `remote reconciliation:
-   main=<sha> latest=<sha> match=Y/N`. backup.sh now also refuses a
-   push when the live remote differs from HEAD.
+   main=<sha> latest=<sha> match=Y/N`. backup.sh refuses a push when the
+   remote has commits local lacks (divergence; local-AHEAD is allowed —
+   it is the retry-after-failed-push state, D-0022).
 
 0b. **Warm-restore branch — the repo is found ON DISK (no clone
    needed; the 2026-11-20 path):**
@@ -93,7 +94,8 @@ cold restore and update this estimate with the real figure.
    4W. **Toolchain-less hosts (Windows fallback, D-0012/A4-C4):** if no
    Rust toolchain/linker exists, do NOT claim test-green. The honest
    procedure: (a) static count — `grep -rn "#\[test\]" engine/crates
-   --include="*.rs" | wc -l` (78 expected); (b) public CI conclusions
+   --include="*.rs" | wc -l` (85 expected — run 4 added +5 holo-socks,
+   +2 holo-ss); (b) public CI conclusions
    for HEAD via anonymous API —
    `https://api.github.com/repos/maniesh-NR/HoloNet/actions/runs?head_sha=<sha>`
    (expected matrix since 2026-11-20: ALL REQUIRED-green — the
