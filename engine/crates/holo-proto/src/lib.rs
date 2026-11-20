@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)] // D-0008 containment: compile-time-enforced; the ONLY exception is holo-util/src/rand.rs (Windows entropy FFI)
+
 //! holo-proto — driver-level shared types: flat Params + the driver SPI.
 use std::collections::BTreeMap;
 use std::net::TcpStream;

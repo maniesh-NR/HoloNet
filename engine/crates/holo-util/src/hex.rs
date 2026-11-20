@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)] // D-0008 containment: compile-time-enforced; the ONLY exception is holo-util/src/rand.rs (Windows entropy FFI)
+
 //! Lowercase hex.
 pub fn encode(data: &[u8]) -> String {
     let mut out = String::with_capacity(data.len() * 2);

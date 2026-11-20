@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)] // D-0008 containment: compile-time-enforced; the ONLY exception is holo-util/src/rand.rs (Windows entropy FFI)
+
 //! holo-config — profiles, settings (incl. Material You theme seed) and the
 //! store. Importers (Clash/V2Ray/sing-box/links/WireGuard INI) were part of
 //! the full engine (see docs/RESTORE.md); this core keeps the link parser

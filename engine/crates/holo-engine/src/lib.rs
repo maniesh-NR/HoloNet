@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)] // D-0008 containment: compile-time-enforced; the ONLY exception is holo-util/src/rand.rs (Windows entropy FFI)
+
 //! holo-engine — the daemon core: IPC (NDJSON JSON-RPC 2.0 over
 //! 127.0.0.1:7977, token auth) + the Material You theme bridge (`theme.get`
 //! serves the full M3 role set derived from the user's seed color) + the

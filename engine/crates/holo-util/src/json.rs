@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)] // D-0008 containment: compile-time-enforced; the ONLY exception is holo-util/src/rand.rs (Windows entropy FFI)
+
 //! A minimal JSON value model with parser + serializer (RFC 8259).
 use std::collections::BTreeMap;
 

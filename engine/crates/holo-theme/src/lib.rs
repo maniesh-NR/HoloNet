@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)] // D-0008 containment: compile-time-enforced; the ONLY exception is holo-util/src/rand.rs (Windows entropy FFI)
+
 //! holo-theme — the Material You (Material Design 3) color system for
 //! HoloNet: one seed color → tonal palettes → light/dark color roles.
 //!

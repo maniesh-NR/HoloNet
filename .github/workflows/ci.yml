@@ -165,5 +165,12 @@ jobs:
         run: |
           rustup toolchain install 1.77.2 --profile minimal --no-self-update
           rustup default 1.77.2
-      - name: Check
+      - name: Check (host)
         run: cargo check --workspace
+      - name: Check (x86_64-pc-windows-msvc target)
+        run: |
+          # S1 item 0 acceptance (A3-C3): the Windows cfg paths — including
+          # the D-0008 FFI — must compile on the 1.77.2 floor. check-only,
+          # so no linker is needed on this ubuntu host.
+          rustup target add x86_64-pc-windows-msvc
+          cargo check --workspace --target x86_64-pc-windows-msvc

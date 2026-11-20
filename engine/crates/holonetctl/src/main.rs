@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)] // D-0008 containment: compile-time-enforced; the ONLY exception is holo-util/src/rand.rs (Windows entropy FFI)
+
 //! holonetctl — CLI control utility (state/list/import/theme/settings).
 fn send(c: &mut holo_engine::IpcClient, method: &str, params: &str) {
     match c.request(method, params) {

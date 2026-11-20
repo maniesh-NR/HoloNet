@@ -1,19 +1,64 @@
 //! Randomness (std-only), with a STRICT separation of security and
 //! non-security sources (see docs/THREAT-MODEL.md, "Entropy"):
 //!
-//! - `os_fill` / `os_bytes` / `os_hex`: OS entropy (`/dev/urandom`),
-//!   FAIL-CLOSED. For ALL security material (AEAD salts, auth tokens,
-//!   future keys and nonces). No silent fallback: if the OS source cannot
-//!   be read, the call returns `Err` and the caller must surface it.
-//!   Windows has no `/dev/urandom` — those calls fail closed (an explicit
-//!   error, never weak randomness) until the audited platform FFI lands
-//!   (ROADMAP S1 item 0, decision D-0008).
+//! - `os_fill` / `os_bytes` / `os_hex`: OS entropy, FAIL-CLOSED. For ALL
+//!   security material (AEAD salts, auth tokens, future keys and
+//!   nonces). No silent fallback: if the OS source cannot be read, the
+//!   call returns `Err` and the caller must surface it. Unix:
+//!   `/dev/urandom`. Windows (S1 item 0, D-0008 — the chartered,
+//!   contained FFI exception): RtlGenRandom via advapi32, available
+//!   since Windows XP so the Windows 7 SP1 floor is covered; any
+//!   syscall failure is an explicit error.
 //! - `fill` / `bytes` / `hex` / `alnum`: non-security PRNG (urandom when
 //!   available, otherwise splitmix64 seeded time^pid^counter) for IDs,
 //!   jitter, and test data. NEVER for crypto material.
 use std::io::Read;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
+
+/// The ONLY `unsafe` in the workspace (D-0008, audited exception,
+/// re-reviewed at every gate): Windows CSPRNG via RtlGenRandom
+/// (advapi32's SystemFunction036). `grep -rn "unsafe" engine/crates/`
+/// must return hits in this file ONLY.
+#[cfg(windows)]
+mod win_entropy {
+    #[cfg(test)]
+    use std::sync::atomic::AtomicBool;
+
+    #[link(name = "advapi32")]
+    extern "system" {
+        fn RtlGenRandom(random_buffer: *mut u8, random_buffer_length: u32) -> u8;
+    }
+
+    /// TEST SEAM (fail-closed injection, analogous to unix's
+    /// `os_fill_at` bad-path test): production never sets it.
+    #[cfg(test)]
+    pub(crate) static INJECT_FAIL: AtomicBool = AtomicBool::new(false);
+
+    pub(crate) fn fill(buf: &mut [u8]) -> std::io::Result<()> {
+        if buf.is_empty() {
+            return Ok(());
+        }
+        #[cfg(test)]
+        if INJECT_FAIL.load(std::sync::atomic::Ordering::Relaxed) {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "RtlGenRandom injected failure — refusing weak randomness (fail-closed)",
+            ));
+        }
+        // RtlGenRandom takes a ULONG length; buffer needs are tiny
+        // (32-byte salts, tokens) but chunk defensively at u32::MAX.
+        let len = buf.len().min(u32::MAX as usize) as u32;
+        let ok = unsafe { RtlGenRandom(buf.as_mut_ptr(), len) };
+        if ok == 0 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "RtlGenRandom failed — refusing weak randomness (fail-closed)",
+            ));
+        }
+        Ok(())
+    }
+}
 
 static COUNTER: AtomicU64 = AtomicU64::new(0x9E3779B97F4A7C15);
 
@@ -51,7 +96,14 @@ pub fn os_fill_at(path: &str, buf: &mut [u8]) -> std::io::Result<()> {
 
 /// Fail-closed OS entropy for SECURITY material — no fallback, ever.
 pub fn os_fill(buf: &mut [u8]) -> std::io::Result<()> {
-    os_fill_at("/dev/urandom", buf)
+    #[cfg(windows)]
+    {
+        win_entropy::fill(buf)
+    }
+    #[cfg(not(windows))]
+    {
+        os_fill_at("/dev/urandom", buf)
+    }
 }
 
 /// Security-grade random bytes (fail-closed).
@@ -114,6 +166,33 @@ mod tests {
         super::os_fill(&mut b).expect("os entropy must be readable on unix");
         assert!(b.iter().any(|&x| x != 0), "entropy must not be all zero");
         assert_eq!(super::os_hex(16).unwrap().len(), 32);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn os_entropy_succeeds_and_is_nonzero_windows() {
+        // S1 item 0 (D-0008): the RtlGenRandom path must satisfy the same
+        // contract as unix — real entropy, never all-zero.
+        let mut b = [0u8; 32];
+        super::os_fill(&mut b).expect("RtlGenRandom must succeed on windows");
+        assert!(b.iter().any(|&x| x != 0), "entropy must not be all zero");
+        assert_eq!(super::os_hex(16).unwrap().len(), 32);
+        let mut empty: [u8; 0] = [];
+        assert!(super::os_fill(&mut empty).is_ok());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn os_entropy_fails_closed_on_ffi_failure_windows() {
+        // S1 item 0 acceptance: a Windows FFI failure is a hard ERROR,
+        // never a silent weak fallback (seam mirrors the unix
+        // os_fill_at bad-path test).
+        super::win_entropy::INJECT_FAIL.store(true, std::sync::atomic::Ordering::Relaxed);
+        let mut b = [0u8; 32];
+        let r = super::os_fill(&mut b);
+        super::win_entropy::INJECT_FAIL.store(false, std::sync::atomic::Ordering::Relaxed);
+        assert!(r.is_err(), "injected FFI failure must surface as Err");
+        assert!(b.iter().all(|&x| x == 0), "no bytes may be produced on failure");
     }
 
     #[test]

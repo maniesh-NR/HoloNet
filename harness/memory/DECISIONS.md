@@ -153,3 +153,14 @@
   locally: chain 0001=genesis, 0002=0001-blob, 85 blobs all resolve;
   backup.sh guards negative-tested (rebase sentinel → refusal with
   recovery commands printed, zero BACKUPS.md mutation).
+- **D-0018 (2026-11-19, S1 item 0 — Windows entropy + secret-at-rest)**:
+  (a) `os_fill` on Windows calls RtlGenRandom (advapi32 SystemFunction036)
+  — chosen over BCryptGenRandom for the Windows 7 SP1 floor (XP-era API,
+  no CNG-disabled caveat) — via the D-0008 contained FFI in
+  `holo-util/src/rand.rs` ONLY (the workspace's sole unsafe), fail-closed
+  with a test-only injection seam (INJECT_FAIL). (b) Data-dir resolution:
+  HOLONET_DATA → HOME → USERPROFILE → hard error; the CWD "." fallback is
+  REMOVED (A2-C2) — unit-tested. (c) Windows ACLs for ipc-token/
+  profiles.json: rely on per-user profile-directory ACLs; no additional
+  FFI (D-0008 containment) — residual (admin/SYSTEM readable) recorded
+  in THREAT-MODEL §G, consistent with §A's root-out-of-scope limit.

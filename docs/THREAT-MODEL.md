@@ -140,13 +140,25 @@ ONLY from `holo_util::rand::os_fill` — **fail-closed**:
 
 - Unix (Linux, macOS, Android): `/dev/urandom`; a read failure is a hard
   error, never a fallback.
-- Windows: pure std has NO CSPRNG and `/dev/urandom` does not exist —
-  `os_fill` FAILS CLOSED with an explicit error. Windows binaries shipped
-  today therefore REFUSE to generate security material rather than
-  silently degrading (a dial attempt errors: "os entropy unavailable").
-  This is the honest interim state; S1 stages the audited, contained FFI
-  exception (RtlGenRandom / BCryptGenRandom) scoped to
-  `engine/crates/holo-util/src/rand.rs` ONLY, re-reviewed at every gate.
+- Windows (S1 item 0 LANDED 2026-11-19, D-0008/D-0018): `os_fill` calls
+  **RtlGenRandom** (advapi32 SystemFunction036) via the chartered,
+  contained FFI exception scoped to
+  `engine/crates/holo-util/src/rand.rs` ONLY — the sole `unsafe` in the
+  workspace, re-reviewed at every gate. Fail-closed preserved: any
+  syscall failure is an explicit error (test-covered via the injection
+  seam), never a weak fallback. RtlGenRandom (not BCryptGenRandom) is
+  the call because it has existed since Windows XP, covering the
+  Windows 7 SP1 floor without a CNG-availability caveat.
+- **Windows secret-at-rest (D-0018, with the S1 FFI):** `ipc-token` and
+  `profiles.json` live under the resolved data dir
+  (`HOLONET_DATA` → `HOME` → `USERPROFILE` → hard error; CWD fallback
+  REMOVED — A2-C2). std Rust cannot set Windows ACLs without further
+  FFI, which D-0008's containment forbids; the recorded decision is to
+  rely on the per-user ACLs Windows applies to profiles under
+  `\Users\<user>\` (user + Administrators + SYSTEM). Residual: another
+  admin/SYSTEM-privileged local actor can read the token/profiles —
+  consistent with §A's accepted limits (root/ptrace out of scope).
+  Revisit only if a threat model change requires tighter ACLs.
 - `splitmix64` remains for NON-security uses only (IDs, jitter, test
   data) and is documented as such at the source.
 - **Windows secret-at-rest (progress review 0002, A2-F4/C2):** the
