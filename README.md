@@ -7,7 +7,7 @@
 [![Rust](https://img.shields.io/badge/engine-Rust%201.77%2B-orange.svg)](engine/Cargo.toml)
 [![Platforms](https://img.shields.io/badge/platforms-Win7%20%E2%80%93%2011%20%7C%20macOS%2010.15%2B%20%7C%20Linux%20%7C%20Android%208%2B-lightgrey.svg)](#platform-matrix)
 [![Crates](https://img.shields.io/badge/dependencies-0%20third--party%20crates-success.svg)](ATTRIBUTION.md)
-[![Tests](https://img.shields.io/badge/tests-76-green-brightgreen.svg)](#status--honesty)
+[![Tests](https://img.shields.io/badge/tests-83-green-brightgreen.svg)](#status--honesty)
 
 HoloNet pairs a Rust engine (`holonetd`) with native frontends: Flutter for
 Android, Kotlin Multiplatform (Compose) for macOS, and Qt 6/QML for Windows
@@ -54,7 +54,9 @@ Flutter (Android)   Compose (macOS)   Qt6/QML (Win+Linux)
 - **Engine wiring**: `session.connect` probes the server, starts the local
   SOCKS listener from `proxy_listen`, and reports honest per-driver
   milestone errors for every protocol that is not live yet.
-- **75/75 tests green** (71 at v0.3.0 plus 4 gate-0001 hardening tests),
+- **83/83 tests green** (71 at v0.3.0 plus 4 gate-0001 hardening tests,
+  plus the S1 hardening items — CI-verified run 44700103379: 83 Linux /
+  82 macOS / 82 Windows, cfg-gated counts differ),
   including 6 end-to-end integration tests over real loopback TCP
   (IPC → import → connect → SOCKS → AEAD tunnel → echo → stats →
   disconnect) plus throughput and memory-bounding regressions.
@@ -112,7 +114,7 @@ everything via [`.github/workflows/release.yml`](.github/workflows/release.yml).
 
 ```bash
 cd engine
-cargo test                        # 76 tests on Linux (75 macOS / 75 Windows — cfg-gated counts differ)
+cargo test                        # 83 tests on Linux (82 macOS / 82 Windows — cfg-gated; CI-verified run 44700103379)
 cargo build --release -p holonetd -p holonetctl
 ./target/release/holonetd &       # data dir + IPC token auto-created
 ./target/release/holonetctl theme dark     # the full M3 role map
@@ -129,7 +131,8 @@ for the engine restoration plan.
 
 Complete and tested: the Material You system, the IPC core, and the first
 live data plane — Shadowsocks AEAD tunneled through the local SOCKS5
-entry point (76 Linux / 75 macOS / 75 Windows tests green, including six end-to-end loopback
+entry point (83 Linux / 82 macOS / 82 Windows tests green — CI-verified
+run 44700103379, including six end-to-end loopback
 integration tests). The remaining planes (TLS 1.3, QUIC, importers,
 providers, system crates) are staged in `harness/memory/ROADMAP.md` from
 the designs captured in `docs/RESTORE.md`; every stage transition is

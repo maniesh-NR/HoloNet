@@ -241,3 +241,28 @@
   amended to match. Same run (context): S1 server-path hardening items
   A2-C1 (SaltCache) and A3-C4 (loopback-only bind) shipped — see
   ROADMAP/THREAT-MODEL annotations and the run-4 journal.
+- **D-0023 (2026-11-20 run 5, S1 server-path hardening — three recorded
+  decisions, all "a decision, not an accident" per record-0003 A3-C10
+  / A1-F8):** (1) **ProbeGuard peer cap = 1024** (`PROBE_GUARD_PEER_CAP`):
+  overflow decays the stalest peer (oldest recorded `last` failure) from
+  both maps — N pinned by record-0003 A1-F8; honest residual: decayed
+  peers re-admit fresh (backoff restarts) and >1024-IP rotation slides
+  the window. (2) **Slow-close ceiling = 2 s** (`SLOW_CLOSE_MAX`), full
+  jitter uniform over `[0, min(backoff, ceiling)]` drawn from the OS
+  CSPRNG via a parameterized draw seam (production: `os_fill`; tests:
+  seeded deterministic draws — A3-C10's injected-seam pattern, no flaky
+  live-draw comparisons). Rationale: 5 doublings of 50 ms remain real
+  progressive slowdown (the accidental 120 ms clamp neutered it after
+  ~2 failures) while bounding failed-auth thread hold time; ProbeGuard's
+  internal 10 s curve is unchanged for other call sites. Same item,
+  found-by-inspection fix: the ProbeGuard Mutex was held ACROSS the
+  sleep — every concurrent connection serialized behind one probe's
+  delay; the lock now covers only the bookkeeping. (3)
+  **Unauthenticated read deadline = 10 s** (`AUTH_READ_DEADLINE`), 2×
+  the client's own 5 s dial timeout, covering salt + first chunk and
+  cleared the moment auth completes; short values injectable for tests
+  via `ServePolicy` (A3-C10 favors injected seams over global state —
+  no env knobs added). Residual (recorded in THREAT-MODEL §C): the
+  attacker-observable timeline still differs between immediate
+  length-rejection and deadline-close on silence — inherent without
+  breaking legitimate slow clients.

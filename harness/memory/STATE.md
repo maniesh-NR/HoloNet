@@ -1,7 +1,35 @@
 # HoloNet State Snapshot
 
-Last updated: 2026-11-20 (UTC, fourth run of the day — S1 server-path
-hardening shipped). Run 4: toolchain REINSTALLED via rustup (rustc
+Last updated: 2026-11-20 (UTC, fifth run of the day — S1 server-path
+hardening second pass + backup push LANDED). **PUSH LANDED** with the
+owner-supplied token (env var only, never stored): origin/main
+ef19a6f..d9e137e (4 commits — run-3 pstack backup, run-4 hardening,
+two honest FAILED markers); **CI run 44700103379 @ d9e137e all-green
+(6/6 jobs)** — per-OS ledger parsed from job logs with the socks
+redirect reconciled: **83 Linux / 82 macOS / 82 Windows** for the
+83-tree (README + ARCHITECTURE counts updated to the CI-verified
+numbers). Run 5 work (baseline re-verified 83/83 BEFORE changes;
+toolchain persisted in ~/.cargo this time): **(1) PROBE GUARD DECAY —
+SHIPPED** (`PROBE_GUARD_PEER_CAP` = 1024, stalest-`last` eviction,
+named test `probe_guard_peer_map_decays_at_cap`); **(2) CSPRNG-JITTERED
+SLOW-CLOSE — SHIPPED** (full jitter over [0, min(backoff, SLOW_CLOSE_MAX)],
+ceiling 2 s = D-0023, os_fill draw via parameterized seam, named test
+`slow_close_jitter_seeded_deterministic`; ALSO fixed found-by-inspection
+defect: ProbeGuard Mutex was held across the sleep, serializing the
+whole server behind one probe's delay); **(3) A2-F6 AUTH READ DEADLINE
+— SHIPPED** (10 s over the whole unauthenticated phase, cleared
+post-auth, `ServePolicy` injection for tests, named test
+`silent_after_valid_length_times_out`). Local suite **86 green**
+(83 + 3: +1 holo-net, +2 holo-ss); static count 88; Cargo.lock v3 HELD.
+All three decisions recorded as D-0023; ROADMAP/THREAT-MODEL §C
+annotated/flipped with honest residuals. serve_conn/accept gained the
+`ServePolicy` param — all call sites updated (4 in-crate + engine
+integration). Remaining S1: XChaCha wire fix, rand-split enforcement,
+BLAKE2s (orphan artifact available for re-derivation), X25519, AES-CFB,
+ExpandLabel, bignum/RSA.
+
+Previous-run state, preserved below (run 4 — S1 server-path hardening
+first pass). Run 4: toolchain REINSTALLED via rustup (rustc
 1.100.0; recycle had wiped it); baseline re-verified 76/76 green
 BEFORE any change; **A2-C1 SALT-REPLAY CACHE SHIPPED** (holo-ss
 SaltCache, bounded FIFO cap 1024, admitted in ServerConn::accept

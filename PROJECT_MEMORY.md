@@ -38,29 +38,36 @@ section — summarize decisions/files/next-steps only.
 
 ## Current objective
 
-S1 server-path hardening RUN 4 (2026-11-20): A2-C1 SaltCache + A3-C4
-loopback-only bind SHIPPED, local 83-green, D-0022 backup retry fix;
-CI verification + per-OS ledger + README counts ride the next push.
+S1 server-path hardening RUN 5 (2026-11-20): ProbeGuard decay (N=1024)
++ CSPRNG-jittered slow-close (ceiling 2 s, D-0023) + A2-F6 auth read
+deadline (10 s) SHIPPED, local 86-green; backup push LANDED
+(ef19a6f..d9e137e) and CI run 44700103379 all-green (6/6) — per-OS
+ledger 83 Linux / 82 macOS / 82 Windows recorded; README/ARCHITECTURE
+counts now CI-verified. CI verification of the 86-tree rides the next
+push.
 
-S1 in progress: item 0 DONE 2026-11-20 (Windows FFI + data-dir + A2-C2,
-D-0018; windows-latest required-green; run 44668106188). Next per the
-amended charter: ProbeGuard decay (N=1024), CSPRNG-jittered slow-close,
-close-vs-hang read-deadline, XChaCha wire fix, rand-split enforcement,
-then BLAKE2s/X25519/AES-CFB/ExpandLabel/bignum-RSA. Owner decisions
-(below) still pending, non-blocking.
+S1 in progress: items 0, salt-cache, loopback-bind, ProbeGuard decay,
+jittered slow-close, read-deadline all DONE. Next per the amended
+charter: XChaCha wire fix + rand-split enforcement (S1a closing), then
+BLAKE2s/X25519/AES-CFB/ExpandLabel/bignum-RSA (S1b/S1c). Owner
+decisions (below) still pending, non-blocking; the XChaCha WIRE change
+waits on D-0009/D-0013.
 
 ## Verification contracts (how "done" is proven)
 
 - Full matrix green on push: ubuntu/macos/1.77.2/cross-check/
   harness-audit green; windows REQUIRED-green since S1 item 0
   (D-0018 — the expected-red window is CLOSED). Verified green:
-  run 44668106188 @ 2dae1ce (2026-11-20; earlier 44234338593 @
-  fc9b889, 2026-11-18).
+  run 44700103379 @ d9e137e (2026-11-20; earlier 44668106188 @
+  2dae1ce, 2026-11-20). Per-OS ledger for THAT tree: 83 Linux /
+  82 macOS / 82 Windows (holo-socks redirected to socks-test.log in
+  CI logs — reconcile before summing; 1 Linux-only integration test,
+  cfg-gated util/config deltas).
 - Memory regression budget: RSS growth < 8 MB over 64 MB relayed
   (D-0015; local reference +88–376 KB; runner variance absorbed).
-- 78 `#[test]` countable: `grep -rn "#\[test\]" engine/crates
-  --include="*.rs" | wc -l` → 78 (per-OS ledger 76 Linux / 75 macOS /
-  75 Windows via cfg gates; D-0018, CI-verified @ 2dae1ce).
+- 88 `#[test]` countable: `grep -rn "#\[test\]" engine/crates
+  --include="*.rs" | wc -l` → 88 (86 runnable on Linux this run;
+  the 83/82/82 ledger above is CI-verified for the prior tree).
 - Every run ends: `bash harness/scripts/backup.sh "<summary>"`
   (WORKFLOW §1.2; push = completion). Gate records quote SHA-256 in
   the BACKUPS.md line; next record number = 0004 (S1→S2 gate,
@@ -78,8 +85,11 @@ then BLAKE2s/X25519/AES-CFB/ExpandLabel/bignum-RSA. Owner decisions
 5. [dev] ~~S1 rest per amended charter: salt-replay cache, off-loopback
    refusal~~ DONE 2026-11-20 run 4 (A2-C1 SaltCache cap-1024 FIFO +
    A3-C4 loopback-only bind w/ HOLONET_PROXY_LISTEN_ANY override; +7
-   named tests, local 83-green); remaining: ProbeGuard decay, CSPRNG
-   slow-close, close-vs-hang uniformity, XChaCha standard switch,
+   named tests, local 83-green); ~~ProbeGuard decay, CSPRNG slow-close,
+   close-vs-hang uniformity~~ DONE 2026-11-20 run 5 (D-0023: cap 1024
+   stalest-eviction + full-jitter ceiling 2 s + auth read deadline 10 s;
+   +3 named tests, local 86-green; lock-across-sleep defect fixed);
+   remaining: XChaCha standard switch (waits on D-0009/D-0013),
    rand-split enforcement, BLAKE2s (BLAKE2b cut unless justified),
    X25519 (1M-vector execution mode decided first), AES-CFB, ExpandLabel,
    bignum/RSA.
@@ -88,36 +98,38 @@ then BLAKE2s/X25519/AES-CFB/ExpandLabel/bignum-RSA. Owner decisions
    refusal + WARN durability, negative-tested).
 7. [research→charter] R-01..R-15 / C-01..C-15 backlog in ROADMAP.
 
-## Key facts snapshot (2026-11-20, run 4)
+## Key facts snapshot (2026-11-20, run 5)
 
-- Run 4 (S1 hardening): local suite **83 green** (rustc 1.100.0,
-  reinstalled this run; baseline 76/76 re-verified before changes);
-  static 85; Cargo.lock v3 HELD post-run (no Cargo.toml change → no
-  regeneration; lesson refined: the hazard fires on lockfile
-  regeneration only).
-- SHIPPED: holo-ss SaltCache (A2-C1) + holo-socks loopback-only bind
-  (A3-C4, override HOLONET_PROXY_LISTEN_ANY=1) — named tests green;
-  ROADMAP + THREAT-MODEL §A/§C annotated/flipped with the honest
-  residual (1024-connection eviction bound).
-- Harness: D-0022 backup.sh retry-deadlock fixed (ancestor-check guard;
-  scenarios A–E verified); push auth STILL absent — per-OS ledger,
-  README/ARCHITECTURE counts deferred to the CI-verified push.
+- Run 5 (S1 hardening second pass): local suite **86 green** (rustc
+  1.100.0, persisted in ~/.cargo across this recycle; baseline 83/83
+  re-verified before changes); static 88; Cargo.lock v3 HELD post-run.
+- PUSH LANDED this run (owner PAT via env-var credential helper only):
+  origin/main ef19a6f..d9e137e; CI 44700103379 all-green 6/6; the v4
+  lockfile regression's CI failure @ ef19a6f confirmed the canary
+  logic. Per-OS ledger 83/82/82 recorded (see verification contract).
+- SHIPPED run 5: holo-net ProbeGuard cap (A1-F8) + holo-ss full-jitter
+  slow-close w/ explicit ceiling (A3-C10) + holo-ss auth read deadline
+  (A2-F6) — named tests green; ROADMAP + THREAT-MODEL §C annotated
+  with honest residuals; D-0023 records all three decisions. serve_conn
+  gained a ServePolicy param (all call sites updated). ProbeGuard-lock
+  -across-sleep serialization defect found by inspection and fixed.
 - Gate 0001 PASSED (S0→S1); progress review 0002 PASSED (4×
-  PROCEED_WITH_CONDITIONS; record 0002, chain 5bbc465c…→72d8858d…);
-  cross-validation 0003 PASSED (4× PWC, 0 BLOCK; residuals applied
-  or carried; A2-C1/A3-C4 now closed by run 4). Next record: 0004 =
-  the S1→S2 gate.
-- Known shipped-plane gaps (chartered in S1, post-run-4): ~~no
-  salt-replay cache~~ (closed run 4); ~~off-loopback bind~~ (closed
-  run 4); xchacha mislabel; ProbeGuard unbounded; deterministic
-  slow-close; close-vs-hang distinguisher.
+  PROCEED_WITH_CONDITIONS); cross-validation 0003 PASSED (4× PWC, 0
+  BLOCK; A2-C1/A3-C4 closed run 4, the three remaining server-path
+  items closed run 5). Next record: 0004 = the S1→S2 gate.
+- Known shipped-plane gaps (chartered in S1, post-run-5): xchacha
+  mislabel (owner decision first); rand-split unenforced; crypto
+  primitives BLAKE2s/X25519/AES-CFB/ExpandLabel/bignum-RSA not yet
+  landed (S1b/S1c).
 - Release surface: only v0.2.0-linux / empty v0.2.0 / src-only v0.3.0
   public (D-0013 reconciliation pending).
+- Hygiene: `SaltCache::len` unused outside tests (run-4 artifact,
+  warning only, recorded in the run-5 journal).
 
 ## Recent Progress & Git Activity
 
 ```text
+### Commit: d9e137e - backup: FAILED 2026-11-20T07:27:35Z (push did not land) (maniesh-NR, 2026-11-20)
 ### Commit: 0945325 - backup: S1 hardening run 4: A2-C1 SaltCache (cap-1024 FIFO, opaque replay refusal, named test) + A3-C4 loopback-only proxy_listen bind (HOLONET_PROXY_LISTEN_ANY override, named tests); suite 76->83 local gree (maniesh-NR, 2026-11-20)
 ### Commit: 203f965 - backup: FAILED 2026-11-20T07:13:21Z (push did not land) (maniesh-NR, 2026-11-20)
-### Commit: 2421428 - backup: pstack re-affirm: memory hooks D-0021 + --check gate; PROJECT_MEMORY refreshed; Cargo.lock v3 restored (live v4 regression found on origin/main); 4W fallback static 78; engine unchanged vs 2dae1ce (maniesh-NR, 2026-11-20)
 ```

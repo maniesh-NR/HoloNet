@@ -93,14 +93,41 @@ Accepted limits (staged in ROADMAP S1, "server-path hardening"):
   prefix can age its salt back out of the FIFO and replay then — the
   accepted bound traded against the unbounded-cache memory DoS.
 - Close-vs-hang timing can distinguish "length decrypted and in-range"
-  from "length rejected" — uniformization staged.
+  from "length rejected" — uniformization staged.~~ DEFENDED since
+  2026-11-20 (S1 run 5): the unauthenticated read phase (salt + first
+  chunk) is bounded by `AUTH_READ_DEADLINE` (10 s = 2× the client's own
+  5 s dial timeout) — a valid-length frame that then goes silent
+  terminates with the same delayed-close treatment as any other auth
+  failure (named test `silent_after_valid_length_times_out`, both the
+  valid-prefix-then-silent and send-nothing scenarios). RESIDUAL,
+  honestly: the attacker-observable TIMELINE still differs (an
+  invalid/oversized length is rejected immediately, silence waits out
+  the deadline before the same opaque close) — inherent without
+  breaking legitimate slow clients; the vector that mattered (the
+  per-connection thread hanging forever in `read_exact`) is closed.
 - The slow-close delay is deterministic today (50ms·2^n clamped to
   120 ms on the wire); CSPRNG-jittered randomization staged with the S1
   entropy work (the deterministic delay is itself a fingerprint —
-  NDSS '20 "Detecting Probe-resistant Proxies").
+  NDSS '20 "Detecting Probe-resistant Proxies").~~ DEFENDED since
+  2026-11-20 (S1 run 5): full-jitter delay uniform over
+  `[0, min(backoff, SLOW_CLOSE_MAX)]`, drawn from the OS CSPRNG
+  (`os_fill`) through a parameterized seam (deterministic seeded tests —
+  A3-C10 pattern). The accidental 120 ms clamp is GONE; the ceiling is
+  an explicit recorded decision (2 s — D-0023), so progressive slowdown
+  is real (5 doublings before the cap) and the backoff ladder no longer
+  fingerprints the implementation. Also fixed: the ProbeGuard lock was
+  held across the sleep, serializing every concurrent connection behind
+  one probe's delay — the lock now covers only the bookkeeping.
 - ProbeGuard maps have no decay/eviction yet — unbounded growth under
   many distinct failing peers (memory DoS on a long-running server);
-  staged.
+  staged.~~ DEFENDED since 2026-11-20 (S1 run 5): the per-peer maps are
+  bounded at `PROBE_GUARD_PEER_CAP` = 1024 distinct failing peers
+  (N pinned by record-0003 A1-F8); overflow decays the stalest peer
+  (oldest recorded `last` failure) first — named test
+  `probe_guard_peer_map_decays_at_cap`. RESIDUAL, honestly: a decayed
+  peer re-admits with a fresh counter (its backoff restarts), and an
+  attacker rotating more than 1024 source IPs slides the window — the
+  accepted bound traded against the unbounded-map memory DoS.
 - UDP is not implemented and reports an honest milestone error.
 
 ### D. Upstream observer (the chosen exit server operator)

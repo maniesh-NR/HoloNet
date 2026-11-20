@@ -649,13 +649,20 @@ impl ServerConn {
     /// Wrap an accepted server-side socket. Returns the target address.
     /// `salts` is the shared replay cache — a duplicate salt is refused
     /// with the opaque auth failure (A2-C1) before any crypto work.
+    /// `auth_read_deadline` bounds the ENTIRE unauthenticated phase (salt
+    /// read + first chunk): a client that completes a valid prefix and
+    /// then goes silent cannot hold the per-connection thread forever
+    /// (S1 A2-F6 elevation). The deadline is cleared before the
+    /// authenticated relay starts, so idle tunnels are unaffected.
     pub fn accept(
         mut sock: TcpStream,
         master: &[u8; 32],
         method: Method,
         salts: &Mutex<SaltCache>,
+        auth_read_deadline: Duration,
     ) -> std::io::Result<ServerConn> {
         sock.set_nodelay(true).ok();
+        sock.set_read_timeout(Some(auth_read_deadline)).ok();
         // 1. client salt
         let salt_bytes = Framing::read_exact(&mut sock, SALT_LEN)?;
         let mut salt = [0u8; 32];
@@ -677,6 +684,9 @@ impl ServerConn {
         })?;
         let (target, used) = Target::decode(&first)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+        // auth completed: clear the unauthenticated-phase deadline so the
+        // relay is never disturbed by it (idle tunnels are legitimate)
+        sock.set_read_timeout(None).ok();
         let write = Direction::new(method, master, &out_salt);
         let mut s = ServerConn {
             sock,
@@ -745,6 +755,66 @@ impl Write for ServerConn {
 
 pub const DIAL_TIMEOUT: Duration = Duration::from_secs(5);
 
+/// Explicit unauthenticated-phase read deadline (S1 A2-F6 elevation —
+/// a DECISION, not an accident): a client that completes a valid prefix
+/// (or nothing at all) and then goes silent must not hold the
+/// per-connection thread indefinitely. 10 s = 2× the client's own 5 s
+/// dial timeout (DIAL_TIMEOUT): generous for lossy links, yet bounds
+/// the thread hold. Covers the salt read and the first chunk; cleared
+/// the moment authentication completes.
+pub const AUTH_READ_DEADLINE: Duration = Duration::from_secs(10);
+
+/// Explicit slow-close ceiling (S1 A3-C10/F8 — a DECISION, not an
+/// accident; the previous 120 ms clamp neutered the progressive-slowdown
+/// property after ~2 failures). Rationale: a failed-auth thread sleeps
+/// at most this long before closing — long enough to make large-scale
+/// probing genuinely expensive (5 doublings of 50 ms before the
+/// ceiling), short enough that a probe flood ties up a bounded amount
+/// of thread time per connection. ProbeGuard's internal curve still
+/// computes up to 10 s for other call sites; the SERVER-side applied
+/// delay is capped here.
+pub const SLOW_CLOSE_MAX: Duration = Duration::from_millis(2_000);
+
+/// Server-side per-connection policy (the named decisions above; tests
+/// inject shortened values through the same seam — A3-C10 favors
+/// injected seams over global state).
+#[derive(Clone, Copy, Debug)]
+pub struct ServePolicy {
+    pub auth_read_deadline: Duration,
+    pub slow_close_max: Duration,
+}
+
+impl Default for ServePolicy {
+    fn default() -> Self {
+        ServePolicy {
+            auth_read_deadline: AUTH_READ_DEADLINE,
+            slow_close_max: SLOW_CLOSE_MAX,
+        }
+    }
+}
+
+/// Full-jitter slow-close delay: uniform over `[0, min(backoff, ceiling)]`
+/// (Brooker-style full jitter — hides the deterministic backoff ladder
+/// that fingerprinted the implementation, NDSS '20). The entropy draw is
+/// PARAMETERIZED (the `os_fill_at` seam pattern): production passes an
+/// `os_fill`-backed CSPRNG closure, tests pass a deterministic seeded
+/// draw — two peers with identical failure counts provably get different
+/// delays without any flaky live-draw comparison (A3-C10). On entropy
+/// failure the caller falls back to the capped deterministic backoff
+/// (fail-closed entropy must never panic the close path; the worst case
+/// degrades to the pre-S1 deterministic behavior).
+pub(crate) fn slow_close_delay(
+    backoff: Duration,
+    ceiling: Duration,
+    draw: &mut dyn FnMut(&mut [u8]) -> std::io::Result<()>,
+) -> std::io::Result<Duration> {
+    let cap_ms = backoff.min(ceiling).as_millis() as u64;
+    let mut b = [0u8; 8];
+    draw(&mut b)?;
+    let r = u64::from_be_bytes(b) % (cap_ms + 1);
+    Ok(Duration::from_millis(r))
+}
+
 /// Produces tunnel connections toward arbitrary targets through one
 /// Shadowsocks server.
 pub struct SsDialer {
@@ -801,16 +871,21 @@ fn resolve(server: &str) -> std::io::Result<std::net::SocketAddr> {
 /// Server-side relay loop for one accepted client socket.
 ///
 /// `upstream_dial` dials the real target; bytes are then pumped in both
-/// directions with pooled buffers. Auth failures get a delayed slow-close
-/// (anti-probing; deterministic today — CSPRNG jitter is staged in S1,
-/// see ROADMAP) and never reach the dialer. Replayed salts (A2-C1) are
-/// refused through the same opaque path via the shared `salts` cache.
+/// directions with pooled buffers. Auth failures get a CSPRNG-jittered
+/// slow-close (full jitter over `[0, min(backoff, slow_close_max)]`;
+/// deterministic pre-S1 — the determinism was itself a fingerprint,
+/// NDSS '20) and never reach the dialer. The ProbeGuard lock is HELD
+/// only for the bookkeeping, never across the sleep — the sleep
+/// serializes nothing. Replayed salts (A2-C1) are refused through the
+/// same opaque path via the shared `salts` cache. The unauthenticated
+/// read phase is bounded by `policy.auth_read_deadline` (A2-F6).
 pub fn serve_conn<F>(
     sock: TcpStream,
     master: &[u8; 32],
     method: Method,
     guard: &Mutex<holo_net::ProbeGuard>,
     salts: &Mutex<SaltCache>,
+    policy: ServePolicy,
     upstream_dial: F,
 ) -> std::io::Result<u64>
 where
@@ -820,14 +895,30 @@ where
         .peer_addr()
         .map(|a| a.ip())
         .unwrap_or_else(|_| "0.0.0.0".parse().unwrap());
-    let sc = match ServerConn::accept(sock, master, method, salts) {
+    let sc = match ServerConn::accept(
+        sock,
+        master,
+        method,
+        salts,
+        policy.auth_read_deadline,
+    ) {
         Ok(sc) => sc,
         Err(e) => {
-            // auth/probe failure: slow close (deterministic backoff today;
-            // CSPRNG jitter staged in S1), no details out
-            let mut g = guard.lock().unwrap();
-            let delay = g.on_failure(peer);
-            std::thread::sleep(delay.min(Duration::from_millis(120)));
+            // auth/probe failure: record + slow close, no details out.
+            // The guard lock covers ONLY the bookkeeping — it must never
+            // be held across the sleep (holding it would serialize every
+            // concurrent connection behind one probe's delay).
+            let backoff = {
+                let mut g = guard.lock().unwrap();
+                g.on_failure(peer)
+            };
+            let delay = slow_close_delay(
+                backoff,
+                policy.slow_close_max,
+                &mut |b| holo_util::rand::os_fill(b),
+            )
+            .unwrap_or(backoff.min(policy.slow_close_max)); // entropy fallback
+            std::thread::sleep(delay);
             return Err(e);
         }
     };
@@ -1024,10 +1115,18 @@ mod tests {
                 let guard = guard.clone();
                 let salts = salts.clone();
                 std::thread::spawn(move || {
-                    let _ = serve_conn(sock, &master, method, &guard, &salts, |target| {
-                        t2.lock().unwrap().push(target.to_string());
-                        TcpStream::connect(("127.0.0.1", upstream))
-                    });
+                    let _ = serve_conn(
+                        sock,
+                        &master,
+                        method,
+                        &guard,
+                        &salts,
+                        ServePolicy::default(),
+                        |target| {
+                            t2.lock().unwrap().push(target.to_string());
+                            TcpStream::connect(("127.0.0.1", upstream))
+                        },
+                    );
                 });
             }
         });
@@ -1129,7 +1228,14 @@ mod tests {
         std::thread::spawn(move || {
             if let Ok(sock) = ln.incoming().next().unwrap() {
                 let master = master_key("correct-pw");
-                let _ = serve_conn(sock, &master, Method::Aes256Gcm, &guard, &salts, |_t| {
+                let _ = serve_conn(
+                    sock,
+                    &master,
+                    Method::Aes256Gcm,
+                    &guard,
+                    &salts,
+                    ServePolicy::default(),
+                    |_t| {
                     d2.store(true, std::sync::atomic::Ordering::SeqCst);
                     TcpStream::connect(("127.0.0.1", echo_port))
                 });
@@ -1181,6 +1287,7 @@ mod tests {
                     Method::ChaCha20IetfPoly1305,
                     &guard,
                     &salts,
+                    ServePolicy::default(),
                     |_t| {
                         d2.store(true, std::sync::atomic::Ordering::SeqCst);
                         TcpStream::connect(("127.0.0.1", echo_port))
@@ -1280,6 +1387,7 @@ mod tests {
                     Method::ChaCha20IetfPoly1305,
                     &guard,
                     &salts,
+                    ServePolicy::default(),
                     |_target| {
                         d2.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                         TcpStream::connect(("127.0.0.1", echo_port))
@@ -1363,6 +1471,151 @@ mod tests {
             dialed.load(std::sync::atomic::Ordering::SeqCst),
             1,
             "the replay must never reach upstream"
+        );
+    }
+
+    // ------------------------------------------------------------------
+    // S1 server-path hardening: slow-close jitter + read deadline
+    // ------------------------------------------------------------------
+
+    /// Deterministic seeded draw for the `slow_close_delay` seam (A3-C10
+    /// injected-seam pattern — no flaky live-draw comparisons).
+    fn seeded_draw(seed: u64) -> impl FnMut(&mut [u8]) -> std::io::Result<()> {
+        let mut state = seed;
+        move |b: &mut [u8]| {
+            state = state
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            for (i, byte) in b.iter_mut().enumerate() {
+                *byte = (state >> ((i % 8) * 8)) as u8;
+            }
+            Ok(())
+        }
+    }
+
+    /// S1 named acceptance test (A3-C10): the slow-close jitter is
+    /// deterministic under a seeded entropy seam — two peers with
+    /// identical failure counts get DIFFERENT delays, the same seed
+    /// reproduces the same delay, the ceiling decision is enforced
+    /// (backoff above the ceiling never exceeds it), zero backoff stays
+    /// zero, and an entropy failure surfaces as Err (serve_conn then
+    /// falls back to the capped deterministic backoff — never a panic).
+    #[test]
+    fn slow_close_jitter_seeded_deterministic() {
+        let backoff = Duration::from_millis(400);
+        let ceiling = Duration::from_millis(2000);
+        // same seed → same delay (reproducibility of the seam)
+        let a1 = slow_close_delay(backoff, ceiling, &mut seeded_draw(7)).unwrap();
+        let a2 = slow_close_delay(backoff, ceiling, &mut seeded_draw(7)).unwrap();
+        assert_eq!(a1, a2, "same seed must reproduce the same delay");
+        // two peers, identical failure counts (same backoff), different
+        // seeded entropy → different delays — WITHOUT comparing two live
+        // CSPRNG draws (that comparison is the flake A3-C10 forbids)
+        let a = slow_close_delay(backoff, ceiling, &mut seeded_draw(1)).unwrap();
+        let b = slow_close_delay(backoff, ceiling, &mut seeded_draw(2)).unwrap();
+        assert_ne!(a, b, "distinct seeds must yield distinct delays");
+        // ceiling decision enforced: backoff above the ceiling caps it
+        for i in 0..64u64 {
+            let d = slow_close_delay(
+                Duration::from_millis(10_000),
+                ceiling,
+                &mut seeded_draw(0xDEAD_BEEFu64.wrapping_add(i)),
+            )
+            .unwrap();
+            assert!(d <= ceiling, "jittered delay {d:?} exceeds the ceiling");
+        }
+        // zero backoff cannot produce a negative/instant-sleep regression
+        assert_eq!(
+            slow_close_delay(Duration::ZERO, ceiling, &mut seeded_draw(3)).unwrap(),
+            Duration::ZERO
+        );
+        // entropy failure surfaces as Err (caller falls back; no panic)
+        assert!(slow_close_delay(backoff, ceiling, &mut |_| Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "entropy unavailable"
+        )))
+        .is_err());
+    }
+
+    /// S1 named acceptance test (A2-F6 elevation): a client that
+    /// completes a VALID crypto prefix (salt + correctly-encrypted length
+    /// header) and then goes silent — or sends nothing at all — must NOT
+    /// hold the per-connection thread forever. With a shortened injected
+    /// `auth_read_deadline` both connections terminate with an error and
+    /// the upstream is never dialed; pre-fix, scenario (a) blocked the
+    /// thread in `read_exact` with NO socket timeout (the recorded
+    /// distinguisher / resource-exhaustion vector).
+    #[test]
+    fn silent_after_valid_length_times_out() {
+        let ln = TcpListener::bind("127.0.0.1:0").unwrap();
+        let ss_port = ln.local_addr().unwrap().port();
+        let dialed = std::sync::Arc::new(std::sync::atomic::AtomicIsize::new(0));
+        let d2 = dialed.clone();
+        let guard = Mutex::new(holo_net::ProbeGuard::new());
+        let guard = std::sync::Arc::new(guard);
+        let salts =
+            std::sync::Arc::new(Mutex::new(SaltCache::new(SALT_CACHE_CAPACITY)));
+        let (tx, rx) = std::sync::mpsc::channel();
+        let policy = ServePolicy {
+            auth_read_deadline: Duration::from_millis(300),
+            slow_close_max: Duration::from_millis(100),
+        };
+        std::thread::spawn(move || {
+            for sock in ln.incoming().flatten().take(2) {
+                let master = master_key("pw");
+                let tx = tx.clone();
+                let guard = guard.clone();
+                let salts = salts.clone();
+                let d2 = d2.clone();
+                std::thread::spawn(move || {
+                    let res = serve_conn(sock, &master, Method::ChaCha20IetfPoly1305,
+                        &guard, &salts, policy, |_t| {
+                            d2.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                            TcpStream::connect(("127.0.0.1", 9))
+                        });
+                    let _ = tx.send(res);
+                });
+            }
+        });
+        // (a) valid crypto prefix, then silence: salt + correctly
+        //     encrypted length header for a 32-byte payload, nothing more
+        let master = master_key("pw");
+        let salt = random_salt().unwrap();
+        let mut d = Direction::new(Method::ChaCha20IetfPoly1305, &master, &salt);
+        let mut c_a = TcpStream::connect(("127.0.0.1", ss_port)).unwrap();
+        c_a.write_all(&salt).unwrap();
+        let len_hdr = d.seal(&[], &32u16.to_be_bytes());
+        c_a.write_all(&len_hdr).unwrap();
+        let _ = c_a.flush();
+        // (b) nothing at all after connecting (bare salt-less hang)
+        let mut c_b = TcpStream::connect(("127.0.0.1", ss_port)).unwrap();
+        let _ = c_b.flush();
+        // both must terminate within deadline + slow-close (<< 5 s);
+        // recv_timeout expiring = the hang regression this test guards
+        for i in 0..2 {
+            let res = rx
+                .recv_timeout(Duration::from_secs(5))
+                .unwrap_or_else(|_| panic!("connection {i} hung past the read deadline"));
+            let e = res.err().expect("silent client must fail, not relay");
+            // deadline error kind is platform-dependent (WouldBlock on
+            // Linux/macOS SO_RCVTIMEO, TimedOut on Windows); the
+            // attacker-observable behavior (delayed close, no relay) is
+            // what must be uniform — asserted via no-dial below
+            assert!(
+                matches!(
+                    e.kind(),
+                    std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+                ),
+                "connection {i}: unexpected error {e:?}"
+            );
+        }
+        // keep the sockets open until both deadlines fired, then clean up
+        drop(c_a);
+        drop(c_b);
+        assert_eq!(
+            dialed.load(std::sync::atomic::Ordering::SeqCst),
+            0,
+            "silent clients must never reach upstream"
         );
     }
 }

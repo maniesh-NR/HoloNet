@@ -62,15 +62,23 @@ fn spawn_ss_server(method: holo_ss::Method, password: &'static str, _upstream: u
             let guard = guard.clone();
             let salts = salts.clone();
             std::thread::spawn(move || {
-                let _ = holo_ss::serve_conn(sock, &master, method, &guard, &salts, |target| {
-                    let t = target.to_string();
-                    let addr = t
-                        .rsplit_once(':')
-                        .map(|(h, p)| format!("{h}:{p}"))
-                        .unwrap_or(t);
-                    let port: u16 = addr.rsplit_once(':').unwrap().1.parse().unwrap();
-                    TcpStream::connect(("127.0.0.1", port))
-                });
+                let _ = holo_ss::serve_conn(
+                    sock,
+                    &master,
+                    method,
+                    &guard,
+                    &salts,
+                    holo_ss::ServePolicy::default(),
+                    |target| {
+                        let t = target.to_string();
+                        let addr = t
+                            .rsplit_once(':')
+                            .map(|(h, p)| format!("{h}:{p}"))
+                            .unwrap_or(t);
+                        let port: u16 = addr.rsplit_once(':').unwrap().1.parse().unwrap();
+                        TcpStream::connect(("127.0.0.1", port))
+                    },
+                );
             });
         }
     });

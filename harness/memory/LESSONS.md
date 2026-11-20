@@ -206,3 +206,25 @@
   caught a wrong expectation: cap=0 evicts immediately, so the index
   never contains the salt — every admit returns true (no protection),
   not "refuse duplicates". Trace edge semantics first, then assert.
+
+## Run 5 additions (2026-11-20 S1 hardening, second pass)
+
+- A lock acquired per connection and held across a sleep (here: the
+  ProbeGuard Mutex across the slow-close sleep) silently serializes the
+  WHOLE server behind one attacker-controlled delay — and raising the
+  delay ceiling (120 ms → 2 s) multiplies the damage. Audit any
+  lock-held-across-await/sleep pattern BEFORE raising the bound it
+  guards. Found by inspection at design time; zero cost to fix, high
+  cost to miss.
+- Deterministic-time assertions in tests: prefer asserting the INVARIANT
+  that survives clock-granularity ties (count of decayed peers, cap
+  held, recv_timeout as the hang guard) over predicting WHICH member a
+  tie-broken min/max picks (HashMap iteration order is unspecified).
+  The re-admission arithmetic also bit once: zeros count goes −1
+  (re-admitted) +1 (slot eviction), net 0 — trace the accounting before
+  asserting it.
+- CI job logs can REDIRECT a test binary's output (holo-socks →
+  socks-test.log in ci.yml): summing "test result" lines from the job
+  log undercounts by exactly the redirected crate (73 visible vs 83
+  real on Linux). Reconcile per-crate sums against the local suite
+  BEFORE recording a per-OS ledger; the mismatch is the tell.

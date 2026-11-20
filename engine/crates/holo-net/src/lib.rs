@@ -724,9 +724,23 @@ impl Padder {
 // ProbeGuard — active-probing resistance
 // ---------------------------------------------------------------------------
 
+/// Peer-capacity bound for the per-peer backoff maps (S1 server-path
+/// hardening; record-0003 A1-F8 pinned N = 1024 — the maps previously
+/// grew unboundedly per distinct failing peer). When a NEW peer arrives
+/// with the map full, the stalest tracked peer (oldest `last` failure
+/// timestamp) is decayed out first.
+pub const PROBE_GUARD_PEER_CAP: usize = 1024;
+
 /// Per-peer exponential backoff after authentication failures. A prober
 /// that blasts handshakes gets progressively slower closes; legitimate
 /// users retrying after a typo see sub-second delays at worst.
+///
+/// Bounded (S1 hardening): at most `PROBE_GUARD_PEER_CAP` distinct
+/// failing peers are tracked; on overflow the stalest peer is decayed.
+/// Honest residual: a peer aged out this way is re-admitted with a
+/// fresh counter (its backoff restarts), and an attacker rotating more
+/// than the cap's worth of source IPs slides the window — the bound
+/// trades per-peer memory for exactly that regression.
 pub struct ProbeGuard {
     attempts: HashMap<std::net::IpAddr, u32>,
     last: HashMap<std::net::IpAddr, Instant>,
@@ -753,6 +767,21 @@ impl ProbeGuard {
     /// Record an auth failure for `peer`; returns the delay to apply
     /// before closing (or before accepting more work from it).
     pub fn on_failure(&mut self, peer: std::net::IpAddr) -> Duration {
+        if !self.attempts.contains_key(&peer)
+            && self.attempts.len() >= PROBE_GUARD_PEER_CAP
+        {
+            // decay: evict the stalest peer (oldest `last`), keeping the
+            // maps bounded under the cap (record-0003 A1-F8)
+            if let Some(stale) = self
+                .last
+                .iter()
+                .min_by_key(|(_, t)| **t)
+                .map(|(k, _)| *k)
+            {
+                self.attempts.remove(&stale);
+                self.last.remove(&stale);
+            }
+        }
         let n = self
             .attempts
             .entry(peer)
@@ -772,6 +801,12 @@ impl ProbeGuard {
 
     pub fn attempts(&self, peer: std::net::IpAddr) -> u32 {
         *self.attempts.get(&peer).unwrap_or(&0)
+    }
+
+    /// Number of distinct failing peers currently tracked (bounded by
+    /// `PROBE_GUARD_PEER_CAP`).
+    pub fn tracked(&self) -> usize {
+        self.attempts.len()
     }
 }
 
@@ -1133,6 +1168,65 @@ mod tests {
         assert_eq!(g.attempts(peer), 0);
         let d4 = g.on_failure(peer);
         assert!(d4 < d2, "reset didn't work");
+    }
+
+    /// S1 server-path hardening named acceptance test (ROADMAP; N pinned
+    /// at 1024 by record-0003 A1-F8): the per-peer maps stay bounded
+    /// under `PROBE_GUARD_PEER_CAP` distinct failing peers — overflow
+    /// decays the stalest peers (oldest `last`), fresh peers survive, an
+    /// aged-out peer re-admits with a fresh counter (the honest bound).
+    #[test]
+    fn probe_guard_peer_map_decays_at_cap() {
+        let mut g = ProbeGuard::new();
+        let ip = |i: u32| {
+            std::net::IpAddr::V4(std::net::Ipv4Addr::new(
+                127,
+                (i >> 16) as u8,
+                (i >> 8) as u8,
+                i as u8,
+            ))
+        };
+        // fill exactly to the cap with distinct failing peers
+        for i in 1..=PROBE_GUARD_PEER_CAP as u32 {
+            g.on_failure(ip(i));
+        }
+        assert_eq!(g.tracked(), PROBE_GUARD_PEER_CAP, "map holds the cap");
+        // guarantee the whole first batch is strictly older than the
+        // second (Instant resolution across batches), then overflow
+        std::thread::sleep(Duration::from_millis(2));
+        for i in (PROBE_GUARD_PEER_CAP as u32 + 1)..=(PROBE_GUARD_PEER_CAP as u32 + 6) {
+            g.on_failure(ip(i));
+        }
+        assert!(
+            g.tracked() <= PROBE_GUARD_PEER_CAP,
+            "bound held under overflow: {}",
+            g.tracked()
+        );
+        // every fresh peer survived — decay picked only from the stale batch
+        for i in (PROBE_GUARD_PEER_CAP as u32 + 1)..=(PROBE_GUARD_PEER_CAP as u32 + 6) {
+            assert_eq!(g.attempts(ip(i)), 1, "fresh peer {i} must survive");
+        }
+        // exactly cap-many fresh insertions minus 6 survivors means 6 of
+        // the stale batch were decayed
+        let decayed = (1..=PROBE_GUARD_PEER_CAP as u32)
+            .filter(|i| g.attempts(ip(*i)) == 0)
+            .count();
+        assert_eq!(decayed, 6, "stalest batch decayed first");
+        // an aged-out peer re-admits with a fresh counter (honest bound):
+        // its slot costs one more stale peer — zeros stay 6 (peer 1 back
+        // in, one previously-tracked member decayed out for the slot)
+        let d = g.on_failure(ip(1));
+        assert_eq!(d, Duration::from_millis(100), "re-admission restarts backoff");
+        assert_eq!(g.attempts(ip(1)), 1);
+        let decayed_after = (1..=PROBE_GUARD_PEER_CAP as u32)
+            .filter(|i| g.attempts(ip(*i)) == 0)
+            .count();
+        assert_eq!(decayed_after, 6, "re-admission decayed one stale peer for the slot");
+        assert_eq!(g.tracked(), PROBE_GUARD_PEER_CAP);
+        // on_success still clears a peer entirely
+        g.on_success(ip(PROBE_GUARD_PEER_CAP as u32));
+        assert_eq!(g.attempts(ip(PROBE_GUARD_PEER_CAP as u32)), 0);
+        assert_eq!(g.tracked(), PROBE_GUARD_PEER_CAP - 1);
     }
 
     #[test]

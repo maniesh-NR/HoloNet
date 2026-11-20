@@ -126,8 +126,20 @@ Server-path hardening backlog (A2-F5; **lands in S1** — tightened from
   2026-11-17.
 - ProbeGuard: use the recorded `last` — decay and evict stale peers (the
   map currently grows unboundedly per distinct failing peer).
+  **DONE 2026-11-20 run 5:** `PROBE_GUARD_PEER_CAP` = 1024 (N pinned by
+  record-0003 A1-F8); overflow decays the stalest peer (oldest `last`)
+  from BOTH maps; named test `probe_guard_peer_map_decays_at_cap` (cap
+  held under overflow, fresh peers survive, aged-out re-admission = the
+  honest bound); local suite 86-green, CI rides the next push.
 - Randomized slow-close via CSPRNG jitter (deterministic today — the
   determinism is itself a fingerprint, NDSS '20).
+  **DONE 2026-11-20 run 5:** full-jitter delay uniform over
+  `[0, min(backoff, SLOW_CLOSE_MAX)]` from `os_fill` through the
+  parameterized-draw seam; ceiling = 2 s, an explicit recorded decision
+  (D-0023 — the accidental 120 ms clamp removed); ProbeGuard lock no
+  longer held across the sleep (found-by-inspection serialization
+  defect); named test `slow_close_jitter_seeded_deterministic` (A3-C10
+  seeded-seam pattern — no live-draw flake); CI rides the next push.
 - Uniform close-vs-hang behavior for rejected vs valid length frames
   (distinguisher recorded in THREAT-MODEL §C). **Record-0003 elevation
   (A2-F6): a valid-length frame that then goes silent blocks the
@@ -135,6 +147,15 @@ Server-path hardening backlog (A2-F5; **lands in S1** — tightened from
   unauthenticated resource-exhaustion vector on self-hosted servers.
   The fix must add a read deadline on the server's first-chunk read,
   not merely uniformize timing.**
+  **DONE 2026-11-20 run 5:** `AUTH_READ_DEADLINE` = 10 s (2× the
+  client's own 5 s dial timeout; a DECISION — D-0023) covers the ENTIRE
+  unauthenticated phase (salt + first chunk) and is cleared the moment
+  auth completes (idle tunnels unaffected); silent-after-valid-length
+  and send-nothing clients terminate with the same delayed-close
+  treatment; named test `silent_after_valid_length_times_out` (short
+  injected deadline, recv_timeout guard = the hang regression lock);
+  honest residual recorded in THREAT-MODEL §C (timeline still differs:
+  immediate rejection vs deadline close); CI rides the next push.
 - **Off-loopback `proxy_listen` refusal (progress review 0002, A3-C4 —
   pulled IN from S6):** refuse non-loopback binds unless an explicit
   override is set; named test: 0.0.0.0/:: bind refused without override.
@@ -205,16 +226,25 @@ Acceptance criteria (all measurable):
   proxy_listen bind refused without explicit override (A3-C4)~~ DONE
   2026-11-20 run 4 (see the S1 backlog annotation above);**
   ProbeGuard map bounded under 1024 distinct failing peers (decay/eviction
-  test — N pinned at 1024, record-0003 A1-F8); CSPRNG-jittered
+  test — N pinned at 1024, record-0003 A1-F8) **DONE 2026-11-20 run 5 —
+  `PROBE_GUARD_PEER_CAP` = 1024, stalest-`last` eviction from both maps,
+  named test `probe_guard_peer_map_decays_at_cap`**; CSPRNG-jittered
   slow-close seeded from `os_fill` through an injected-seam pattern
   (deterministic test via seeded entropy — two peers with identical
   failure counts get different delays WITHOUT a flaky live-draw
   comparison — record-0003 A3-C10) and the intended delay ceiling
   stated explicitly (today ProbeGuard computes up to 10 s but
   serve_conn clamps to 120 ms — the ceiling must be a decision, not an
-  accident); close-vs-hang uniformity for length-rejected vs
+  accident) **DONE 2026-11-20 run 5 — `slow_close_delay` full-jitter
+  via the parameterized draw seam, named test
+  `slow_close_jitter_seeded_deterministic`, ceiling = 2 s recorded as
+  D-0023 (clamp removed)**; close-vs-hang uniformity for length-rejected vs
   length-valid frames plus the first-chunk read deadline (A2-F6
-  elevation above).
+  elevation above) **DONE 2026-11-20 run 5 — `AUTH_READ_DEADLINE` 10 s
+  over the whole unauthenticated phase, cleared post-auth, named test
+  `silent_after_valid_length_times_out`; the remaining S1 crypto items
+  (XChaCha wire fix, rand-split enforcement, BLAKE2s, X25519, AES-CFB,
+  ExpandLabel, bignum/RSA) are the next runs' work**.
 - OpenSSL cross-checks during development, recorded in the session
   journal WITH the exact command lines and ≥16 hex characters of each
   digest quoted (a bare "cross-checked" note does not satisfy this —
