@@ -51,9 +51,23 @@ S1 in progress: items 0, salt-cache, loopback-bind, ProbeGuard decay,
 jittered slow-close, read-deadline AND rand-split enforcement (run 6,
 D-0024 — rand::nosec doc-hidden module, ALL re-export paths closed,
 named workspace audit test) all DONE. S1a is CLOSED except the XChaCha
-wire fix, which waits on D-0009/D-0013 (owner). Next: BLAKE2s →
-X25519 → AES-CFB → ExpandLabel → bignum-RSA (S1b/S1c). Owner
-decisions (below) still pending, non-blocking.
+wire fix, which is NOW UNBLOCKED: both owner decisions landed run 7.
+
+RUN 7 (2026-11-20, owner decisions executed): **D-0025 = (a) advisory +
+v0.3.1** and **D-0026 = S5 creds embedded-with-risk-acceptance**.
+Executed: HoloNet-SA-0001 drafted (docs/advisories/) AND published as
+GHSA-8h6m-w5qj-cq9g (CVE requested, pending); **v0.3.1 CUT** from the
+CI-verified tree 6314da0 — 4 per-OS tags built all-green (runs
+44758027482/44758056729/44758090961/44758125210), all 7 binaries
+sha256-verified against their per-OS manifests, a signed master
+SHA256SUMS.txt (Ed25519, python-crypto sign + stock-openssl verify,
+roundtrip-proven) + the advisory attached to the main release; the 7
+phantom v0.2.0/v0.3.0 DRAFTS deleted (2 vulnerable Windows builds
+destroyed, 5 superseded unix builds de-footgunned; inventories quoted
+in the journal); public v0.2.0-linux kept (unaffected). Signing key:
+private in sandbox /home/z/my-project/keys/ (NOT in repo), pubkey
+committed docs/release-signing.pub.pem; owner re-key at S7. Next dev:
+XChaCha wire fix (unblocked) + BLAKE2s onward (S1b/S1c).
 
 ## Verification contracts (how "done" is proven)
 
@@ -78,10 +92,12 @@ decisions (below) still pending, non-blocking.
 
 ## Active playbook / todo
 
-1. [owner] D-0009/D-0013: advisory + signed v0.3.1 (cut BEFORE S1
-   XChaCha20 wire change) or dated no-go; republish/delete invisible
-   per-OS releases.
-2. [owner] S5 credentials model (embedded vs user-supplied).
+1. [owner] ~~D-0009/D-0013: advisory + signed v0.3.1~~ DECIDED run 7
+   (D-0025, option (a)) AND EXECUTED (SA-0001 + GHSA-8h6m-w5qj-cq9g +
+   v0.3.1 cut + drafts deleted).
+2. [owner] ~~S5 credentials model~~ DECIDED run 7 (D-0026: embedded
+   with recorded risk-acceptance; D-0001 amended for S5 operational
+   creds; test fixtures stay synthetic).
 3. [owner] Confirm D-0014 (trojan = named v1.0 second protocol).
 4. [dev] ~~S1 item 0~~ DONE 2026-11-20 (D-0018; ledger 76/75/75;
    expected-red window closed).
@@ -139,15 +155,17 @@ decisions (below) still pending, non-blocking.
   mislabel (owner decision first); crypto primitives
   BLAKE2s/X25519/AES-CFB/ExpandLabel/bignum-RSA not yet landed
   (S1b/S1c). Rand-split CLOSED run 6 (D-0024).
-- Release surface: only v0.2.0-linux / empty v0.2.0 / src-only v0.3.0
-  public (D-0013 reconciliation pending).
+- Release surface (run 7): v0.3.1 family PUBLIC (4 per-OS + main with
+  signed manifest + SA-0001), v0.3.0 (src), v0.2.0-linux (kept,
+  unaffected), empty v0.2.0. All 7 phantom per-OS DRAFTS deleted
+  (D-0025); GHSA-8h6m-w5qj-cq9g published, CVE requested.
 - Hygiene: `SaltCache::len` unused outside tests (run-4 artifact,
   warning only, recorded in the run-5 journal).
 
 ## Recent Progress & Git Activity
 
 ```text
+### Commit: 6314da0 - backup: FAILED 2026-11-20T11:39:41Z (push did not land) (maniesh-NR, 2026-11-20)
 ### Commit: 6a1af0d - backup: run-6 CI-VERIFIED: run 44728988531 @ 937554f all-green 6/6, per-OS ledger 87 Linux/86 macOS/86 Windows (socks redirect reconciled); README/ARCHITECTURE/STATE/PROJECT_MEMORY updated to verified counts (maniesh-NR, 2026-11-20)
 ### Commit: 937554f - backup: FAILED 2026-11-20T11:36:06Z (push did not land) (maniesh-NR, 2026-11-20)
-### Commit: 13983d5 - backup: backup: run-6 push landed via retry (1c82ad4..5382c5f); CI of the 87-tree triggers on this closure push (maniesh-NR, 2026-11-20)
 ```

@@ -1,6 +1,20 @@
 # HoloNet State Snapshot
 
-Last updated: 2026-11-20 (UTC, sixth run of the day — S1a closing item:
+Last updated: 2026-11-20 (UTC, seventh run of the day — OWNER
+DECISIONS EXECUTED: D-0025 advisory+v0.3.1, D-0026 S5 creds). Run 7
+highlights: HoloNet-SA-0001 drafted AND published as GHSA-8h6m-w5qj-
+cq9g (CVE requested); v0.3.1 cut from CI-verified 6314da0 — 4 per-OS
+release builds all-green (windows 44758027482, macos 44758056729,
+linux 44758090961, android 44758125210), all 7 binaries checksum-
+verified, master SHA256SUMS.txt signed with Ed25519 (private key in
+the executor sandbox, NOT in repo; pubkey committed docs/release-
+signing.pub.pem; stock-openssl verification documented in README);
+7 phantom per-OS drafts deleted (2 vulnerable Windows builds
+destroyed; public v0.2.0-linux kept, unaffected). Lesson learned:
+4 tags pushed in ONE git push dropped their workflow events —
+individual pushes with gaps fire reliably. Owner may still need to:
+confirm D-0014 (trojan default), rotate the PAT used this session.
+Previous-run state, preserved below (run 6 — S1a closing item:
 MECHANICAL rand-split enforcement, D-0024). Restore ritual: warm path
 (runbook 0/0b) — remote reconciliation MATCH at 1c82ad4 == origin/main
 (the run-5 push fully landed; CI 44703200189 all-green 86/85/85),

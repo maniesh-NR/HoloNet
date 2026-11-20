@@ -291,3 +291,61 @@
   path the condition demands. Both halves demonstrated live this run:
   a planted scratch violation made the audit FAIL with the offending
   line, and the old root call produced E0425.
+- **D-0025 (2026-11-20, RESOLUTION of D-0009/D-0013 — owner decision,
+  given in chat this session):** the owner chose **(a) advisory +
+  v0.3.1**. The full picture, API-verified this session: the per-OS
+  v0.2.0/v0.3.0 releases exist as SEVEN maintainer-visible DRAFTS
+  (`v0.2.0-windows/-macos/-android`, `v0.3.0-windows/-macos/-linux/
+  -android`) — the workflows' "success" uploads landed on drafts, which
+  is the entire invisible-releases defect. The two Windows drafts hold
+  pre-hardening binaries (predictable splitmix64 salts/IPC token);
+  the five unix drafts are entropy-clean but superseded. Executor-
+  recorded sub-decisions (within the (a) envelope; owner did not
+  specify, each reviewable):
+  (1) **Advisory published** as `docs/advisories/2026-11-20-sa-0001-
+  v0.2.0-v0.3.0-windows-weak-entropy.md` (HoloNet-SA-0001) + the main
+  v0.3.1 release notes; **GHSA CREATED AND PUBLISHED via API:
+  GHSA-8h6m-w5qj-cq9g** (CVE requested, id pending assignment). Scope stated honestly: affected artifacts existed as
+  drafts only (not publicly downloadable); any earlier public window
+  is unknowable (D-0013); unix builds unaffected (/dev/urandom path).
+  (2) **Phantom drafts DELETED** (all seven): republishing the Windows
+  drafts would rebuild vulnerable code — never an option; deleting the
+  unix drafts removes the one-click-publish footgun D-0013 named; the
+  public `v0.2.0-linux` is KEPT (unaffected; superseded by
+  v0.3.1-linux). Asset inventories quoted in the journal + BACKUPS.md
+  before deletion.
+  (3) **Signing**: Ed25519 detached signature over the master
+  SHA256SUMS.txt — python-cryptography generation, verifiable with
+  STOCK openssl (`openssl pkeyutl -verify -pubin -inkey <pub.pem>
+  -rawin -in SHA256SUMS.txt -sigfile SHA256SUMS.txt.sig`), so users
+  need no extra tooling. (ssh-keygen is unavailable in the executor
+  sandbox — same minisign-style mechanism, different verification
+  story; corrected before commit.) Keypair generated in the executor
+  sandbox this session (private key NOT in the repo), public key
+  committed with README verification instructions. Owner may re-key under an owner-held key
+  at S7 — the S7 signing criterion becomes "re-sign under an
+  owner-held key (or record no-go)".
+  (4) **v0.3.1 cut** from the CI-verified tree `6314da0` (run
+  44729423292 all-green 6/6) as 4 per-OS tags + a main release carrying
+  the advisory, the master checksum manifest, and its signature.
+  Deadline context: decided BEFORE the S1 XChaCha20 wire change (which
+  is now UNBLOCKED) — v0.3.1 is a pure security re-release, no wire
+  change bundled.
+- **D-0026 (2026-11-20, S5 credentials model — owner decision, given
+  in chat this session):** the owner chose **(ii) embedded, with
+  recorded risk-acceptance**. This AMENDS D-0001 for S5 OPERATIONAL
+  provider credentials only: shared/embedded provider credentials may
+  be committed to the public GPL repo and shipped in binaries, with
+  the owner explicitly accepting the named risks — extractability
+  from public source and binaries, burnability through abuse, and
+  provider-ToS exposure (account bans, credential attrition).
+  Constraints that SURVIVE this decision: (a) WORKFLOW §3.3 session
+  secrets (PATs, tokens) remain env-var-only, never committed — the
+  amendment does NOT touch executor/session secrets; (b) S5 TEST
+  fixtures remain synthetic — the "no credential material committed"
+  acceptance narrows to test material (operational creds are exempted
+  by this decision, test fixtures are not); (c) operational
+  credentials live in one documented config module with a stated
+  rotation/burn path in THREAT-MODEL §E; (d) the Green-R2 S5a ordering
+  stands — VPN Gate first (official CSV, needs NO credentials),
+  Opera's embedded creds land with the risk note attached.

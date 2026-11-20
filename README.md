@@ -83,17 +83,17 @@ Flutter (Android)   Compose (macOS)   Qt6/QML (Win+Linux)
 **Release-surface status (progress review 0002, 2026-11-17 — verified
 against the GitHub API):** only three releases are publicly visible today —
 `v0.2.0` (empty), `v0.2.0-linux` (static musl tarball + `SHA256SUMS.txt`),
-and `v0.3.0` (source tarball only). The per-OS releases the v0.2.0/v0.3.0
-release workflows built successfully on 2026-11-08 (`v0.2.0-windows`,
-`v0.2.0-macos`, `v0.2.0-android`, all `v0.3.0-*`) are **not publicly
-downloadable** — their workflow runs concluded "success" but no public
-release exists for those tags (unpublished drafts or deleted; reconciliation
-and a re-publish decision are open owner items, tracked with D-0009 in
-`harness/memory/DECISIONS.md`). Until that lands, treat
-`v0.2.0-linux` as the only prebuilt binary release, and note it predates
-the fail-closed entropy hardening on non-CSPRNG platforms (not applicable
-to Linux, which used `/dev/urandom`; see
-[docs/THREAT-MODEL.md](docs/THREAT-MODEL.md) §G).
+and `v0.3.0` (source tarball only). The per-OS artifacts the v0.2.0/v0.3.0
+release workflows built on 2026-11-08 turned out to be unpublished
+**drafts** — API-verified and DELETED on 2026-11-20 per decision D-0025
+(the two Windows drafts held pre-hardening builds; never republished —
+see [security advisory SA-0001](docs/advisories/2026-11-20-sa-0001-v0.2.0-v0.3.0-windows-weak-entropy.md)).
+**v0.3.1** is the first full per-OS release, cut from the hardened,
+CI-verified tree: `v0.3.1-windows` / `-macos` / `-linux` / `-android`
+per-OS builds, plus a main `v0.3.1` release carrying the advisory and a
+signed master checksum manifest. `v0.2.0-linux` predates the fail-closed
+entropy hardening but is NOT affected by SA-0001 (Linux used
+`/dev/urandom`; see [docs/THREAT-MODEL.md](docs/THREAT-MODEL.md) §G).
 
 Intended release matrix (what `release.yml` builds per tag push):
 
@@ -109,6 +109,23 @@ publish `SHA256SUMS.txt` next to their archives — verify downloads before
 running anything (`sha256sum -c SHA256SUMS.txt`). The GUI frontends build
 from source — see [docs/BUILDING.md](docs/BUILDING.md). Tag pushes rebuild
 everything via [`.github/workflows/release.yml`](.github/workflows/release.yml).
+
+### Verifying release signatures
+
+From v0.3.1 on, the main release carries a signed master checksum
+manifest: `SHA256SUMS.txt` (hashes of every per-OS asset) +
+`SHA256SUMS.txt.sig` (Ed25519 detached signature). Verify with stock
+openssl — no extra tooling:
+
+```bash
+openssl pkeyutl -verify -pubin -inkey release-signing.pub   -rawin -in SHA256SUMS.txt -sigfile SHA256SUMS.txt.sig
+sha256sum -c SHA256SUMS.txt          # for the files you downloaded
+```
+
+`release-signing.pub` lives in this repo under `docs/`. The private
+key is generated and held OUTSIDE the repository (mechanism documented
+in `harness/memory/DECISIONS.md`, D-0025); re-signing under an
+owner-held key is the recorded S7 packaging criterion.
 
 ## Quick start
 

@@ -215,13 +215,20 @@ ONLY from `holo_util::rand::os_fill` — **fail-closed**:
   fallback to `USERPROFILE`, hard error when neither `HOLONET_DATA`
   nor `HOME`/`USERPROFILE` resolves (never CWD), and a recorded
   Windows ACL decision for `ipc-token`/`profiles.json`.
-- **Disclosure (gate 0001, A1-C1):** the PUBLISHED v0.2.0/v0.3.0
-  binaries predate this hardening — at those tags, Windows builds
-  generated AEAD salts and the IPC token from the splitmix64 fallback
-  (time/pid-seeded, predictable). The fail-closed behavior above
-  applies from the gate-0001 remediation commit (53ff229) onward.
-  Owner decision required (D-0009): publish an advisory or cut a
-  v0.3.1 re-release from the hardened tree.
+- **Disclosure (gate 0001, A1-C1) — RESOLVED 2026-11-20 (D-0025):**
+  the v0.2.0/v0.3.0 Windows binaries predate this hardening — at those
+  tags, Windows builds generated AEAD salts and the IPC token from the
+  splitmix64 fallback (time/pid-seeded, predictable). API verification
+  showed the affected artifacts existed as maintainer-visible release
+  DRAFTS only (never publicly downloadable); the drafts were DELETED
+  2026-11-20 and NOT republished (republishing would rebuild
+  vulnerable code). Formal advisory: **HoloNet-SA-0001**
+  (`docs/advisories/2026-11-20-sa-0001-…-weak-entropy.md`). **v0.3.1**
+  (2026-11-20) is the first release cut from the hardened tree
+  (`53ff229` onward), with per-OS checksums and a signed master
+  manifest. Owner decision: option (a) — advisory + re-release —
+  chosen BEFORE the S1 XChaCha20 wire change lands, so the re-release
+  carries no wire-format change.
 
 ## Revision history
 

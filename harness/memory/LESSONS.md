@@ -240,3 +240,11 @@
   5's deterministic-jitter lesson. The scratch file was an orphan .rs
   (not in any mod tree) so cargo never compiled it; the audit walked
   it anyway, which is exactly the property the demo proved.
+- Pushing MULTIPLE tags in ONE `git push` can silently drop the
+  workflow events: all 4 v0.3.1-* tags landed on the remote (ls-remote
+  verified) yet ZERO release runs fired; delete + individual re-push
+  with ~10 s gaps fired all four. When a tag-triggered workflow does
+  not start, suspect event coalescing/loss, not the trigger syntax.
+  Also: `git push` needs the inline credential helper on EVERY
+  invocation (one was missed on the delete pushes — auth error read
+  as "could not read Username", easy to misread as a dead token).

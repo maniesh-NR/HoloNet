@@ -332,12 +332,17 @@ Proton, Tor, Obscura, Lantern. ~51 tests. Acceptance: offline fixtures
 only (no live network in tests), cache semantics tested, no credential
 material committed.
 
-**OWNER DECISION REQUIRED BEFORE S5 CHARTERS (progress review 0002,
-A3-C7/F11): the credentials model.** "se0316 creds" named in tracked
-files contradict D-0001 "no credentials" and WORKFLOW §3.3 — embedded
-shared credentials in a public GPL binary are burnable and ToS-exposed.
-Options: user-supplied-at-runtime only, or embedded-with-recorded-risk-
-acceptance. **Green-R2 reality check (2026-11-17): reorder S5a = VPN
+**DECIDED 2026-11-20 (D-0026, owner): embedded, with recorded risk-
+acceptance** — amends D-0001 for S5 OPERATIONAL provider credentials
+only. Owner-accepted risks: extractability from public source and
+binaries, burnability through abuse, provider-ToS exposure. Constraints
+that survive: WORKFLOW §3.3 session secrets remain env-var-only (the
+amendment does not touch executor/session secrets); S5 TEST fixtures
+stay synthetic ("no credential material committed" narrows to test
+material); operational credentials live in ONE documented config module
+with a stated rotation/burn path (THREAT-MODEL §E). The Green-R2
+ordering stands: VPN Gate first (official CSV, needs NO credentials);
+Opera's embedded creds land with the risk note attached. **Green-R2 reality check (2026-11-17): reorder S5a = VPN
 Gate (official CSV, zero ToS friction) → Opera (unofficial API, drift
 risk) → warp_wg (needs the WG driver); CUT warp_masque/Proton/Tor/
 Obscura/Lantern/Mozilla from v1.0 scope (warp_masque alone ≈ rescoped
