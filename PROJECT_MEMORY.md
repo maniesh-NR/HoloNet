@@ -60,18 +60,17 @@ decisions (below) still pending, non-blocking.
 - Full matrix green on push: ubuntu/macos/1.77.2/cross-check/
   harness-audit green; windows REQUIRED-green since S1 item 0
   (D-0018 — the expected-red window is CLOSED). Verified green:
-  run 44703200189 @ f433de4 (2026-11-20; earlier 44700103379 @
-  d9e137e, 44668106188 @ 2dae1ce). Per-OS ledger for the CURRENT
-  tree: 86 Linux / 85 macOS / 85 Windows (holo-socks redirected to
+  run 44728988531 @ 937554f (2026-11-20; earlier 44703200189 @
+  f433de4, 44700103379 @ d9e137e). Per-OS ledger for the CURRENT
+  tree: 87 Linux / 86 macOS / 86 Windows (holo-socks redirected to
   socks-test.log in CI logs — reconcile before summing; 1 Linux-only
   integration test, cfg-gated util/config deltas).
 - Memory regression budget: RSS growth < 8 MB over 64 MB relayed
   (D-0015; local reference +88–376 KB; runner variance absorbed).
 - 89 `#[test]` countable: `grep -rn "#\[test\]" engine/crates
   --include="*.rs" | wc -l` → 89 (87 runnable on Linux after run 6's
-  +1 audit test — no cfg gates, so +1 on macOS/Windows too; the 86/85/85
-  ledger above is CI-verified @ f433de4; the 87-tree expects CI
-  verification on the next push).
+  +1 audit test — no cfg gates, so +1 on macOS/Windows too; the 87/86/86
+  ledger above is CI-verified @ 937554f, run 44728988531).
 - Every run ends: `bash harness/scripts/backup.sh "<summary>"`
   (WORKFLOW §1.2; push = completion). Gate records quote SHA-256 in
   the BACKUPS.md line; next record number = 0004 (S1→S2 gate,
@@ -114,7 +113,10 @@ decisions (below) still pending, non-blocking.
   test CI-enforces the two-entry allowlist (definition + holo-config
   profile IDs); both negative paths demonstrated live (planted scratch
   violation → audit FAIL with file:line; old root call → E0425).
-  Expected CI ledger for this tree: 87 Linux / 86 macOS / 86 Windows.
+  **CI-VERIFIED: run 44728988531 @ 937554f all-green (6/6 jobs) —
+  per-OS ledger 87 Linux / 86 macOS / 86 Windows** (visible sums
+  77/76/76 + the redirected holo-socks 10, reconciled; README +
+  ARCHITECTURE citations updated).
 - Run 5 (S1 hardening second pass): local suite **86 green**
   (baseline 83/83 re-verified before changes); push LANDED; CI
   44700103379 + 44703200189 all-green (ledger 86/85/85).
@@ -145,7 +147,7 @@ decisions (below) still pending, non-blocking.
 ## Recent Progress & Git Activity
 
 ```text
+### Commit: 937554f - backup: FAILED 2026-11-20T11:36:06Z (push did not land) (maniesh-NR, 2026-11-20)
 ### Commit: 13983d5 - backup: backup: run-6 push landed via retry (1c82ad4..5382c5f); CI of the 87-tree triggers on this closure push (maniesh-NR, 2026-11-20)
 ### Commit: 5382c5f - backup: FAILED 2026-11-20T09:19:04Z (push did not land) (maniesh-NR, 2026-11-20)
-### Commit: 652c346 - backup: S1a closing: rand-split enforcement D-0024: weak PRNG behind rand::nosec doc-hidden, re-exports closed, workspace audit test allowlist-enforced; negative demos live (audit FAIL w/ file:line + E0425); (maniesh-NR, 2026-11-20)
 ```

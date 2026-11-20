@@ -24,3 +24,6 @@ UTC time | prev-commit | run summary
 2026-11-20T11:36:06Z | LANDED | retry push (credential helper from HOLO_GITHUB_TOKEN env; backup.sh's in-script push has no terminal for the prompt) carried 1c82ad4..5382c5f incl. the FAILED marker above — the marker documents the first attempt honestly; run-6 backup 652c346 IS on origin/main; CI of the 87-tree triggers on the closure push
 2026-11-20T11:36:06Z | prev=5382c5f | backup: run-6 push landed via retry (1c82ad4..5382c5f); CI of the 87-tree triggers on this closure push
 2026-11-20T11:36:06Z | FAILED | push did not land — run incomplete
+2026-11-20T11:39:41Z | LANDED | retry push carried 5382c5f..937554f (closure commit 13983d5 + its FAILED marker; first retry attempt failed on a dropped env var, re-loaded from the owner upload — not a token problem) — HEAD final at 937554f
+2026-11-20T11:39:41Z | LANDED | CI run 44728988531 @ 937554f SUCCESS 6/6 jobs; per-OS ledger 87 Linux / 86 macOS / 86 Windows (visible 77/76/76 + redirected socks 10, reconciled); README/ARCHITECTURE/PROJECT_MEMORY/STATE updated to the verified numbers
+2026-11-20T11:39:41Z | prev=937554f | run-6 CI-VERIFIED: run 44728988531 @ 937554f all-green 6/6, per-OS ledger 87 Linux/86 macOS/86 Windows (socks redirect reconciled); README/ARCHITECTURE/STATE/PROJECT_MEMORY updated to verified counts

@@ -55,8 +55,8 @@ Flutter (Android)   Compose (macOS)   Qt6/QML (Win+Linux)
   SOCKS listener from `proxy_listen`, and reports honest per-driver
   milestone errors for every protocol that is not live yet.
 - **86/86 tests green** (71 at v0.3.0 plus gate-0001 hardening tests
-  plus the S1 hardening items — CI-verified run 44703200189: 86 Linux /
-  85 macOS / 85 Windows, cfg-gated counts differ),
+  plus the S1 hardening items — CI-verified run 44728988531: 87 Linux /
+  86 macOS / 86 Windows, cfg-gated counts differ),
   including 6 end-to-end integration tests over real loopback TCP
   (IPC → import → connect → SOCKS → AEAD tunnel → echo → stats →
   disconnect) plus throughput and memory-bounding regressions.
@@ -114,7 +114,7 @@ everything via [`.github/workflows/release.yml`](.github/workflows/release.yml).
 
 ```bash
 cd engine
-cargo test                        # 86 tests on Linux (85 macOS / 85 Windows — cfg-gated; CI-verified run 44703200189)
+cargo test                        # 87 tests on Linux (86 macOS / 86 Windows — cfg-gated; CI-verified run 44728988531)
 cargo build --release -p holonetd -p holonetctl
 ./target/release/holonetd &       # data dir + IPC token auto-created
 ./target/release/holonetctl theme dark     # the full M3 role map

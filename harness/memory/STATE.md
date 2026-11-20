@@ -31,7 +31,11 @@ Cargo.lock v3 HELD post-run. Remaining S1: XChaCha wire fix
 (owner-blocked on D-0009/D-0013), BLAKE2s (orphan available for
 re-derivation per D-0020), X25519, AES-CFB (its planned CI grep-audit
 follows THIS audit's pattern, per ROADMAP item 3), ExpandLabel,
-bignum/RSA.
+bignum/RSA. **CI-VERIFIED post-push: run 44728988531 @ 937554f
+all-green (6/6 jobs incl. the 1.77.2 canary — Cargo.lock v3 held
+through CI) — per-OS ledger 87 Linux / 86 macOS / 86 Windows
+(visible 77/76/76 + redirected socks 10, reconciled; README +
+ARCHITECTURE counts updated to the verified 87 numbers).**
 
 Previous-run state, preserved below (run 5 — S1 server-path
 hardening second pass + backup push LANDED). **PUSH LANDED** with the

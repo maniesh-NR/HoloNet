@@ -48,7 +48,7 @@ docs/            MATERIAL_YOU.md · RESTORE.md · TECHNIQUES.md ·
 
 The first data plane is LIVE: `session.connect` → reachability probe →
 local SOCKS5 → Shadowsocks AEAD tunnel (end-to-end integration tests
-over real loopback TCP; 86 Linux / 85 macOS / 85 Windows tests, all
+over real loopback TCP; 87 Linux / 86 macOS / 86 Windows tests, all
 green on CI — run 44703200189; platform-gated). The remaining planes (TLS 1.3, QUIC,
 provider-fed profiles, system crates) are staged in
 `harness/memory/ROADMAP.md`; every not-yet-live protocol honestly

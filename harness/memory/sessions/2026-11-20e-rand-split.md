@@ -107,3 +107,28 @@ next push (same honesty pattern as runs 4–5).
   in the environment this session — otherwise the honest FAILED
   marker commits locally per the durability rule (outcome: BACKUPS.md
   tail).
+
+## Verification outcome (post-push, owner PAT)
+
+- Push chain this run: backup 652c346 + FAILED marker 5382c5f →
+  manual retry push with the env-var credential helper LANDED
+  1c82ad4..5382c5f → LANDED line + closure commit 13983d5 → in-script
+  push failed honestly (no terminal) → FAILED marker 937554f → retry
+  LANDED 5382c5f..937554f (the first retry attempt hit "Invalid
+  username or token" because the env var had been dropped between
+  shell sessions — re-loaded from the upload, NOT a token problem;
+  journaled for the record). Final HEAD = 937554f.
+- **CI run 44728988531 @ 937554f: SUCCESS, 6/6 jobs** (ubuntu, macos,
+  windows, cross-check, 1.77.2, harness-audit). The 1.77.2 canary
+  green confirms Cargo.lock v3 held through CI.
+- **Per-OS ledger (parsed from job logs, socks redirect reconciled):
+  87 Linux / 86 macOS / 86 Windows** — visible sums 77/76/76, zero
+  FAILED lines, + the redirected holo-socks 10 per OS (its
+  `> socks-test.log` step gates on `test result: ok` and the job is
+  green). Exactly the predicted counts (86/85/85 + 1 ungated audit
+  test on every OS). README + ARCHITECTURE + PROJECT_MEMORY + STATE
+  citations updated to the verified numbers.
+- BACKUPS.md carries the LANDED lines for both retry pushes; the
+  FAILED markers document the in-script attempts honestly.
+- Owner action requested: rotate the PAT (it transited chat/upload
+  twice; recommended after every session that uses it).
