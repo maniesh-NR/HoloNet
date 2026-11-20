@@ -17,3 +17,4 @@ UTC time | prev-commit | run summary
 2026-11-20T07:27:35Z | FAILED | push did not land — run incomplete
 2026-11-20T08:30:26Z | prev=d9e137e | S1 hardening run 5: ProbeGuard decay cap-1024 (A1-F8), CSPRNG full-jitter slow-close w/ explicit 2s ceiling (A3-C10), A2-F6 auth read deadline 10s; backup push LANDED ef19a6f..d9e137e, CI 44700103379 
 2026-11-20T08:30:26Z | FAILED | push did not land — run incomplete
+2026-11-20T08:31:40Z | LANDED | retry push (credential helper from HOLO_GITHUB_TOKEN env; backup.sh's in-script push has no terminal for the prompt) carried d9e137e..7a00fcc incl. the FAILED marker above — the marker documents the first attempt honestly; run-5 backup 4ddd081 IS on origin/main; CI of the 86-tree triggers on this push

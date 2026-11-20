@@ -129,7 +129,7 @@ waits on D-0009/D-0013.
 ## Recent Progress & Git Activity
 
 ```text
+### Commit: 7a00fcc - backup: FAILED 2026-11-20T08:30:26Z (push did not land) (maniesh-NR, 2026-11-20)
 ### Commit: 4ddd081 - backup: S1 hardening run 5: ProbeGuard decay cap-1024 (A1-F8), CSPRNG full-jitter slow-close w/ explicit 2s ceiling (A3-C10), A2-F6 auth read deadline 10s; backup push LANDED ef19a6f..d9e137e, CI 44700103379 (maniesh-NR, 2026-11-20)
 ### Commit: d9e137e - backup: FAILED 2026-11-20T07:27:35Z (push did not land) (maniesh-NR, 2026-11-20)
-### Commit: 0945325 - backup: S1 hardening run 4: A2-C1 SaltCache (cap-1024 FIFO, opaque replay refusal, named test) + A3-C4 loopback-only proxy_listen bind (HOLONET_PROXY_LISTEN_ANY override, named tests); suite 76->83 local gree (maniesh-NR, 2026-11-20)
 ```
