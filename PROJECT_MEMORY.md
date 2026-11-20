@@ -147,7 +147,7 @@ decisions (below) still pending, non-blocking.
 ## Recent Progress & Git Activity
 
 ```text
+### Commit: 6a1af0d - backup: run-6 CI-VERIFIED: run 44728988531 @ 937554f all-green 6/6, per-OS ledger 87 Linux/86 macOS/86 Windows (socks redirect reconciled); README/ARCHITECTURE/STATE/PROJECT_MEMORY updated to verified counts (maniesh-NR, 2026-11-20)
 ### Commit: 937554f - backup: FAILED 2026-11-20T11:36:06Z (push did not land) (maniesh-NR, 2026-11-20)
 ### Commit: 13983d5 - backup: backup: run-6 push landed via retry (1c82ad4..5382c5f); CI of the 87-tree triggers on this closure push (maniesh-NR, 2026-11-20)
-### Commit: 5382c5f - backup: FAILED 2026-11-20T09:19:04Z (push did not land) (maniesh-NR, 2026-11-20)
 ```
