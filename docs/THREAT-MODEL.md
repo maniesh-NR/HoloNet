@@ -199,7 +199,13 @@ ONLY from `holo_util::rand::os_fill` — **fail-closed**:
   consistent with §A's accepted limits (root/ptrace out of scope).
   Revisit only if a threat model change requires tighter ACLs.
 - `splitmix64` remains for NON-security uses only (IDs, jitter, test
-  data) and is documented as such at the source.
+  data) — enforced MECHANICALLY since run 6 (D-0024, gate-0001 A2-C3):
+  the weak PRNG lives behind `rand::nosec` (`#[doc(hidden)]`, no
+  re-exports — the old root paths are compile errors) and a workspace
+  audit test fails CI outside a two-entry allowlist. Residual: `nosec`
+  stays callable — new non-security consumers must extend the allowlist
+  with a justification and a DECISIONS record (the visible, journaled
+  path).
 - **Windows secret-at-rest (progress review 0002, A2-F4/C2):** the
   0600 owner-only writes are unix-only (`#[cfg(unix)]`); std Rust has
   no Windows ACL API, and the daemon's data dir falls back

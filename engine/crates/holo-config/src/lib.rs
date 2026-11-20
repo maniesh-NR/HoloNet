@@ -128,7 +128,10 @@ impl Profile {
 }
 
 pub fn new_id() -> String {
-    holo_util::rand::hex(8)
+    // Profile IDs are the ONE gate-classified non-security PRNG consumer
+    // (rand-split audit allowlist, D-0024): never route security material
+    // through rand::nosec — use os_fill/os_bytes/os_hex instead.
+    holo_util::rand::nosec::hex(8)
 }
 
 // ---------------------------------------------------------------------------

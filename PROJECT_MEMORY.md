@@ -48,11 +48,12 @@ run 44703200189 @ f433de4 all-green (6/6 jobs; 86 Linux / 85 macOS /
 85 Windows).
 
 S1 in progress: items 0, salt-cache, loopback-bind, ProbeGuard decay,
-jittered slow-close, read-deadline all DONE. Next per the amended
-charter: XChaCha wire fix + rand-split enforcement (S1a closing), then
-BLAKE2s/X25519/AES-CFB/ExpandLabel/bignum-RSA (S1b/S1c). Owner
-decisions (below) still pending, non-blocking; the XChaCha WIRE change
-waits on D-0009/D-0013.
+jittered slow-close, read-deadline AND rand-split enforcement (run 6,
+D-0024 — rand::nosec doc-hidden module, ALL re-export paths closed,
+named workspace audit test) all DONE. S1a is CLOSED except the XChaCha
+wire fix, which waits on D-0009/D-0013 (owner). Next: BLAKE2s →
+X25519 → AES-CFB → ExpandLabel → bignum-RSA (S1b/S1c). Owner
+decisions (below) still pending, non-blocking.
 
 ## Verification contracts (how "done" is proven)
 
@@ -66,9 +67,11 @@ waits on D-0009/D-0013.
   integration test, cfg-gated util/config deltas).
 - Memory regression budget: RSS growth < 8 MB over 64 MB relayed
   (D-0015; local reference +88–376 KB; runner variance absorbed).
-- 88 `#[test]` countable: `grep -rn "#\[test\]" engine/crates
-  --include="*.rs" | wc -l` → 88 (86 runnable on Linux; the 86/85/85
-  ledger above is CI-verified @ f433de4).
+- 89 `#[test]` countable: `grep -rn "#\[test\]" engine/crates
+  --include="*.rs" | wc -l` → 89 (87 runnable on Linux after run 6's
+  +1 audit test — no cfg gates, so +1 on macOS/Windows too; the 86/85/85
+  ledger above is CI-verified @ f433de4; the 87-tree expects CI
+  verification on the next push).
 - Every run ends: `bash harness/scripts/backup.sh "<summary>"`
   (WORKFLOW §1.2; push = completion). Gate records quote SHA-256 in
   the BACKUPS.md line; next record number = 0004 (S1→S2 gate,
@@ -91,20 +94,31 @@ waits on D-0009/D-0013.
    stalest-eviction + full-jitter ceiling 2 s + auth read deadline 10 s;
    +3 named tests, local 86-green; lock-across-sleep defect fixed);
    remaining: XChaCha standard switch (waits on D-0009/D-0013),
-   rand-split enforcement, BLAKE2s (BLAKE2b cut unless justified),
-   X25519 (1M-vector execution mode decided first), AES-CFB, ExpandLabel,
-   bignum/RSA.
+   BLAKE2s (BLAKE2b cut unless justified), X25519 (1M-vector execution
+   mode decided first), AES-CFB, ExpandLabel, bignum/RSA. Rand-split
+   enforcement DONE 2026-11-20 run 6 (D-0024).
 6. [dev] ~~A4-C2 harness-audit~~ DONE 2026-11-19 (full-tree integrity
    audit, D-0017); ~~A4-C3 backup.sh guards~~ DONE (rebase/unmerged
    refusal + WARN durability, negative-tested).
 7. [research→charter] R-01..R-15 / C-01..C-15 backlog in ROADMAP.
 
-## Key facts snapshot (2026-11-20, run 5)
+## Key facts snapshot (2026-11-20, run 6)
 
-- Run 5 (S1 hardening second pass): local suite **86 green** (rustc
-  1.100.0, persisted in ~/.cargo across this recycle; baseline 83/83
-  re-verified before changes); static 88; Cargo.lock v3 HELD post-run.
-- PUSH LANDED this run (owner PAT via env-var credential helper only):
+- Run 6 (S1a closing: rand-split, D-0024): local suite **87 green**
+  (rustc 1.100.0 reinstalled via rustup — the recycle wiped ~/.cargo
+  again; baseline 86/86 re-verified BEFORE changes); static 89;
+  Cargo.lock v3 HELD post-run. Weak PRNG behind rand::nosec
+  (doc-hidden), ALL re-export paths closed (incl. the crate-root
+  `pub use rand::{bytes, fill}` — found by the run's call-site map;
+  leaving it would have defeated a module-only split), named audit
+  test CI-enforces the two-entry allowlist (definition + holo-config
+  profile IDs); both negative paths demonstrated live (planted scratch
+  violation → audit FAIL with file:line; old root call → E0425).
+  Expected CI ledger for this tree: 87 Linux / 86 macOS / 86 Windows.
+- Run 5 (S1 hardening second pass): local suite **86 green**
+  (baseline 83/83 re-verified before changes); push LANDED; CI
+  44700103379 + 44703200189 all-green (ledger 86/85/85).
+- Run 5 PUSH LANDED (owner PAT via env-var credential helper only):
   origin/main ef19a6f..f433de4; CI all-green 6/6 on BOTH pushes
   (44700103379 @ d9e137e = the 83-tree; 44703200189 @ f433de4 = the
   86-tree, ledger 86/85/85); the v4 lockfile regression's CI failure
@@ -119,10 +133,10 @@ waits on D-0009/D-0013.
   PROCEED_WITH_CONDITIONS); cross-validation 0003 PASSED (4× PWC, 0
   BLOCK; A2-C1/A3-C4 closed run 4, the three remaining server-path
   items closed run 5). Next record: 0004 = the S1→S2 gate.
-- Known shipped-plane gaps (chartered in S1, post-run-5): xchacha
-  mislabel (owner decision first); rand-split unenforced; crypto
-  primitives BLAKE2s/X25519/AES-CFB/ExpandLabel/bignum-RSA not yet
-  landed (S1b/S1c).
+- Known shipped-plane gaps (chartered in S1, post-run-6): xchacha
+  mislabel (owner decision first); crypto primitives
+  BLAKE2s/X25519/AES-CFB/ExpandLabel/bignum-RSA not yet landed
+  (S1b/S1c). Rand-split CLOSED run 6 (D-0024).
 - Release surface: only v0.2.0-linux / empty v0.2.0 / src-only v0.3.0
   public (D-0013 reconciliation pending).
 - Hygiene: `SaltCache::len` unused outside tests (run-4 artifact,
@@ -131,7 +145,7 @@ waits on D-0009/D-0013.
 ## Recent Progress & Git Activity
 
 ```text
+### Commit: 1c82ad4 - backup: S1 run 5 CI-VERIFIED: run 44703200189 @ f433de4 all-green 6/6, per-OS ledger 86 Linux/85 macOS/85 Windows (socks redirect reconciled); README/ARCHITECTURE/ROADMAP/STATE/PROJECT_MEMORY updated to verif (maniesh-NR, 2026-11-20)
 ### Commit: f433de4 - backup: run-5 push landed via retry (d9e137e..7a00fcc); ledger closed (maniesh-NR, 2026-11-20)
 ### Commit: 7a00fcc - backup: FAILED 2026-11-20T08:30:26Z (push did not land) (maniesh-NR, 2026-11-20)
-### Commit: 4ddd081 - backup: S1 hardening run 5: ProbeGuard decay cap-1024 (A1-F8), CSPRNG full-jitter slow-close w/ explicit 2s ceiling (A3-C10), A2-F6 auth read deadline 10s; backup push LANDED ef19a6f..d9e137e, CI 44700103379 (maniesh-NR, 2026-11-20)
 ```

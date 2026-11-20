@@ -266,3 +266,28 @@
   attacker-observable timeline still differs between immediate
   length-rejection and deadline-close on silence — inherent without
   breaking legitimate slow clients.
+- **D-0024 (2026-11-20 run 6, S1a closing — rand-split enforcement,
+  gate-0001 A2-C3 / ROADMAP S1 item 7):** the security/non-security
+  randomness split is now MECHANICAL, not naming-and-docs. Three layers:
+  (1) the weak PRNG (`fill`/`bytes`/`hex`/`alnum` + the splitmix64
+  machinery) moved into `rand::nosec`, `#[doc(hidden)]`, with loud
+  never-for-crypto docs; (2) BOTH re-export paths closed — the `rand`
+  module root AND the crate root (`pub use rand::{bytes, fill}` deleted;
+  the crate-root re-export was found by this run's call-site map and
+  would have kept `holo_util::fill` compilable, silently defeating a
+  module-only split); (3) the named audit test
+  `rand_split_audit_no_weak_prng_outside_allowlist` scans every
+  workspace `.rs` file (engine root via CARGO_MANIFEST_DIR ancestors;
+  skips `target`/hidden dirs; floor asserts the scan found the real
+  tree) for `nosec::`, `rand::fill`, `rand::bytes`, `rand::hex`,
+  `rand::alnum`, `use rand::{` and fails with file:line outside the
+  two-entry allowlist — the definition file plus the holo-config
+  profile-ID consumer (the ONE consumer gate-0001 classified
+  non-security); integration `tests/` dirs are exempt per the verdict's
+  "outside holo-config IDs/tests". Residual, honest: unit-test modules
+  inside src files are NOT exempt (a weak call there requires a visible
+  allowlist edit + DECISIONS record), and `nosec` stays callable for
+  anyone who edits the allowlist — exactly the reviewable, journaled
+  path the condition demands. Both halves demonstrated live this run:
+  a planted scratch violation made the audit FAIL with the offending
+  line, and the old root call produced E0425.

@@ -453,6 +453,14 @@ verdicts of A1/A2/A3/A4, archived verbatim in
 7. **Mechanical rand-split enforcement (A2-C3, with the S1 FFI work)**:
    grep-audit test or module gating so `fill/bytes/hex/alnum` cannot be
    called for security material by mistake.
+   **DONE 2026-11-20 run 6 (D-0024) — BOTH halves of the condition:
+   compile-failure (weak names moved to `rand::nosec`, `#[doc(hidden)]`;
+   rand-root and crate-root re-exports removed — `rand::hex` is E0425,
+   demonstrated live) + the named workspace audit test
+   `rand_split_audit_no_weak_prng_outside_allowlist` (CI-enforced,
+   two-entry allowlist: definition + holo-config profile-ID consumer;
+   negative-demonstrated on a planted scratch violation). Local
+   87-green; +1 test on every OS (no cfg gates).**
 8. **XChaCha20 standard compliance (A1-C2, in S1)**: switch holo-ss to
    holo-crypto's standard `aead_xchacha20poly1305_*` (24-byte nonce)
    with draft-irtf-cfrg-xchacha vectors, or de-scope the cipher with an

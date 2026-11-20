@@ -228,3 +228,15 @@
   log undercounts by exactly the redirected crate (73 visible vs 83
   real on Linux). Reconcile per-crate sums against the local suite
   BEFORE recording a per-OS ledger; the mismatch is the tell.
+- A module split is not MECHANICAL until every re-export path is
+  closed: the run-6 call-site map found `pub use rand::{bytes, fill}`
+  at the holo-util crate root — had the weak fns only been moved into
+  `nosec`, `holo_util::fill` would still compile and the split would
+  be cosmetic. When enforcing "X must not be called", grep for
+  re-exports and aliases of X, not just call sites (D-0024).
+- An audit test that has never failed proves nothing: demonstrate the
+  negative path live (plant a scratch violation, watch it FAIL with
+  file:line, remove it) — same invariant-over-prediction rule as run
+  5's deterministic-jitter lesson. The scratch file was an orphan .rs
+  (not in any mod tree) so cargo never compiled it; the audit walked
+  it anyway, which is exactly the property the demo proved.

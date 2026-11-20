@@ -1,6 +1,39 @@
 # HoloNet State Snapshot
 
-Last updated: 2026-11-20 (UTC, fifth run of the day — S1 server-path
+Last updated: 2026-11-20 (UTC, sixth run of the day — S1a closing item:
+MECHANICAL rand-split enforcement, D-0024). Restore ritual: warm path
+(runbook 0/0b) — remote reconciliation MATCH at 1c82ad4 == origin/main
+(the run-5 push fully landed; CI 44703200189 all-green 86/85/85),
+fileMode guard re-applied, hooks present, memory gate PASSED (lag 1).
+Toolchain REINSTALLED via rustup (rustc 1.100.0; the recycle wiped
+~/.cargo a second time — runbook step 2 is exercised and reliable).
+Baseline re-verified **86/86 green BEFORE changes** (matches the
+CI-verified run-5 ledger exactly). **RAND-SPLIT ENFORCEMENT SHIPPED**
+(gate-0001 A2-C3 / ROADMAP S1 item 7) — both halves of the condition:
+(1) compile-failure — weak PRNG (`fill`/`bytes`/`hex`/`alnum` +
+splitmix64 machinery) moved to `rand::nosec` (`#[doc(hidden)]`, loud
+never-for-crypto docs) and BOTH re-export paths closed (rand module
+root + the crate-root `pub use rand::{bytes, fill}`; the crate-root
+path was found by this run's call-site map — a module-only split would
+have been silently defeated by it); old root calls are E0425,
+demonstrated live; (2) the named workspace audit test
+`rand_split_audit_no_weak_prng_outside_allowlist` scans every engine
+`.rs` for `nosec::` + the weak root paths and fails with file:line
+outside the two-entry allowlist (definition + the holo-config
+profile-ID consumer, the ONE gate-classified non-security consumer);
+negative-demonstrated on a planted scratch violation (audit FAILED
+with the offending line, scratch removed). Call-site map: os_* =
+holo-ss:918 (slow-close seam), holo-ss:1067 (random_salt),
+holo-engine:78 (token); weak = holo-config:131 only. Local suite
+**87 green** (86 + 1; the audit test has no cfg gates → +1 on all
+three OSes; CI verification rides the next push); static count 89;
+Cargo.lock v3 HELD post-run. Remaining S1: XChaCha wire fix
+(owner-blocked on D-0009/D-0013), BLAKE2s (orphan available for
+re-derivation per D-0020), X25519, AES-CFB (its planned CI grep-audit
+follows THIS audit's pattern, per ROADMAP item 3), ExpandLabel,
+bignum/RSA.
+
+Previous-run state, preserved below (run 5 — S1 server-path
 hardening second pass + backup push LANDED). **PUSH LANDED** with the
 owner-supplied token (env var only, never stored): origin/main
 ef19a6f..d9e137e (4 commits — run-3 pstack backup, run-4 hardening,

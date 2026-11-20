@@ -19,3 +19,4 @@ UTC time | prev-commit | run summary
 2026-11-20T08:30:26Z | FAILED | push did not land — run incomplete
 2026-11-20T08:31:40Z | LANDED | retry push (credential helper from HOLO_GITHUB_TOKEN env; backup.sh's in-script push has no terminal for the prompt) carried d9e137e..7a00fcc incl. the FAILED marker above — the marker documents the first attempt honestly; run-5 backup 4ddd081 IS on origin/main; CI of the 86-tree triggers on this push
 2026-11-20T08:34:51Z | prev=f433de4 | S1 run 5 CI-VERIFIED: run 44703200189 @ f433de4 all-green 6/6, per-OS ledger 86 Linux/85 macOS/85 Windows (socks redirect reconciled); README/ARCHITECTURE/ROADMAP/STATE/PROJECT_MEMORY updated to verif
+2026-11-20T09:19:04Z | prev=1c82ad4 | S1a closing: rand-split enforcement D-0024: weak PRNG behind rand::nosec doc-hidden, re-exports closed, workspace audit test allowlist-enforced; negative demos live (audit FAIL w/ file:line + E0425); 
