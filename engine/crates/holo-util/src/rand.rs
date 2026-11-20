@@ -27,7 +27,12 @@ mod win_entropy {
 
     #[link(name = "advapi32")]
     extern "system" {
-        fn RtlGenRandom(random_buffer: *mut u8, random_buffer_length: u32) -> u8;
+        // RtlGenRandom is a header-level macro; the import library
+        // exports the underlying ordinal name SystemFunction036 (linking
+        // as "RtlGenRandom" yields LNK2019 __imp_RtlGenRandom — CI-learned
+        // 2026-11-20; a check-only cross-compile cannot catch this, only
+        // the real MSVC link does).
+        fn SystemFunction036(random_buffer: *mut u8, random_buffer_length: u32) -> u8;
     }
 
     /// TEST SEAM (fail-closed injection, analogous to unix's
@@ -46,10 +51,10 @@ mod win_entropy {
                 "RtlGenRandom injected failure — refusing weak randomness (fail-closed)",
             ));
         }
-        // RtlGenRandom takes a ULONG length; buffer needs are tiny
-        // (32-byte salts, tokens) but chunk defensively at u32::MAX.
+        // SystemFunction036 == RtlGenRandom; takes a ULONG length; buffer
+        // needs are tiny (32-byte salts, tokens) but chunk defensively.
         let len = buf.len().min(u32::MAX as usize) as u32;
-        let ok = unsafe { RtlGenRandom(buf.as_mut_ptr(), len) };
+        let ok = unsafe { SystemFunction036(buf.as_mut_ptr(), len) };
         if ok == 0 {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::Other,
