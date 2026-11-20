@@ -14,3 +14,4 @@ UTC time | prev-commit | run summary
 2026-11-20T07:13:21Z | prev=ef19a6f | pstack re-affirm: memory hooks D-0021 + --check gate; PROJECT_MEMORY refreshed; Cargo.lock v3 restored (live v4 regression found on origin/main); 4W fallback static 78; engine unchanged vs 2dae1ce
 2026-11-20T07:13:21Z | FAILED | push did not land — run incomplete
 2026-11-20T07:27:35Z | prev=203f965 | S1 hardening run 4: A2-C1 SaltCache (cap-1024 FIFO, opaque replay refusal, named test) + A3-C4 loopback-only proxy_listen bind (HOLONET_PROXY_LISTEN_ANY override, named tests); suite 76->83 local gree
+2026-11-20T07:27:35Z | FAILED | push did not land — run incomplete

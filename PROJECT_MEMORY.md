@@ -117,7 +117,7 @@ then BLAKE2s/X25519/AES-CFB/ExpandLabel/bignum-RSA. Owner decisions
 ## Recent Progress & Git Activity
 
 ```text
+### Commit: 0945325 - backup: S1 hardening run 4: A2-C1 SaltCache (cap-1024 FIFO, opaque replay refusal, named test) + A3-C4 loopback-only proxy_listen bind (HOLONET_PROXY_LISTEN_ANY override, named tests); suite 76->83 local gree (maniesh-NR, 2026-11-20)
 ### Commit: 203f965 - backup: FAILED 2026-11-20T07:13:21Z (push did not land) (maniesh-NR, 2026-11-20)
 ### Commit: 2421428 - backup: pstack re-affirm: memory hooks D-0021 + --check gate; PROJECT_MEMORY refreshed; Cargo.lock v3 restored (live v4 regression found on origin/main); 4W fallback static 78; engine unchanged vs 2dae1ce (maniesh-NR, 2026-11-20)
-### Commit: ef19a6f - backup: cross-validation 0003 PASSED (4x PWC, panel consensus; mid-run remote divergence reconciled); residual conditions applied; tests 76 green; record sha256=2ad6fe71c58a8e6c39001966eab1d3c80a43e62b250601c (maniesh-NR, 2026-11-20)
 ```
