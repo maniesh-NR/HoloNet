@@ -145,7 +145,7 @@ decisions (below) still pending, non-blocking.
 ## Recent Progress & Git Activity
 
 ```text
+### Commit: 5382c5f - backup: FAILED 2026-11-20T09:19:04Z (push did not land) (maniesh-NR, 2026-11-20)
 ### Commit: 652c346 - backup: S1a closing: rand-split enforcement D-0024: weak PRNG behind rand::nosec doc-hidden, re-exports closed, workspace audit test allowlist-enforced; negative demos live (audit FAIL w/ file:line + E0425); (maniesh-NR, 2026-11-20)
 ### Commit: 1c82ad4 - backup: S1 run 5 CI-VERIFIED: run 44703200189 @ f433de4 all-green 6/6, per-OS ledger 86 Linux/85 macOS/85 Windows (socks redirect reconciled); README/ARCHITECTURE/ROADMAP/STATE/PROJECT_MEMORY updated to verif (maniesh-NR, 2026-11-20)
-### Commit: f433de4 - backup: run-5 push landed via retry (d9e137e..7a00fcc); ledger closed (maniesh-NR, 2026-11-20)
 ```
