@@ -8,7 +8,7 @@ release builds all-green (windows 44758027482, macos 44758056729,
 linux 44758090961, android 44758125210), all 7 binaries checksum-
 verified, master SHA256SUMS.txt signed with Ed25519 (private key in
 the executor sandbox, NOT in repo; pubkey committed docs/release-
-signing.pub.pem; stock-openssl verification documented in README);
+signing.pub; stock-openssl verification documented in README);
 7 phantom per-OS drafts deleted (2 vulnerable Windows builds
 destroyed; public v0.2.0-linux kept, unaffected). Lesson learned:
 4 tags pushed in ONE git push dropped their workflow events —

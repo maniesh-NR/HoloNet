@@ -165,7 +165,7 @@ XChaCha wire fix (unblocked) + BLAKE2s onward (S1b/S1c).
 ## Recent Progress & Git Activity
 
 ```text
+### Commit: 6ae86fa - backup: FAILED 2026-11-20T15:01:11Z (push did not land) (maniesh-NR, 2026-11-20)
 ### Commit: 19e0791 - backup: run 7: D-0025 advisory+GHSA+v0.3.1 cut+drafts deleted; D-0026 S5 creds decided --allow-untracked (maniesh-NR, 2026-11-20)
 ### Commit: 6314da0 - backup: FAILED 2026-11-20T11:39:41Z (push did not land) (maniesh-NR, 2026-11-20)
-### Commit: 6a1af0d - backup: run-6 CI-VERIFIED: run 44728988531 @ 937554f all-green 6/6, per-OS ledger 87 Linux/86 macOS/86 Windows (socks redirect reconciled); README/ARCHITECTURE/STATE/PROJECT_MEMORY updated to verified counts (maniesh-NR, 2026-11-20)
 ```
