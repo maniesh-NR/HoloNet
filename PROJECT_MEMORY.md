@@ -113,7 +113,7 @@ bignum-RSA. Owner decisions (below) still pending, non-blocking.
 ## Recent Progress & Git Activity
 
 ```text
+### Commit: 2421428 - backup: pstack re-affirm: memory hooks D-0021 + --check gate; PROJECT_MEMORY refreshed; Cargo.lock v3 restored (live v4 regression found on origin/main); 4W fallback static 78; engine unchanged vs 2dae1ce (maniesh-NR, 2026-11-20)
 ### Commit: ef19a6f - backup: cross-validation 0003 PASSED (4x PWC, panel consensus; mid-run remote divergence reconciled); residual conditions applied; tests 76 green; record sha256=2ad6fe71c58a8e6c39001966eab1d3c80a43e62b250601c (maniesh-NR, 2026-11-20)
 ### Commit: cc4564f - backup: S1 item 0 DONE + verified: Windows entropy FFI (SystemFunction036) fail-closed; windows-latest REQUIRED-green; ledger 76/75/75 (run on 92b4b15 success); A3-C3 window closed; D-0018; THREAT-MODEL G shi (maniesh-NR, 2026-11-20)
-### Commit: 92b4b15 - S1 item 0 completion bookkeeping: per-platform ledger 76/75/75 (CI-verified), expected-red window closed (A3-C3), README badge/claims updated + stale <2MB fixed, ROADMAP item-0 DONE annotation, STATE refreshed, journal + LNK2019/ledger lessons (maniesh-NR, 2026-11-20)
 ```
