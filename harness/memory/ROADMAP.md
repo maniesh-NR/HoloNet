@@ -75,11 +75,24 @@ annotations: BLAKE2b cut-or-justify, constant-time bar for X25519/bignum.
    **Progress review 0002, A3-C6/F13: BLAKE2b has NO consumer in any
    chartered S1–S7 stage (WireGuard needs BLAKE2s; TLS/QUIC use SHA-2) —
    CUT from S1 unless a consumer is named and justified; BLAKE2s stays.**
+   **Record-0003 warning (A1-F5): the crashed session's BLAKE2 orphan
+   implemented ROTR correctly yet still failed its own KATs for inputs
+   ≥31 bytes — the real killer was a mis-transcribed SIGMA row
+   (SIGMA[3][8]) plus missing `use super::SIGMA` scoping. Re-derive the
+   message schedule from RFC 7693 §3.3 — never transcribe it by eye.
+   The orphan's 32 KAT expectations were independently verified against
+   OpenSSL and ARE reusable; the orphan's code is NOT (D-0020).**
 2. X25519 (RFC 7748) — a24 = 121665; inversion exponent p−2 with limb 0
    0xffffffeb…; reject the all-zero shared secret.
    **Contributory-behavior policy (A2): all-zero-output check ONLY,
    TLS 1.3-style; non-canonical u-coordinates accepted as-is — documented
    so S2/S3 inherit a decision, not an accident.**
+   **Record-0003 precision (A2-C3): "accepted as-is" means decoded per
+   RFC 7748 §5 — mask bit 255, little-endian, arithmetic mod 2^255−19 —
+   with NO canonical-form rejection; it does NOT permit skipping the
+   decode steps. The all-zero shared-secret compare must use the
+   constant-time `ct_eq`; acceptance adds a non-canonical-acceptance
+   test and quotes the RFC text verbatim when drafting.**
    **Execution-mode decision required before implementation (progress
    review 0002, A3-C5/F5): the RFC 7748 §5.2 1,000,000-iteration vector
    runs release-mode-only or behind an opt-in cfg — never as a default
@@ -91,6 +104,11 @@ annotations: BLAKE2b cut-or-justify, constant-time bar for X25519/bignum.
 3. AES-CFB (NIST SP 800-38A) — legacy provider paths only.
    **Constraint (A2): unauthenticated; forbidden outside an authenticated
    wrapper.**
+   **Record-0003 enforcement (A2-C4): the constraint is mechanical, not
+   prose — raw CFB encrypt/decrypt types are not `pub` outside the
+   authenticated wrapper module, and a CI grep-audit fails on any `cfb`
+   reference outside that module (same spirit as the rand-split audit,
+   binding condition 7).**
 4. TLS 1.3 key schedule helpers: HKDF-Expand-Label / Derive-Secret per
    RFC 8446 §7.1.
 5. **Bignum + RSA verification prep (moved from S2, A2-F9):** CIOS
@@ -111,7 +129,12 @@ Server-path hardening backlog (A2-F5; **lands in S1** — tightened from
 - Randomized slow-close via CSPRNG jitter (deterministic today — the
   determinism is itself a fingerprint, NDSS '20).
 - Uniform close-vs-hang behavior for rejected vs valid length frames
-  (distinguisher recorded in THREAT-MODEL §C).
+  (distinguisher recorded in THREAT-MODEL §C). **Record-0003 elevation
+  (A2-F6): a valid-length frame that then goes silent blocks the
+  per-connection thread in `read_exact` with NO socket timeout — an
+  unauthenticated resource-exhaustion vector on self-hosted servers.
+  The fix must add a read deadline on the server's first-chunk read,
+  not merely uniformize timing.**
 - **Off-loopback `proxy_listen` refusal (progress review 0002, A3-C4 —
   pulled IN from S6):** refuse non-loopback binds unless an explicit
   override is set; named test: 0.0.0.0/:: bind refused without override.
@@ -134,12 +157,14 @@ Acceptance criteria (all measurable):
   recorded Windows ACL decision for ipc-token/profiles.json is
   reflected in THREAT-MODEL §A/§G.**
 - Windows enforceability (A3-C3): the FULL workspace suite — including
-  the 5 engine integration tests — green on `windows-latest` CI (today
-  that job is honestly red: fail-closed entropy aborts token/salt
-  generation on Windows; turning it green IS the visible pass condition
-  for the FFI); a Windows 1.77.2 compile check (windows-latest pinned to
-  1.77.2 or `cargo check --target x86_64-pc-windows-msvc` in the legacy
-  job); a Windows FFI failure-injection seam analogous to `os_fill_at`.
+  the 5 Windows-runnable engine integration tests — green on
+  `windows-latest` CI **(SATISFIED by S1 item 0, D-0018: ledger
+  76/75/75, run 44668106188 — the job is now REQUIRED-green; the
+  continue-on-error window is closed)**; a Windows 1.77.2 compile check
+  (done: legacy job checks `cargo check --target
+  x86_64-pc-windows-msvc`); a Windows FFI failure-injection seam
+  (done: INJECT_FAIL in `win_entropy`; direct linkage has no
+  dynamic-load path — record-0003 A2 cross-check).
 - Windows FFI specifics (A2-C1): (a) all `unsafe` confined to
   `holo-util/src/rand.rs` — verifiable by `grep -rn "unsafe"
   engine/crates/` returning zero hits outside that file; (b) explicit
@@ -162,17 +187,28 @@ Acceptance criteria (all measurable):
   **salt-replay cache rejects a replayed salt+first-chunk connection
   (progress review 0002, A2-C1); off-loopback proxy_listen bind refused
   without explicit override (A3-C4);**
-  ProbeGuard map bounded under N distinct failing peers (decay/eviction
-  test); CSPRNG-jittered slow-close seeded from `os_fill` (two peers with
-  identical failure counts get different delays); close-vs-hang
-  uniformity for length-rejected vs length-valid frames.
+  ProbeGuard map bounded under 1024 distinct failing peers (decay/eviction
+  test — N pinned at 1024, record-0003 A1-F8); CSPRNG-jittered
+  slow-close seeded from `os_fill` through an injected-seam pattern
+  (deterministic test via seeded entropy — two peers with identical
+  failure counts get different delays WITHOUT a flaky live-draw
+  comparison — record-0003 A3-C10) and the intended delay ceiling
+  stated explicitly (today ProbeGuard computes up to 10 s but
+  serve_conn clamps to 120 ms — the ceiling must be a decision, not an
+  accident); close-vs-hang uniformity for length-rejected vs
+  length-valid frames plus the first-chunk read deadline (A2-F6
+  elevation above).
 - OpenSSL cross-checks during development, recorded in the session
-  journal (process evidence, not an in-tree artifact — stated per A1-F10).
+  journal WITH the exact command lines and ≥16 hex characters of each
+  digest quoted (a bare "cross-checked" note does not satisfy this —
+  record-0003 A3-C9; process evidence, not an in-tree artifact).
 - No new third-party crates; the ONLY permitted unsafe is the chartered
-  Windows entropy FFI (D-0008); workspace test count grows
-  monotonically per platform from the post-gate-0001 baselines
-  (Linux 75 / macOS 74 / Windows 72 — cfg-gated tests count differently
-  per OS, A1-C5).
+  Windows entropy FFI (D-0008) — containment now compile-time-enforced
+  by `#![forbid(unsafe_code)]` on every crate except holo-util
+  (D-0018); workspace test count grows monotonically per platform from
+  the CURRENT baselines (Linux 76 / macOS 75 / Windows 75 — the item-0
+  ledger, D-0018; supersedes the post-gate-0001 75/74/72 figures;
+  cfg-gated tests count differently per OS, A1-C5).
 - Gate: the S1→S2 gate (record number assigned sequentially — see
   WORKFLOW §2.6, D-0011; do NOT hardcode record numbers) required
   before starting TLS.

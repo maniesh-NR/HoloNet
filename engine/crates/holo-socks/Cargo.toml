@@ -8,4 +8,5 @@ description = "HoloNet local proxy: RFC 1928/1929 SOCKS5 server with DRR-fair sh
 [dependencies]
 holo-net = { path = "../holo-net" }
 holo-proto = { path = "../holo-proto" }
-holo-util = { path = "../holo-util" }
+# holo-util dependency removed at record 0003 (A1-F7: zero usage —
+# the cargo "unused dependency" warning)

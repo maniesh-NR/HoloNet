@@ -48,13 +48,14 @@ docs/            MATERIAL_YOU.md · RESTORE.md · TECHNIQUES.md ·
 
 The first data plane is LIVE: `session.connect` → reachability probe →
 local SOCKS5 → Shadowsocks AEAD tunnel (end-to-end integration tests
-over real loopback TCP; 75 tests green on Linux — 74 macOS / 72
-Windows, platform-gated). The remaining planes (TLS 1.3, QUIC,
+over real loopback TCP; 76 Linux / 75 macOS / 75 Windows tests, all
+green on CI — item-0 ledger, run 44668106188; platform-gated). The remaining planes (TLS 1.3, QUIC,
 provider-fed profiles, system crates) are staged in
 `harness/memory/ROADMAP.md`; every not-yet-live protocol honestly
 reports a per-driver milestone error at connect — nothing fakes
-success. Windows data-plane material fails CLOSED until the S1 entropy
-FFI lands (D-0008).
+success. Windows entropy comes from the chartered RtlGenRandom FFI —
+the workspace's sole `unsafe` (D-0008/D-0018, S1 item 0, landed
+2026-11-20) — fail-closed on any entropy error.
 
 ## Material You data flow
 

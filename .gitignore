@@ -52,10 +52,15 @@ Makefile*
 Thumbs.db
 
 # Local secrets — never commit (hardened at gate 0001: A2-F8/A4-C3 —
-# `git add -A` in backup.sh must never sweep credential-shaped files)
+# `git add -A` in backup.sh must never sweep credential-shaped files;
+# profiles.json/.env.local/keystore added at record 0003, A2-C9:
+# profiles.json carries WG private keys when HOLONET_DATA points in-tree)
 **/ipc-token
 **/*.log
 *.env
+.env.local
+**/profiles.json
+keystore/
 *.pem
 *.key
 *.p12

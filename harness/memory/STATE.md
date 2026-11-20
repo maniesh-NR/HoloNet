@@ -1,20 +1,24 @@
 # HoloNet State Snapshot
 
-Last updated: 2026-11-17 (UTC) — progress review 0002 run (adversarial
-panel + forensics + research; record
-`harness/adversarial/verdicts/0002-progress-review.md`, CONSENSUS 4×
-PROCEED_WITH_CONDITIONS). First run on the owner's WINDOWS host (Git
-Bash; no Rust toolchain, no MSVC — all verification this run was static
-analysis + public GitHub API; nothing was executed locally).
+Last updated: 2026-11-20 (UTC, second run of the day) — cross-validation
+progress review 0003 (independent adversarial panel, 4×
+PROCEED_WITH_CONDITIONS, 0 BLOCK; record
+`harness/adversarial/verdicts/0003-cross-validation.md`). Linux sandbox
+WITH full toolchain (rustc 1.100.0); the suite was re-run locally.
+
+- MID-RUN DIVERGENCE (record-0003 A4-F3, the run's sharpest finding):
+  the run started from an on-disk tree @ `8761716` believing "local ==
+  origin/main" from a stale tracking ref; `git ls-remote` revealed
+  origin/main had moved 12 commits ahead — a PARALLEL SESSION had
+  pushed its own record-0002 progress-review cycle (2026-11-17) plus
+  harness hardening (2026-11-19) plus S1 ITEM 0 (2026-11-20, D-0018).
+  Reconciled by fast-forward (`merge --ff-only`, local was an
+  ancestor); all record-0003 work then landed on the merged tree.
+  backup.sh now refuses to push when the live remote differs (A4-C2).
 
 - Restored from GitHub `maniesh-NR/HoloNet` @ `8761716` (branch `main`,
   = `sandbox/latest`), clean tree at start. Run ends with the mandated
   `harness/scripts/backup.sh` push (see BACKUPS.md tail).
-- Engine: pure-std Rust workspace at `engine/` (edition 2021,
-  GPL-3.0-or-later, zero third-party crates, D-0002). **11 crates**:
-  holo-util, holo-config, holo-theme, holo-proto, holo-engine, holo-net,
-  holo-crypto, holo-ss, holo-socks, holonetctl, holonetd. No engine code
-  changed this run (review-only + the remediations below).
 - Tests: **76 Linux / 75 macOS / 75 Windows, ALL GREEN on CI**
   (verified 2026-11-20, run 44668106188 @ 2dae1ce; socks suite hidden
   from CI logs by redirection — add 5 to naive log sums). Growth:
@@ -42,12 +46,36 @@ analysis + public GitHub API; nothing was executed locally).
   expected-red window is closed.**
   harness-audit green. Authenticated log access works via the owner's
   cached git credential (GCM) — anonymous is 403.
-- Live data plane (v0.3.0): Shadowsocks AEAD (SIP004, 3 ciphers), local
-  SOCKS5 pooled relay, `session.connect` wiring (default-deny dispatch
-  with honest per-driver milestone errors — A1 re-verified), Material
-  You theme system + Flutter/KMP/Qt frontends validated by golden
-  vectors. Share-LINK import for all 7 schemes live; remaining import
-  formats are S4.
+- Engine: pure-std Rust workspace at `engine/` (edition 2021,
+  GPL-3.0-or-later, zero third-party crates, D-0002). **11 crates**:
+  holo-util, holo-config, holo-theme, holo-proto, holo-engine, holo-net,
+  holo-crypto, holo-ss, holo-socks, holonetctl, holonetd. No engine code
+  changed in the 0003 run except Cargo.toml hygiene: unused
+  `holo-util` dep removed from holo-socks; redundant holo-util
+  dev-dep removed from holo-engine (record-0003 A1-F7; suite
+  re-verified green locally after the change).
+- Record-0003 residual conditions APPLIED THIS RUN: doc claim fixes
+  (TECHNIQUES phantom §12 + RTT-wiring claim + OpenSSL-evidence chain;
+  RESTORE; ARCHITECTURE counts 76/75/75 + FFI-shipped wording),
+  .gitignore += profiles.json/.env.local/keystore/ (A2-C9), backup.sh
+  untracked-guard + live-remote-guard (A4-C4/A4-C2), SANDBOX-RESTORE
+  step 0 reconciliation + 0b warm-restore + fileMode (A4-C2/C3),
+  WORKFLOW §4.4 first-act triage (A3-C8), S1 charter amendments
+  (X25519 decode/ct_eq precision A2-C3; CFB mechanical ban A2-C4;
+  close-vs-hang read-deadline elevation A2-F6; ProbeGuard N=1024 +
+  deterministic jitter seam + ceiling decision A1-F8/A3-C10;
+  OpenSSL-journal auditability A3-C9; BLAKE2 SIGMA-transcription
+  warning A1-F5; baselines → item-0 ledger), orphan disposition
+  D-0020. CARRIED (code work, S1): everything not applied above.
+- Research lane (owner charge "research fixes/improvements/new
+  features"): the researcher subagent failed twice (empty responses);
+  the orchestrator ran the research pass directly with citations —
+  `harness/research/0001-s1-preflight-landscape.md` (std CSPRNG still
+  unstable in 1.100.0 → FFI permanent for the 1.77.2 floor; XChaCha
+  still draft-irtf-cfrg-xchacha-03, NOT an RFC; TLS-in-TLS fingerprint
+  literature for the S2/S3 padding work; ECH = RFC 9849 (2026-03) but
+  ~0.06 % real-world usage → not v1.0 cover; Wycheproof (C2SP)
+  RsassaPkcs1/Pss verify vector classes named for S1c acceptance).
 - **Public release surface (A1, API-verified 2026-11-17): only
   `v0.2.0` (empty), `v0.2.0-linux` (tarball + SHA256SUMS.txt), and
   `v0.3.0` (source only) are visible. v0.2.0-windows/macos/android and
@@ -75,20 +103,34 @@ analysis + public GitHub API; nothing was executed locally).
   guards: DONE 2026-11-19, D-0017 — verified locally and by CI;
   A1-C1/A1-C2 closed 2026-11-18 with runs 44229892465/44234338593;
   SANDBOX-RESTORE Windows section done 2026-11-17, A4-C4.)
-- Gate status: gate 0001 PASSED (S0→S1, S1 open to start); progress
-  review 0002 PASSED (no transition authority; S1 charter AMENDED).
-  Next record number: 0003 (expected: the S1→S2 gate, per WORKFLOW
-  §2.6).
-- Suggested next session START (A3-C7): owner decisions — D-0009/
-  D-0013 (advisory vs v0.3.1, cut BEFORE the S1 XChaCha20 wire change
-  if chosen) and S5 credentials model; then S1 item 0 (Windows FFI +
-  Windows-green CI) with the A3-C3 ordering rule.
+- Live data plane (v0.3.0): Shadowsocks AEAD (SIP004, 3 ciphers), local
+  SOCKS5 pooled relay, `session.connect` wiring (default-deny dispatch
+  with honest per-driver milestone errors — A1 re-verified), Material
+  You theme system + Flutter/KMP/Qt frontends validated by golden
+  vectors. Share-LINK import for all 7 schemes live; remaining import
+  formats are S4.
+- Gate status: gate 0001 PASSED (S0→S1); progress review 0002 PASSED
+  (no transition authority; S1 charter amended); progress review 0003
+  PASSED (cross-validation, no transition authority; residual
+  conditions applied/carried as above). S1 item 0 DONE (D-0018).
+  Next record: 0004 = the S1→S2 gate (sequence number per D-0011;
+  do not hardcode).
+- Suggested next session START (A3-C7, updated 2026-11-20): owner
+  decisions — D-0009/D-0013 (advisory vs v0.3.1, cut BEFORE the S1
+  XChaCha20 wire change if chosen) and the S5 credentials model; then
+  CONTINUE S1: item 1 BLAKE2s (SIGMA re-derivation warning applies,
+  D-0020), item 2 X25519, item 3 AES-CFB, item 4 ExpandLabel, item 5
+  bignum/RSA prep, server-path hardening backlog (salt-replay cache,
+  ProbeGuard N=1024 decay, jittered slow-close with an explicit
+  ceiling, first-chunk read deadline), XChaCha wire-cipher fix
+  (binding condition 8; draft-irtf-cfrg-xchacha vectors),
+  rand-split mechanical enforcement (condition 7).
 
 Re-verify after any restore before trusting this file — PER HOST
 (A4-C4/D-0012, this host's honest procedure): tree clean at
 `sandbox/latest`; `cargo test --workspace` green IF a Rust toolchain
-exists (Linux sandbox expected 75); on a toolchain-less host (this
-Windows one today), the honest fallback is the public CI conclusions
-for HEAD via api.github.com (actions runs) — currently expecting: ubuntu
-green-again only AFTER the next push (lockfile fix), 1.77.2 job expected
-green after the same fix, windows-latest expected red until S1 item 0.
+exists (Linux sandbox expected 76); on a toolchain-less host, the
+honest fallback is the public CI conclusions for HEAD via
+api.github.com (actions runs) — currently expecting the full matrix
+REQUIRED-green (the expected-red windows window closed with S1 item 0,
+D-0018).

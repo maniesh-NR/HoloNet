@@ -140,3 +140,30 @@
   (1 linux-gated test) and 5 on macOS/Windows. Post-item-0 ledger:
   76 Linux / 75 macOS / 75 Windows (verified by full-log sums + hidden
   socks 5).
+
+## Record-0003 additions (2026-11-20 cross-validation run)
+
+- BLAKE2: transcription of the RFC schedule is the KILLER, not rotation
+  direction. The crashed session's orphan implemented ROTR correctly and
+  still failed its own KATs for inputs >= 31 bytes — a mis-transcribed
+  SIGMA row (SIGMA[3][8]) plus missing `use super::SIGMA` scoping
+  (E0425). Re-derive SIGMA from RFC 7693 §3.3 programmatically; never
+  transcribe tables by eye (D-0020; orphan KAT expectations verified
+  authentic against OpenSSL and ARE reusable, the code is NOT).
+- "local == origin/main" checked via `git status`/`origin/main` compares
+  against a TRACKING REF that can be stale since the last clone — it
+  does NOT query the live remote. The 2026-11-20 run found origin/main
+  12 commits ahead (a parallel session had pushed) while the tracking
+  ref claimed equality. Only `git ls-remote` is truth; backup.sh now
+  refuses a push when the live remote differs from HEAD (A4-C1/F3).
+- Sandbox restore flips tracked file modes 100644 -> 100755 (umask
+  artifact; 76 files in one run — 0 insertions/0 deletions). Normalize
+  with `git config core.fileMode false` after every restore/clone
+  (exec-bit is the only mode git tracks; the 0600 fs-perm tests are
+  unaffected; genuine exec-bit changes go through
+  `git update-index --chmod=+x`). In SANDBOX-RESTORE step 0b now.
+- A crashed session can leave untracked WIP in the tree; backup.sh's
+  `git add -A` would have committed a non-compiling 352-line orphan as
+  a "backup". backup.sh now REFUSES on untracked paths outside
+  harness/ unless the message carries an explicit --allow-untracked
+  bypass — triage first, journal the disposition (A4-C4/A3-C8).

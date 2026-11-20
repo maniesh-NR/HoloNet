@@ -14,8 +14,9 @@ plane — 71 workspace tests, all green:
    Poly1305 (3-limb, u128 schoolbook, fold **only at 2^130 — never 2^128**;
    RFC clamp applied as ONE 128-bit number), ChaCha20-Poly1305 AEAD,
    HChaCha20/XChaCha20, AES (S-box generated, not transcribed), AES-GCM
-   (NIST TC3/TC4 bit-exact), EVP_BytesToKey. 17 vector tests, all
-   cross-checked against OpenSSL during development.
+   (NIST TC3/TC4 bit-exact), EVP_BytesToKey. 17 vector tests — OpenSSL
+   cross-checks during pre-harness development are self-attested only;
+   no recorded evidence survives (record 0003, A1-F3).
 2. **holo-net** — RFC 6298 RTT/RTO, token bucket, DRR fair queuing,
    CoDel AQM, CUBIC + HyStart++, BBR (model portion), padding policies,
    ProbeGuard, BufferPool. 9 tests incl. deterministic link-sim CC

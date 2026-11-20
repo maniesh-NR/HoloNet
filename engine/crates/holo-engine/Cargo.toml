@@ -17,4 +17,5 @@ holo-util = { path = "../holo-util" }
 [dev-dependencies]
 holo-net = { path = "../holo-net" }
 holo-ss = { path = "../holo-ss" }
-holo-util = { path = "../holo-util" }
+# holo-util removed from dev-dependencies at record 0003 (A1-F7:
+# redundant — already a [dependencies] entry; tests resolve it from there)

@@ -164,3 +164,45 @@
   profiles.json: rely on per-user profile-directory ACLs; no additional
   FFI (D-0008 containment) — residual (admin/SYSTEM readable) recorded
   in THREAT-MODEL §G, consistent with §A's root-out-of-scope limit.
+- **D-0019 (2026-11-20, cross-validation progress review 0003 —
+  consensus decision):** a second, fully independent adversarial panel
+  (fresh agents, emphasis rotated, run in a DIFFERENT sandbox from the
+  record-0002 one) reviewed the same baseline `8761716` and returned
+  4/4 PROCEED_WITH_CONDITIONS, 0 BLOCK — matching record 0002's verdict
+  pattern. Mid-run its A4 discovered via `git ls-remote` that
+  origin/main had moved to `cc4564f` (a parallel session had pushed its
+  own record-0002 cycle + S1 item 0); the run fast-forwarded and the
+  record documents the divergence verbatim. Cross-check outcome: the
+  majority of the 0002-record conditions were already closed by the
+  parallel run (unsafe containment compile-enforced D-0018, memory
+  budget D-0015, harness-audit full-tree D-0017, backup guards,
+  platform counts CI-verified, descope/terminal-gate D-0014,
+  D-0009/D-0013 re-escalation, credentials model owner-gated); the
+  RESIDUAL conditions were applied this run (doc claim fixes A1-F1/F2/F3,
+  per-platform-count ARCHITECTURE refresh, .gitignore profiles.json/
+  .env.local/keystore, backup.sh untracked-guard + live-remote guard,
+  SANDBOX-RESTORE step 0/0b, LESSONS additions) or carried into the S1
+  charter (X25519 decode/ct_eq precision, CFB mechanical ban, read
+  deadline for the close-vs-hang DoS elevation, ProbeGuard N=1024,
+  deterministic jitter seam, delay-ceiling decision, OpenSSL-journal
+  auditability). WORKFLOW §4.4 added: first-act untracked-stray triage
+  with journaled disposition. Record numbering per D-0011: 0003 is a
+  SEQUENCE number — the S1→S2 gate will be 0004. Research lane:
+  subagent researcher failed twice (empty responses); the orchestrator
+  ran the research pass directly — output in
+  `harness/research/0001-s1-preflight-landscape.md`.
+- **D-0020 (2026-11-20, orphan disposition — A1-C5/A4-C7):** the
+  untracked `engine/crates/holo-crypto/src/blake2.rs` found on the
+  restored tree (sha256 begins 375d41cd; full hash in the run report —
+  truncated here so the D-0017 blob-resolution audit stays exact) is
+  DOUBLY BROKEN: (1) SIGMA scoping E0425 — the file never compiled;
+  (2) with scoping fixed, 3/5 of its own KATs fail for inputs where
+  m[2] != m[8] — consistent with a mis-transcribed SIGMA row. Its 32
+  embedded KAT EXPECTATIONS are authentic (independently verified
+  against OpenSSL: hashlib + b2sum) and ARE reusable in S1; its CODE is
+  not. Disposition: moved OUT of every git tree to
+  `/home/z/my-project/blake2-orphan-2026-11-20.rs` (owner's machine;
+  history unverifiable — it predates any tracking); S1 re-derives the
+  mix schedule from RFC 7693 §3.3 and may copy the KAT expectations
+  after re-verifying them against the official blake2-kat.json. LESSONS
+  carries the pitfall; ROADMAP S1 item 1 carries the warning.

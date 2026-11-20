@@ -6,7 +6,38 @@ identity, tests, memory reading order all ran for real. The
 backup of the harness run — budget ~5–10 minutes total; time the next
 cold restore and update this estimate with the real figure.
 **Windows-host variant added 2026-11-17 (progress review 0002, A4-C4)
-— see step 4W.**
+— see step 4W. Warm-restore branch + step 0 added 2026-11-20
+(record 0003, A4-C2/C3 — both were exercised for real that run).**
+
+0. **Remote reconciliation FIRST — every run, warm or cold (record
+   0003, A4-C2; the 2026-11-20 run found origin/main 12 commits ahead
+   of the local tree while the tracking refs claimed equality):**
+
+       git ls-remote origin refs/heads/main
+       git rev-parse HEAD          # must EQUAL the ls-remote hash
+
+   On mismatch: STOP. `git fetch origin`, then fast-forward
+   (`git merge --ff-only origin/main`) or reconcile per WORKFLOW §1.4.
+   Record the result in the session journal: `remote reconciliation:
+   main=<sha> latest=<sha> match=Y/N`. backup.sh now also refuses a
+   push when the live remote differs from HEAD.
+
+0b. **Warm-restore branch — the repo is found ON DISK (no clone
+   needed; the 2026-11-20 path):**
+
+       cd /home/z/my-project/download/HoloNet
+       git status --porcelain          # triage untracked strays FIRST
+       git config core.fileMode false  # sandbox umask flips 644→755 on
+                                       # restore (76 files last time);
+                                       # exec-bit is the only bit git
+                                       # tracks, 0600 fs-perm tests are
+                                       # unaffected; genuine exec-bit
+                                       # changes: git update-index --chmod=+x
+       command -v cargo >/dev/null 2>&1 || . "$HOME/.cargo/env"
+
+   Untracked files: a crashed session's leftovers are NEVER committed
+   and NEVER trusted — triage, journal the disposition (record 0003
+   A3-C8/A4-C4); backup.sh now refuses on strays outside harness/.
 
 1. **Recover the repo** (the GitHub repository is the source of truth):
 
@@ -53,20 +84,22 @@ cold restore and update this estimate with the real figure.
 4. **Verify the baseline** (never trust, always re-verify):
 
        cd /home/z/my-project/download/HoloNet/engine
-       cargo test --workspace        # must be green (75 as of 2026-11-13)
+       cargo test --workspace        # must be green (76 as of 2026-11-20;
+                                     # 75 on macOS / 75 on Windows —
+                                     # item-0 ledger, D-0018)
 
    and check the CI badge on the GitHub repo page is green.
 
    4W. **Toolchain-less hosts (Windows fallback, D-0012/A4-C4):** if no
    Rust toolchain/linker exists, do NOT claim test-green. The honest
    procedure: (a) static count — `grep -rn "#\[test\]" engine/crates
-   --include="*.rs" | wc -l` (75 expected); (b) public CI conclusions
+   --include="*.rs" | wc -l` (78 expected); (b) public CI conclusions
    for HEAD via anonymous API —
    `https://api.github.com/repos/maniesh-NR/HoloNet/actions/runs?head_sha=<sha>`
-   (expected matrix since 2026-11-18: ubuntu green, macOS green,
-   1.77.2 green, windows expected-red-with-continue-on-error until S1
-   item 0); (c) record BOTH facts in the session journal. Any CI-red
-   beyond the labeled windows job blocks baseline trust.
+   (expected matrix since 2026-11-20: ALL REQUIRED-green — the
+   expected-red windows window closed with S1 item 0, D-0018); (c)
+   record BOTH facts in the session journal. Any CI-red blocks
+   baseline trust.
    **Log access (owner credential):** anonymous log download is 403;
    the owner's cached git credential works —
    `TOKEN=$(printf "protocol=https\nhost=github.com\n\n" | git

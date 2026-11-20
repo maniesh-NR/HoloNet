@@ -79,3 +79,12 @@ cannot be silently amended: changes to it are entries in
 2. `memory/LESSONS.md` and `memory/DECISIONS.md` are append-only.
 3. Durable knowledge discovered mid-run (pitfalls, vector notes,
    infrastructure quirks) lands in `LESSONS.md` in the same run's backup.
+4. First act of every run (record-0003 A3-C8): `git status --porcelain`;
+   untracked/modified strays are triaged BEFORE new work and the
+   disposition (discarded / kept-and-rederived / unrelated-artifact-
+   outside-tree) is recorded in the session journal. Broken or
+   crashed-session WIP is never committed and never trusted: reusable
+   material (vectors, constants, scaffolding) must be re-derived from
+   its primary RFC/NIST source and pass its own tests before reuse.
+   backup.sh enforces the same rule at push time (refusal on strays
+   outside harness/ unless the message carries --allow-untracked).

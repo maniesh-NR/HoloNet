@@ -50,6 +50,50 @@ if ! git diff --name-only --diff-filter=U --quiet; then
   exit 1
 fi
 
+# Record-0003 A4-C4: a crashed session's untracked leftovers must never be
+# swept into a backup commit silently (the 2026-11-20 BLAKE2 orphan — 352
+# lines of non-compiling WIP — proved the hazard is real). Refuse on
+# untracked paths OUTSIDE harness/ (new records/journals/research live
+# under harness/ and are expected at backup time). The bypass is loud and
+# explicit: append --allow-untracked to the message.
+UNTRACKED="$(git status --porcelain | grep '^??' || true)"
+STRAY="$(printf '%s\n' "$UNTRACKED" | grep -v '^?? harness/' || true)"
+if [ -n "$STRAY" ]; then
+  case "$MSG" in
+    *--allow-untracked*)
+      echo "backup: operator bypassed the untracked guard (--allow-untracked in message)" >&2
+      ;;
+    *)
+      echo "backup: REFUSING — untracked files outside harness/ (record-0003 A4-C4):" >&2
+      printf '%s\n' "$STRAY" >&2
+      echo "  Triage them FIRST and record the disposition in the session journal." >&2
+      echo "  If they are INTENDED for this backup, re-run with --allow-untracked" >&2
+      echo "  appended to the message — the bypass is loud, never silent." >&2
+      exit 1
+      ;;
+  esac
+fi
+
+# Record-0003 A4-C1/F3: the 2026-11-20 panel found origin/main had moved
+# ahead of the local tree while the run believed "local == origin/main"
+# from a stale tracking ref. Verify against the LIVE remote before pushing;
+# refuse on divergence with the §1.4 recovery commands. If the query itself
+# fails (offline), continue — the push will surface the truth honestly.
+if REMOTE_HEAD="$(git ls-remote origin refs/heads/main 2>/dev/null | cut -f1)" && [ -n "$REMOTE_HEAD" ]; then
+  LOCAL_HEAD="$(git rev-parse HEAD)"
+  if [ "$REMOTE_HEAD" != "$LOCAL_HEAD" ]; then
+    echo "backup: REFUSING — local HEAD != origin/main (live check, record-0003 A4-C2):" >&2
+    echo "  local  = $LOCAL_HEAD" >&2
+    echo "  remote = $REMOTE_HEAD" >&2
+    echo "  Reconcile first (WORKFLOW §1.4; keep BOTH BACKUPS.md lines on conflict):" >&2
+    echo "    git fetch origin && git rebase origin/main" >&2
+    echo "  then re-run: bash harness/scripts/backup.sh \"<summary>\"" >&2
+    exit 1
+  fi
+else
+  echo "backup: WARN could not query the live remote (continuing; the push will surface the truth)" >&2
+fi
+
 LOG="harness/memory/BACKUPS.md"
 PREV="$(git rev-parse --short HEAD)"
 

@@ -25,8 +25,10 @@ V. Paxson et al., "Computing TCP's Retransmission Timer", RFC 6298.
 **Tests:** convergence to a stable RTT, spike behavior, backoff doubling
 (`holo-net` `rtt_estimator_rfc6298_convergence`).
 
-**Wired into:** the SS dialer records connect RTT samples; the estimator is
-the shared building block for the v0.4 QUIC/UDP transports.
+**Wired into:** validated but NOT wired into the live data plane — the SS
+dialer records no connect RTT samples today (holo-ss has no runtime
+dependency on holo-net; corrected at record 0003, A1-F2). The estimator
+becomes a live building block with the QUIC/UDP transports (S3).
 
 ## 2. Congestion control
 
@@ -181,8 +183,10 @@ nothing per chunk (`memory_stays_bounded_under_sustained_relay`).
 ## 9. Cryptography
 
 All primitives are hand-written std-only implementations validated against
-official vectors (see `holo-crypto` tests; also cross-checked against
-OpenSSL during development):
+official vectors (see `holo-crypto` tests). OpenSSL CLI cross-checks were
+run during pre-harness development only — self-attested; those session
+journals were lost to a sandbox recycle, so no recorded command/digest
+evidence survives (corrected at record 0003, A1-F3).
 
 - ChaCha20, Poly1305, ChaCha20-Poly1305 AEAD, HChaCha20/XChaCha20 —
   Y.-A. Nir, A. Langley, "ChaCha20 and Poly1305 for IETF Protocols",
@@ -208,4 +212,7 @@ OpenSSL during development):
   with the QUIC work.
 
 Every "not yet" here is a documented milestone (docs/RESTORE.md,
-docs/ARCHITECTURE.md §12), never a silent stub.
+harness/memory/ROADMAP.md; the per-driver milestone errors live in
+holo-engine's `session.connect` dispatch) — never a silent stub
+(citation corrected at record 0003, A1-F1: ARCHITECTURE.md has no
+numbered sections).
