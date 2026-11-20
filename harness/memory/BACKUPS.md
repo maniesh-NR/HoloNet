@@ -29,3 +29,4 @@ UTC time | prev-commit | run summary
 2026-11-20T11:39:41Z | prev=937554f | run-6 CI-VERIFIED: run 44728988531 @ 937554f all-green 6/6, per-OS ledger 87 Linux/86 macOS/86 Windows (socks redirect reconciled); README/ARCHITECTURE/STATE/PROJECT_MEMORY updated to verified counts
 2026-11-20T11:39:41Z | FAILED | push did not land — run incomplete
 2026-11-20T15:01:11Z | prev=6314da0 | run 7: D-0025 advisory+GHSA+v0.3.1 cut+drafts deleted; D-0026 S5 creds decided --allow-untracked
+2026-11-20T15:01:11Z | FAILED | push did not land — run incomplete
