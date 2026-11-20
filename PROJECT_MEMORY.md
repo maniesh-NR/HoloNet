@@ -1,13 +1,15 @@
 # PROJECT_MEMORY — HoloNet operational state (single compressed source of truth)
 
-Owner protocol (2026-11-19, pstack principles, D-0016): this file is the
+Owner protocol (2026-11-19, pstack principles, D-0016; hooks/gate D-0021): this file is the
 TOKEN-EFFICIENT OPERATIONAL VIEW — tech-stack rules, active playbook,
 verification contracts. The BINDING durable memory stays in
 `harness/memory/*` (append-only DECISIONS/LESSONS/BACKUPS, STATE,
 ROADMAP, session journals; gate records in `harness/adversarial/verdicts/`,
 hash-chained). On any conflict: harness is authoritative; update both.
 `update_memory.py` (repo root) appends the git-activity section below;
-run at session start. Zero-noise rule: no raw history dumps beyond that
+run at session start; `--check` gates structure/freshness and
+`--install-hooks` installs the pre-/post-commit hooks (D-0021).
+Zero-noise rule: no raw history dumps beyond that
 section — summarize decisions/files/next-steps only.
 
 ## Tech Stack & Architecture Rules (invariants)
@@ -20,7 +22,9 @@ section — summarize decisions/files/next-steps only.
   (macOS), app_qt (Win/Linux); NDJSON JSON-RPC to holonetd
   127.0.0.1:7977; Material You via one verified Rust color engine.
 - **Cargo.lock stays `version = 3`** — modern cargo silently rewrites
-  v3→v4 and breaks the 1.77.2 CI job; re-check after every cargo run.
+  v3→v4 and breaks the 1.77.2 CI job; re-check after EVERY cargo run
+  and journal it. (Violated by the 0003 run — the v4 rewrite rode to
+  origin/main; found + restored to v3 on 2026-11-20 run 3.)
 - `unsafe`: forbidden except the chartered S1 Windows entropy FFI in
   `holo-util/src/rand.rs` (D-0008), fail-closed entropy everywhere.
 - Honesty rules: no fake success — non-live drivers return milestone
@@ -34,6 +38,11 @@ section — summarize decisions/files/next-steps only.
 
 ## Current objective
 
+Protocol re-affirmed 2026-11-20 run 3 (owner instruction): D-0021
+memory hooks live; Cargo.lock v3 restored (live regression found on
+origin/main); toolchain absent this recycle — 4W fallback, no engine
+code changed.
+
 S1 in progress: item 0 DONE 2026-11-20 (Windows FFI + data-dir + A2-C2,
 D-0018; windows-latest required-green; run 44668106188). Next: S1
 crypto extensions per amended charter (salt-replay cache + off-loopback
@@ -43,16 +52,18 @@ bignum-RSA. Owner decisions (below) still pending, non-blocking.
 ## Verification contracts (how "done" is proven)
 
 - Full matrix green on push: ubuntu/macos/1.77.2/cross-check/
-  harness-audit green; windows EXPECTED-RED with continue-on-error +
-  D-0008 warning (flip off at S1 item 0). Verified green:
-  run 44234338593 @ fc9b889 (2026-11-18).
+  harness-audit green; windows REQUIRED-green since S1 item 0
+  (D-0018 — the expected-red window is CLOSED). Verified green:
+  run 44668106188 @ 2dae1ce (2026-11-20; earlier 44234338593 @
+  fc9b889, 2026-11-18).
 - Memory regression budget: RSS growth < 8 MB over 64 MB relayed
   (D-0015; local reference +88–376 KB; runner variance absorbed).
-- 75 `#[test]` countable: `grep -rn "#\[test\]" engine/crates
-  --include="*.rs" | wc -l` → 75 (per-OS 75/74/72 via cfg gates).
+- 78 `#[test]` countable: `grep -rn "#\[test\]" engine/crates
+  --include="*.rs" | wc -l` → 78 (per-OS ledger 76 Linux / 75 macOS /
+  75 Windows via cfg gates; D-0018, CI-verified @ 2dae1ce).
 - Every run ends: `bash harness/scripts/backup.sh "<summary>"`
   (WORKFLOW §1.2; push = completion). Gate records quote SHA-256 in
-  the BACKUPS.md line; next record number = 0003 (S1→S2 gate,
+  the BACKUPS.md line; next record number = 0004 (S1→S2 gate,
   sequence-numbered per WORKFLOW §2.6).
 
 ## Active playbook / todo
@@ -74,11 +85,26 @@ bignum-RSA. Owner decisions (below) still pending, non-blocking.
    refusal + WARN durability, negative-tested).
 7. [research→charter] R-01..R-15 / C-01..C-15 backlog in ROADMAP.
 
-## Key facts snapshot (2026-11-20)
+## Key facts snapshot (2026-11-20, run 3)
 
-- HEAD ~fc9b889+backup; CI matrix as specified above (verified).
+- HEAD `ef19a6f` = origin/main (live ls-remote match this run); tree
+  clean after core.fileMode=false (94 exec-bit phantom mods, 0
+  content changes — SANDBOX-RESTORE 0b).
+- RUN-3 FIX: Cargo.lock v3→v4 silent rewrite by the 0003 run's
+  modern-cargo test re-run (was LIVE on origin/main; breaks the
+  1.77.2 job) — v3 restored pre-push; LESSONS records the
+  re-check-after-ANY-cargo-run rule.
 - Gate 0001 PASSED (S0→S1); progress review 0002 PASSED (4×
-  PROCEED_WITH_CONDITIONS; record 0002, chain 5bbc465c…→72d8858d…).
+  PROCEED_WITH_CONDITIONS; record 0002, chain 5bbc465c…→72d8858d…);
+  cross-validation 0003 PASSED (4× PWC, 0 BLOCK; residuals applied
+  or carried). Next record: 0004 = the S1→S2 gate.
+- Tests: ledger 76 Linux / 75 macOS / 75 Windows (CI-verified run
+  44668106188 @ 2dae1ce); static 78 re-verified this run; anonymous
+  API rate-limited → evidence = engine diff vs 2dae1ce (Cargo.toml
+  hygiene + the now-fixed lockfile line only). Toolchain ABSENT this
+  sandbox (recycle) — 4W fallback, no engine code changed this run.
+- Memory hooks live (D-0021): --check gate + --install-hooks
+  (pre-commit refresh+stage; post-commit read-only warn).
 - Known shipped-plane gaps (chartered in S1): no salt-replay cache;
   xchacha mislabel; ProbeGuard unbounded; deterministic slow-close.
 - Release surface: only v0.2.0-linux / empty v0.2.0 / src-only v0.3.0
@@ -87,7 +113,7 @@ bignum-RSA. Owner decisions (below) still pending, non-blocking.
 ## Recent Progress & Git Activity
 
 ```text
-### Commit: 2dae1ce - fix(windows-ffi): link RtlGenRandom via its import-library export name SystemFunction036 (RtlGenRandom is a header macro; __imp_RtlGenRandom -> LNK2019 at real MSVC link — check-only cross-compile cannot catch import-lib naming) (maniesh-NR, 2026-11-20)
-### Commit: 8d674ea - S1 item 0 (D-0008/D-0018): Windows entropy FFI — RtlGenRandom via advapi32, fail-closed, test-only injection seam, sole workspace unsafe; data-dir HOME->USERPROFILE->hard-error (CWD fallback removed, A2-C2) + unit test; #![forbid(unsafe_code)] crate-wide except rand.rs; legacy CI adds 1.77.2 x86_64-pc-windows-msvc check; THREAT-MODEL G updated (maniesh-NR, 2026-11-20)
-### Commit: 4b35add - backup: harness hardening verified: A4-C2 full-tree audit + A4-C3 backup guards GREEN on CI (run 44494124628 @ 00772a4, D-0017); all record-0002 conditions closed or owner-gated (maniesh-NR, 2026-11-19)
+### Commit: ef19a6f - backup: cross-validation 0003 PASSED (4x PWC, panel consensus; mid-run remote divergence reconciled); residual conditions applied; tests 76 green; record sha256=2ad6fe71c58a8e6c39001966eab1d3c80a43e62b250601c (maniesh-NR, 2026-11-20)
+### Commit: cc4564f - backup: S1 item 0 DONE + verified: Windows entropy FFI (SystemFunction036) fail-closed; windows-latest REQUIRED-green; ledger 76/75/75 (run on 92b4b15 success); A3-C3 window closed; D-0018; THREAT-MODEL G shi (maniesh-NR, 2026-11-20)
+### Commit: 92b4b15 - S1 item 0 completion bookkeeping: per-platform ledger 76/75/75 (CI-verified), expected-red window closed (A3-C3), README badge/claims updated + stale <2MB fixed, ROADMAP item-0 DONE annotation, STATE refreshed, journal + LNK2019/ledger lessons (maniesh-NR, 2026-11-20)
 ```

@@ -1,6 +1,21 @@
 # HoloNet State Snapshot
 
-Last updated: 2026-11-20 (UTC, second run of the day) — cross-validation
+Last updated: 2026-11-20 (UTC, third run of the day — pstack re-affirm,
+memory hooks D-0021, lockfile-v3 regression fixed). Run 3 changed no
+Rust code: owner re-sent the pstack framework (already adopted D-0016;
+the HOOK gap is now closed — update_memory.py --check gate +
+--install-hooks, pre-commit refresh+stage / post-commit read-only);
+warm-restore 0/0b done (reconciliation MATCH at ef19a6f; 94 phantom
+exec-bit mods cleared, 0 content). FOUND+FIXED live regression:
+Cargo.lock had been silently rewritten v3→v4 by the 0003 run's
+modern-cargo test re-run (violates the v3 invariant; breaks the
+1.77.2 CI job) — v3 restored this run BEFORE any push. Toolchain
+ABSENT after recycle → 4W fallback (static 78; anonymous API
+rate-limited — CI not re-fetched; engine diff vs CI-verified 2dae1ce
+= Cargo.toml hygiene + the lockfile line only). Backup push outcome:
+BACKUPS.md tail (HOLO_GITHUB_TOKEN absent).
+
+Previous-run state, preserved verbatim below: cross-validation
 progress review 0003 (independent adversarial panel, 4×
 PROCEED_WITH_CONDITIONS, 0 BLOCK; record
 `harness/adversarial/verdicts/0003-cross-validation.md`). Linux sandbox

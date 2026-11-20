@@ -167,3 +167,20 @@
   a "backup". backup.sh now REFUSES on untracked paths outside
   harness/ unless the message carries an explicit --allow-untracked
   bypass — triage first, journal the disposition (A4-C4/A3-C8).
+
+## Run 3 additions (2026-11-20 pstack re-affirm)
+
+- The "Cargo.lock stays version = 3" check must fire after EVERY cargo
+  invocation — including verification-only local runs — and the
+  re-check must be journaled. The record-0003 run's rustc-1.100.0
+  suite re-run silently rewrote the lockfile v3→v4; the change rode
+  into the cc4564f/ef19a6f pushes and origin/main briefly carried a
+  v4 lockfile (breaks the 1.77.2 CI job) — caught only by the NEXT
+  session's read-only `git diff <last-CI-verified>..HEAD -- engine/`
+  baseline audit. The rule existed on paper; no gate enforced it.
+  Run-3 fix: v3 restored before any further push.
+- Anonymous api.github.com from this sandbox's shared IP is
+  rate-limited (60/hr/IP exhausted) — CI conclusions then CANNOT be
+  re-verified honestly; fall back to local evidence (static counts +
+  engine diff vs the last CI-verified SHA) and say so verbatim in the
+  journal.

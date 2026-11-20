@@ -206,3 +206,21 @@
   mix schedule from RFC 7693 §3.3 and may copy the KAT expectations
   after re-verifying them against the official blake2-kat.json. LESSONS
   carries the pitfall; ROADMAP S1 item 1 carries the warning.
+- **D-0021 (2026-11-20, owner instruction re-affirmation — memory
+  hooks + gate):** update_memory.py (repo root) gains two modes:
+  `--check` (verification gate: memory file present, activity section
+  with ≥1 commit entry, newest entry an ancestor of HEAD, lag ≤
+  NUM_COMMITS=3) and `--install-hooks` (.git/hooks/pre-commit
+  refreshes the zero-noise activity section and stages
+  PROJECT_MEMORY.md so every commit carries fresh memory; post-commit
+  is a read-only structural check that warns, never blocks; hooks are
+  local-only — re-install after a fresh clone/restore). Rationale: the
+  re-affirmed pstack protocol demands session-start + hook operation;
+  the write path stays single and idempotent so hook and manual runs
+  cannot conflict. REJECTED: a JSON/graph twin for RAG — the
+  structured markdown + harness/memory files already form the
+  agent-accessible durable graph (D-0016 layering); a second derived
+  artifact adds sync risk with no current consumer (revisit when a
+  real RAG consumer exists). Same run, remediation (not a new
+  decision): Cargo.lock v3 restored after the 0003-era v4 silent
+  rewrite was found live on origin/main.
