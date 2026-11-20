@@ -15,12 +15,12 @@ analysis + public GitHub API; nothing was executed locally).
   holo-util, holo-config, holo-theme, holo-proto, holo-engine, holo-net,
   holo-crypto, holo-ss, holo-socks, holonetctl, holonetd. No engine code
   changed this run (review-only + the remediations below).
-- Tests: **75 `#[test]` functions countable from the tree** (crypto 17,
-  theme 10, config 10, net 9, engine 8, ss 7, util 7, socks 5, proto 2);
-  per-OS arithmetic 75/74/72 via the three cfg gates (verified by A1
-  and Blue-Forensics independently). **NOT re-executed this run (no
-  toolchain on this host) — see CI state below; "75 green" is a static
-  count plus LOCAL evidence from 2026-11-13, not a fresh execution.**
+- Tests: **76 Linux / 75 macOS / 75 Windows, ALL GREEN on CI**
+  (verified 2026-11-20, run 44668106188 @ 2dae1ce; socks suite hidden
+  from CI logs by redirection — add 5 to naive log sums). Growth:
+  75/74/72 → 76/75/75 (data-dir test everywhere, +2 Windows FFI
+  tests). Static count now 78 `#[test]` definitions total; per-OS
+  counts differ via cfg gates (quote per platform).
 - **CI state (fully diagnosed 2026-11-18, closing A1-C1/C2):** at the
   lockfile-fix push `26b48c9` (run 44229892465): **Rust 1.77.2 job
   GREEN again, macOS GREEN, cross-check + harness-audit GREEN**;
@@ -37,6 +37,9 @@ analysis + public GitHub API; nothing was executed locally).
   3 failed, all entropy). Expected matrix after the D-0015 push:
   ubuntu green, macOS green, 1.77.2 green, windows expected-red
   (continue-on-error ⇒ run conclusion green), cross-check green,
+  harness-audit green. **SUPERSEDED 2026-11-20: S1 item 0 LANDED — the
+  full matrix is ALL-REQUIRED green (see the Tests bullet above); the
+  expected-red window is closed.**
   harness-audit green. Authenticated log access works via the owner's
   cached git credential (GCM) — anonymous is 403.
 - Live data plane (v0.3.0): Shadowsocks AEAD (SIP004, 3 ciphers), local

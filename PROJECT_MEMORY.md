@@ -34,9 +34,11 @@ section — summarize decisions/files/next-steps only.
 
 ## Current objective
 
-S1 (entropy + crypto extensions) is OPEN, not started. Before any S1
-code: owner decisions (below) + S1 item 0 first (A3-C3 ordering:
-Windows FFI + windows-latest green before any crypto-extension item).
+S1 in progress: item 0 DONE 2026-11-20 (Windows FFI + data-dir + A2-C2,
+D-0018; windows-latest required-green; run 44668106188). Next: S1
+crypto extensions per amended charter (salt-replay cache + off-loopback
+refusal first — small, named tests), then BLAKE2s/X25519/ExpandLabel/
+bignum-RSA. Owner decisions (below) still pending, non-blocking.
 
 ## Verification contracts (how "done" is proven)
 
@@ -60,9 +62,8 @@ Windows FFI + windows-latest green before any crypto-extension item).
    per-OS releases.
 2. [owner] S5 credentials model (embedded vs user-supplied).
 3. [owner] Confirm D-0014 (trojan = named v1.0 second protocol).
-4. [dev] S1 item 0: Windows entropy FFI + USERPROFILE data-dir
-   fallback + Windows ACL decision + 1.77.2 msvc check in legacy job;
-   acceptance per ROADMAP S1 (A2-C2 additions).
+4. [dev] ~~S1 item 0~~ DONE 2026-11-20 (D-0018; ledger 76/75/75;
+   expected-red window closed).
 5. [dev] S1 rest per amended charter: salt-replay cache, off-loopback
    refusal, ProbeGuard decay, CSPRNG slow-close, close-vs-hang
    uniformity, XChaCha standard switch, rand-split enforcement,
@@ -73,7 +74,7 @@ Windows FFI + windows-latest green before any crypto-extension item).
    refusal + WARN durability, negative-tested).
 7. [research→charter] R-01..R-15 / C-01..C-15 backlog in ROADMAP.
 
-## Key facts snapshot (2026-11-19)
+## Key facts snapshot (2026-11-20)
 
 - HEAD ~fc9b889+backup; CI matrix as specified above (verified).
 - Gate 0001 PASSED (S0→S1); progress review 0002 PASSED (4×
@@ -86,7 +87,7 @@ Windows FFI + windows-latest green before any crypto-extension item).
 ## Recent Progress & Git Activity
 
 ```text
-### Commit: 00772a4 - harness: A4-C2 harness-audit reimplemented as full-tree integrity audit (hash resolution + chain recomputation, D-0017); A4-C3 backup.sh hardening (rebase/unmerged refusal with recovery commands, WARN durability + error capture) — locally simulated + negative-tested (maniesh-NR, 2026-11-19)
-### Commit: 4aecfca - backup: pstack protocol adopted (D-0016): PROJECT_MEMORY.md operational layer + zero-noise update_memory.py; CI-diagnosis verified closed (run 44234338593 all green except expected-red windows); session journ (maniesh-NR, 2026-11-19)
-### Commit: fc9b889 - ci: fix duplicate runs-on key (previous push produced an invalid-workflow run with 0 jobs); conservative expected-red form — continue-on-error via matrix comparison + step-level D-0008 warning annotation (maniesh-NR, 2026-11-18)
+### Commit: 2dae1ce - fix(windows-ffi): link RtlGenRandom via its import-library export name SystemFunction036 (RtlGenRandom is a header macro; __imp_RtlGenRandom -> LNK2019 at real MSVC link — check-only cross-compile cannot catch import-lib naming) (maniesh-NR, 2026-11-20)
+### Commit: 8d674ea - S1 item 0 (D-0008/D-0018): Windows entropy FFI — RtlGenRandom via advapi32, fail-closed, test-only injection seam, sole workspace unsafe; data-dir HOME->USERPROFILE->hard-error (CWD fallback removed, A2-C2) + unit test; #![forbid(unsafe_code)] crate-wide except rand.rs; legacy CI adds 1.77.2 x86_64-pc-windows-msvc check; THREAT-MODEL G updated (maniesh-NR, 2026-11-20)
+### Commit: 4b35add - backup: harness hardening verified: A4-C2 full-tree audit + A4-C3 backup guards GREEN on CI (run 44494124628 @ 00772a4, D-0017); all record-0002 conditions closed or owner-gated (maniesh-NR, 2026-11-19)
 ```

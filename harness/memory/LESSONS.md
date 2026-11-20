@@ -127,3 +127,16 @@
   `continue-on-error: ${{ matrix.os == '...' }}` pattern work;
   put honesty markers in step-level `::warning` annotations rather
   than compound `&&/||` name expressions (costs a CI cycle to learn).
+- RtlGenRandom is a header MACRO: link the advapi32 import library
+  export `SystemFunction036` instead — `#[link(name="advapi32")] extern
+  "system" { fn RtlGenRandom(...) }` fails at link time with
+  LNK2019 `__imp_RtlGenRandom` on real MSVC. A `cargo check
+  --target x86_64-pc-windows-msvc` CANNOT catch import-library naming
+  (check does not link) — only the windows-latest test job links. Cost:
+  one CI cycle (2026-11-20).
+- Per-platform test-count reconciliation from CI logs: socks-suite
+  output is REDIRECTED (socks-test.log), so log-summed totals are 5
+  below the real count on every OS; engine integration is 6 on Linux
+  (1 linux-gated test) and 5 on macOS/Windows. Post-item-0 ledger:
+  76 Linux / 75 macOS / 75 Windows (verified by full-log sums + hidden
+  socks 5).

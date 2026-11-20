@@ -53,6 +53,15 @@ off-loopback refusal (pulled in from S6), 1M-vector execution mode;
 annotations: BLAKE2b cut-or-justify, constant-time bar for X25519/bignum.
 
 0. **Per-platform CSPRNG, fail-closed** (A2-C1, blocks everything else).
+   **S1 item 0: DONE 2026-11-20** (runs 44666798185/44668106188):
+   RtlGenRandom FFI via SystemFunction036 landed (sole unsafe,
+   forbid(unsafe_code) everywhere else), fail-closed with injection
+   seam; data-dir HOME/USERPROFILE/hard-error + test (A2-C2/D-0018);
+   windows-latest FULL suite green as REQUIRED job (76/75/75
+   Linux/macOS/Windows); legacy job checks 1.77.2 msvc target;
+   THREAT-MODEL §G shipped-provenance; continue-on-error window
+   closed (A3-C3).
+
    Unix `/dev/urandom` via `os_fill`: DONE in the gate-0001 remediation
    (`rand.rs` split into fail-closed OS entropy vs non-security splitmix;
    `random_salt` + `ensure_token` converted; failure-injection test added).

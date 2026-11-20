@@ -16,22 +16,17 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
-    continue-on-error: ${{ matrix.os == 'windows-latest' }}
-    # windows-latest is honestly RED until the S1 Windows entropy FFI
-    # lands (D-0008): fail-closed entropy aborts holo-ss token/salt
-    # generation. continue-on-error keeps the matrix readable during the
-    # red window (A3-C3, progress review 0002) — a NEW Windows regression
-    # is no longer indistinguishable from the known one. Flip off at
-    # item-0 completion.
+    # S1 item 0 COMPLETE (2026-11-20, run 44668106188 @ 2dae1ce): the
+    # D-0008 Windows entropy FFI landed and windows-latest runs the FULL
+    # suite green as a REQUIRED job — the A3-C3 expected-red window
+    # (continue-on-error + warning annotation) was removed at item-0
+    # completion, per plan.
     defaults:
       run:
         shell: bash
         working-directory: engine
     steps:
       - uses: actions/checkout@v4
-      - name: Expected-red window notice (D-0008)
-        if: runner.os == 'Windows'
-        run: echo "::warning title=Expected red::Windows tests are expected to fail until S1 item 0 (D-0008 entropy FFI) lands. A failure here is the KNOWN red, not a new regression."
       - name: Install Rust (stable)
         run: |
           rustup toolchain install stable --profile minimal --no-self-update
