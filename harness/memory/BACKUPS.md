@@ -23,3 +23,4 @@ UTC time | prev-commit | run summary
 2026-11-20T09:19:04Z | FAILED | push did not land — run incomplete
 2026-11-20T11:36:06Z | LANDED | retry push (credential helper from HOLO_GITHUB_TOKEN env; backup.sh's in-script push has no terminal for the prompt) carried 1c82ad4..5382c5f incl. the FAILED marker above — the marker documents the first attempt honestly; run-6 backup 652c346 IS on origin/main; CI of the 87-tree triggers on the closure push
 2026-11-20T11:36:06Z | prev=5382c5f | backup: run-6 push landed via retry (1c82ad4..5382c5f); CI of the 87-tree triggers on this closure push
+2026-11-20T11:36:06Z | FAILED | push did not land — run incomplete
