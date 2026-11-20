@@ -16,3 +16,4 @@ UTC time | prev-commit | run summary
 2026-11-20T07:27:35Z | prev=203f965 | S1 hardening run 4: A2-C1 SaltCache (cap-1024 FIFO, opaque replay refusal, named test) + A3-C4 loopback-only proxy_listen bind (HOLONET_PROXY_LISTEN_ANY override, named tests); suite 76->83 local gree
 2026-11-20T07:27:35Z | FAILED | push did not land — run incomplete
 2026-11-20T08:30:26Z | prev=d9e137e | S1 hardening run 5: ProbeGuard decay cap-1024 (A1-F8), CSPRNG full-jitter slow-close w/ explicit 2s ceiling (A3-C10), A2-F6 auth read deadline 10s; backup push LANDED ef19a6f..d9e137e, CI 44700103379 
+2026-11-20T08:30:26Z | FAILED | push did not land — run incomplete
