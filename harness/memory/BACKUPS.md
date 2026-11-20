@@ -9,3 +9,4 @@ UTC time | prev-commit | run summary
 2026-11-18T03:21:46Z | prev=3700d61 | record 0002 tie-in: sha256=72d8858d012b4a2d8477fd96af33c7aabcf0e7dda0d659ebd138c37ace3c05c5
 2026-11-19T08:45:10Z | prev=fc9b889 | pstack protocol adopted (D-0016): PROJECT_MEMORY.md operational layer + zero-noise update_memory.py; CI-diagnosis verified closed (run 44234338593 all green except expected-red windows); session journ
 2026-11-19T09:18:04Z | prev=00772a4 | harness hardening verified: A4-C2 full-tree audit + A4-C3 backup guards GREEN on CI (run 44494124628 @ 00772a4, D-0017); all record-0002 conditions closed or owner-gated
+2026-11-20T03:51:12Z | prev=92b4b15 | S1 item 0 DONE + verified: Windows entropy FFI (SystemFunction036) fail-closed; windows-latest REQUIRED-green; ledger 76/75/75 (run on 92b4b15 success); A3-C3 window closed; D-0018; THREAT-MODEL G shi
