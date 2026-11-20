@@ -117,3 +117,16 @@ this journal.
    /home/z/my-project/blake2-orphan-2026-11-20.rs is reusable material
    per WORKFLOW's orphan rule ONLY after re-derivation from RFC 7693 +
    its own KAT pass (record-0003 A3-C8/F10).
+
+## Verification outcome (post-push)
+- Push chain this run: ef19a6f..d9e137e (run-3/4 backlog) → CI
+  44700103379 all-green 6/6, ledger 83/82/82 recorded → run-5 backup
+  4ddd081 (backup.sh in-script push failed honestly: no terminal for
+  the credential prompt → FAILED marker 7a00fcc committed per the
+  durability rule) → manual retry push with the env-var credential
+  helper carried d9e137e..7a00fcc → ledger closure commit f433de4.
+- **CI run 44703200189 @ f433de4: all-green, 6/6 jobs. Per-OS ledger
+  for the 86-tree: 86 Linux / 85 macOS / 85 Windows** (visible sums
+  76/75/75 + the redirected holo-socks 10 — reconciled per the
+  LESSONS entry). README badge/counts + ARCHITECTURE + ROADMAP
+  citations updated to the verified numbers.

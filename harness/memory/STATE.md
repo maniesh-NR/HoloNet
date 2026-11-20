@@ -24,7 +24,10 @@ post-auth, `ServePolicy` injection for tests, named test
 All three decisions recorded as D-0023; ROADMAP/THREAT-MODEL §C
 annotated/flipped with honest residuals. serve_conn/accept gained the
 `ServePolicy` param — all call sites updated (4 in-crate + engine
-integration). Remaining S1: XChaCha wire fix, rand-split enforcement,
+integration). **CI-VERIFIED: run 44703200189 @ f433de4 all-green
+(6/6 jobs) — per-OS ledger 86 Linux / 85 macOS / 85 Windows** (socks
+redirect reconciled; README/ARCHITECTURE now cite the verified 86
+numbers). Remaining S1: XChaCha wire fix, rand-split enforcement,
 BLAKE2s (orphan artifact available for re-derivation), X25519, AES-CFB,
 ExpandLabel, bignum/RSA.
 

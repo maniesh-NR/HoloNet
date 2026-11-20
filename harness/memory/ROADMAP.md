@@ -130,7 +130,8 @@ Server-path hardening backlog (A2-F5; **lands in S1** — tightened from
   record-0003 A1-F8); overflow decays the stalest peer (oldest `last`)
   from BOTH maps; named test `probe_guard_peer_map_decays_at_cap` (cap
   held under overflow, fresh peers survive, aged-out re-admission = the
-  honest bound); local suite 86-green, CI rides the next push.
+  honest bound); local suite 86-green; CI-VERIFIED run 44703200189
+  (86 Linux / 85 macOS / 85 Windows, all 6 jobs green).
 - Randomized slow-close via CSPRNG jitter (deterministic today — the
   determinism is itself a fingerprint, NDSS '20).
   **DONE 2026-11-20 run 5:** full-jitter delay uniform over
@@ -139,7 +140,8 @@ Server-path hardening backlog (A2-F5; **lands in S1** — tightened from
   (D-0023 — the accidental 120 ms clamp removed); ProbeGuard lock no
   longer held across the sleep (found-by-inspection serialization
   defect); named test `slow_close_jitter_seeded_deterministic` (A3-C10
-  seeded-seam pattern — no live-draw flake); CI rides the next push.
+  seeded-seam pattern — no live-draw flake); CI-VERIFIED run
+  44703200189.
 - Uniform close-vs-hang behavior for rejected vs valid length frames
   (distinguisher recorded in THREAT-MODEL §C). **Record-0003 elevation
   (A2-F6): a valid-length frame that then goes silent blocks the
@@ -155,7 +157,7 @@ Server-path hardening backlog (A2-F5; **lands in S1** — tightened from
   treatment; named test `silent_after_valid_length_times_out` (short
   injected deadline, recv_timeout guard = the hang regression lock);
   honest residual recorded in THREAT-MODEL §C (timeline still differs:
-  immediate rejection vs deadline close); CI rides the next push.
+  immediate rejection vs deadline close); CI-VERIFIED run 44703200189.
 - **Off-loopback `proxy_listen` refusal (progress review 0002, A3-C4 —
   pulled IN from S6):** refuse non-loopback binds unless an explicit
   override is set; named test: 0.0.0.0/:: bind refused without override.

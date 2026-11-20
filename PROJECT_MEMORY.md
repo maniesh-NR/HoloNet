@@ -43,8 +43,9 @@ S1 server-path hardening RUN 5 (2026-11-20): ProbeGuard decay (N=1024)
 deadline (10 s) SHIPPED, local 86-green; backup push LANDED
 (ef19a6f..d9e137e) and CI run 44700103379 all-green (6/6) — per-OS
 ledger 83 Linux / 82 macOS / 82 Windows recorded; README/ARCHITECTURE
-counts now CI-verified. CI verification of the 86-tree rides the next
-push.
+counts now CI-verified. The 86-tree itself is CI-verified too:
+run 44703200189 @ f433de4 all-green (6/6 jobs; 86 Linux / 85 macOS /
+85 Windows).
 
 S1 in progress: items 0, salt-cache, loopback-bind, ProbeGuard decay,
 jittered slow-close, read-deadline all DONE. Next per the amended
@@ -58,16 +59,16 @@ waits on D-0009/D-0013.
 - Full matrix green on push: ubuntu/macos/1.77.2/cross-check/
   harness-audit green; windows REQUIRED-green since S1 item 0
   (D-0018 — the expected-red window is CLOSED). Verified green:
-  run 44700103379 @ d9e137e (2026-11-20; earlier 44668106188 @
-  2dae1ce, 2026-11-20). Per-OS ledger for THAT tree: 83 Linux /
-  82 macOS / 82 Windows (holo-socks redirected to socks-test.log in
-  CI logs — reconcile before summing; 1 Linux-only integration test,
-  cfg-gated util/config deltas).
+  run 44703200189 @ f433de4 (2026-11-20; earlier 44700103379 @
+  d9e137e, 44668106188 @ 2dae1ce). Per-OS ledger for the CURRENT
+  tree: 86 Linux / 85 macOS / 85 Windows (holo-socks redirected to
+  socks-test.log in CI logs — reconcile before summing; 1 Linux-only
+  integration test, cfg-gated util/config deltas).
 - Memory regression budget: RSS growth < 8 MB over 64 MB relayed
   (D-0015; local reference +88–376 KB; runner variance absorbed).
 - 88 `#[test]` countable: `grep -rn "#\[test\]" engine/crates
-  --include="*.rs" | wc -l` → 88 (86 runnable on Linux this run;
-  the 83/82/82 ledger above is CI-verified for the prior tree).
+  --include="*.rs" | wc -l` → 88 (86 runnable on Linux; the 86/85/85
+  ledger above is CI-verified @ f433de4).
 - Every run ends: `bash harness/scripts/backup.sh "<summary>"`
   (WORKFLOW §1.2; push = completion). Gate records quote SHA-256 in
   the BACKUPS.md line; next record number = 0004 (S1→S2 gate,
@@ -104,9 +105,10 @@ waits on D-0009/D-0013.
   1.100.0, persisted in ~/.cargo across this recycle; baseline 83/83
   re-verified before changes); static 88; Cargo.lock v3 HELD post-run.
 - PUSH LANDED this run (owner PAT via env-var credential helper only):
-  origin/main ef19a6f..d9e137e; CI 44700103379 all-green 6/6; the v4
-  lockfile regression's CI failure @ ef19a6f confirmed the canary
-  logic. Per-OS ledger 83/82/82 recorded (see verification contract).
+  origin/main ef19a6f..f433de4; CI all-green 6/6 on BOTH pushes
+  (44700103379 @ d9e137e = the 83-tree; 44703200189 @ f433de4 = the
+  86-tree, ledger 86/85/85); the v4 lockfile regression's CI failure
+  @ ef19a6f confirmed the canary logic.
 - SHIPPED run 5: holo-net ProbeGuard cap (A1-F8) + holo-ss full-jitter
   slow-close w/ explicit ceiling (A3-C10) + holo-ss auth read deadline
   (A2-F6) — named tests green; ROADMAP + THREAT-MODEL §C annotated
@@ -129,7 +131,7 @@ waits on D-0009/D-0013.
 ## Recent Progress & Git Activity
 
 ```text
+### Commit: f433de4 - backup: run-5 push landed via retry (d9e137e..7a00fcc); ledger closed (maniesh-NR, 2026-11-20)
 ### Commit: 7a00fcc - backup: FAILED 2026-11-20T08:30:26Z (push did not land) (maniesh-NR, 2026-11-20)
 ### Commit: 4ddd081 - backup: S1 hardening run 5: ProbeGuard decay cap-1024 (A1-F8), CSPRNG full-jitter slow-close w/ explicit 2s ceiling (A3-C10), A2-F6 auth read deadline 10s; backup push LANDED ef19a6f..d9e137e, CI 44700103379 (maniesh-NR, 2026-11-20)
-### Commit: d9e137e - backup: FAILED 2026-11-20T07:27:35Z (push did not land) (maniesh-NR, 2026-11-20)
 ```

@@ -48,8 +48,8 @@ docs/            MATERIAL_YOU.md · RESTORE.md · TECHNIQUES.md ·
 
 The first data plane is LIVE: `session.connect` → reachability probe →
 local SOCKS5 → Shadowsocks AEAD tunnel (end-to-end integration tests
-over real loopback TCP; 83 Linux / 82 macOS / 82 Windows tests, all
-green on CI — run 44700103379; platform-gated). The remaining planes (TLS 1.3, QUIC,
+over real loopback TCP; 86 Linux / 85 macOS / 85 Windows tests, all
+green on CI — run 44703200189; platform-gated). The remaining planes (TLS 1.3, QUIC,
 provider-fed profiles, system crates) are staged in
 `harness/memory/ROADMAP.md`; every not-yet-live protocol honestly
 reports a per-driver milestone error at connect — nothing fakes
