@@ -35,6 +35,12 @@ section — summarize decisions/files/next-steps only.
   GitHub API (anonymous for conclusions; cached git credential for
   logs: `git credential fill`, GCM_INTERACTIVE=never, never echo
   token). Copilot cloud sandbox available for real Linux execution.
+- AGENT MEMORY ACCESS (D-0027/D-0028): do NOT load whole memory files —
+  retrieve first: `python harness/memory/graph/memory_rag.py ask
+  "<query>" [--json]` (BM25 chunks + graph context); structured lookup:
+  `python harness/memory/graph/memory_graph.py query <id|--type:T
+  |--status:S> [--rel R]`; both validated in the harness-audit CI job.
+  Graph/markdown stay authoritative; RAG is the read layer.
 
 ## Current objective
 

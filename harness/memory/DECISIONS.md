@@ -349,3 +349,26 @@
   rotation/burn path in THREAT-MODEL §E; (d) the Green-R2 S5a ordering
   stands — VPN Gate first (official CSV, needs NO credentials),
   Opera's embedded creds land with the risk note attached.
+
+
+  NUMBERING NOTE (2026-11-21 reconciliation): this entry and D-0027
+  were drafted as D-0019/D-0020 in a parallel session BEFORE the
+  divergence was discovered; the pushed tree's D-0019..D-0026
+  (cross-validation 0003 / orphan disposition / D-0021..D-0026)
+  keep their numbers, so these were renumbered to D-0027/D-0028.
+- **D-0028 (2026-11-21, owner instruction — RAG over the memory graph)**:
+  `harness/memory/graph/memory_rag.py` gives every agent (and human)
+  retrieval-augmented access to project memory: BM25 chunk retrieval over
+  the binding markdown corpus (heading-chunked; identifiers like D-NNNN /
+  A#-C# tokenize as single tokens so exact ids outrank prose) PLUS
+  graph-context expansion (matched nodes contribute summary + 1-hop
+  edges from graph.json). Interface: `ask "<query>" [-k N] [--json]`,
+  `smoke` (retrieval regressions: RtlGenRandom→SystemFunction036,
+  salt-replay, lockfile-v3, trojan-descope, backup-final-step + graph
+  id-resolution). Std-only, zero dependencies; index built per
+  invocation (corpus < 1 MB — always fresh, no cache to invalidate);
+  lexical not semantic (limitation stated in the docstring). `check`
+  (D-0019) and `smoke` both run in the harness-audit CI job so neither
+  the graph nor the retrieval anchors can silently rot. The graph and
+  markdown remain authoritative; this is a READ layer over them.
+ dd6f4ba (agentic memory graph + RAG (D-0019/D-0020): graph.json 118 nodes/74 typed edges; memory_graph.py check/stats/query/dot (coverage-enforced); memory_rag.py BM25+graph-context ask/json/smoke; harness-audit CI runs check+smoke; PROJECT_MEMORY agent guidance; session journal)

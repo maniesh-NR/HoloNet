@@ -90,6 +90,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: memory graph + RAG regressions (D-0027/D-0028)
+        run: |
+          set -euo pipefail
+          python3 harness/memory/graph/memory_graph.py check
+          python3 harness/memory/graph/memory_rag.py smoke
       - name: every quoted hash resolves to a tracked blob; record chains are intact
         run: |
           set -euo pipefail
