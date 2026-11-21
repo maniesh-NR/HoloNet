@@ -192,7 +192,7 @@ Next dev: BLAKE2s (S1b), X25519, AES-CFB, ExpandLabel, bignum/RSA.
 ## Recent Progress & Git Activity
 
 ```text
-### Commit: 17e5b8d - docs: fix split-line pubkey filename in STATE (release-signing.pub) (maniesh-NR, 2026-11-20)
-### Commit: 6ae86fa - backup: FAILED 2026-11-20T15:01:11Z (push did not land) (maniesh-NR, 2026-11-20)
-### Commit: 19e0791 - backup: run 7: D-0025 advisory+GHSA+v0.3.1 cut+drafts deleted; D-0026 S5 creds decided --allow-untracked (maniesh-NR, 2026-11-20)
+### Commit: e2e3a83 - run 8: XChaCha20 wire fix — standard XChaCha20-Poly1305-IETF (24-byte LE SIP004 counter) + draft-irtf-cfrg-xchacha vectors; +5 tests, local 92-green (maniesh-NR, 2026-11-21)
+### Commit: 05f9906 - graph+RAG post-rebase reconciliation: curate parallel-run decisions D-0019..D-0026 + REVIEW-0003 + sessions 2026-11-20b..f; statuses updated (A2-C1/A3-C4/A2-C3/A3-C7 closed; GAP-replay/probeguard closed; OD-v031/OD-s5creds decided); my entries renumbered D-0027(graph)/D-0028(RAG); DECISIONS conflict resolved with numbering note (maniesh-NR, 2026-11-21)
+### Commit: bcf8da1 - agentic memory graph + RAG (D-0019/D-0020): graph.json 118 nodes/74 typed edges; memory_graph.py check/stats/query/dot (coverage-enforced); memory_rag.py BM25+graph-context ask/json/smoke; harness-audit CI runs check+smoke; PROJECT_MEMORY agent guidance; session journal (maniesh-NR, 2026-11-21)
 ```

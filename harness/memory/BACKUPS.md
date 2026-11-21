@@ -31,3 +31,4 @@ UTC time | prev-commit | run summary
 2026-11-20T15:01:11Z | prev=6314da0 | run 7: D-0025 advisory+GHSA+v0.3.1 cut+drafts deleted; D-0026 S5 creds decided --allow-untracked
 2026-11-20T15:01:11Z | FAILED | push did not land — run incomplete
 2026-11-21T00:00:00Z | LANDED | (run-8 reconciliation, found at session start) the run-7 push DID land: origin/main == 17e5b8d (carries 6314da0..17e5b8d incl. the 19e0791 run-7 backup + both FAILED markers + the STATE filename fix); the 15:01:11Z FAILED line above documents only the in-script attempt. CI of the 17e5b8d tree: run 44759108489 SUCCESS (same 87/86/86 engine tree as 937554f plus docs/harness-only commits) — recorded by run 8 after the session cut
+2026-11-21T05:41:44Z | prev=e2e3a83 | run 8: XChaCha wire fix D-0029 (standard XChaCha20-Poly1305-IETF, 24-byte LE SIP004 counter; draft-irtf-cfrg-xchacha-03 vectors 2.2.1/A.2.1/A.1; +5 tests, rebased-tree 92-green, static 94); mid-run di
