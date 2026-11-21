@@ -108,8 +108,14 @@ hook — no second code path); 16 KATs (8 unkeyed + 8 keyed); the
 Appendix E self-test grand hash-of-hashes 6a411f08…4c1dfe over 48
 digests (16/20/28/32-byte out × 0/3/64/65/255/1024-byte in ×
 keyed+unkeyed — covers the ≥31-byte inputs that hid the orphan's
-SIGMA[3][8] defect). Local 97-green (+5), static 99, lock v3 HELD;
-CI verification rides the run-9 push.
+SIGMA[3][8] defect). Local 97-green (+5), static 99, lock v3 HELD.
+**CI-VERIFIED in two rounds: push 6331952 failed ONLY the harness-audit
+graph-coverage gate (new journal without a graph SES node — all 5 test
+jobs green even there); graph.json extended (+1 SES +4 test nodes +6
+edges, check/RAG-smoke green locally); fix push e3c8304 = run
+44897540455 ALL-GREEN 6/6 — per-OS ledger 97 Linux / 96 macOS / 96
+Windows (visible 87/86/86 + redirected socks 10); README/ARCHITECTURE
+citations updated.**
 
 Next dev: X25519 (execution-mode decision first), AES-CFB (+ planned
 mechanical grep-audit), ExpandLabel, bignum/RSA.
@@ -129,9 +135,10 @@ mechanical grep-audit), ExpandLabel, bignum/RSA.
 - 89→99 `#[test]` countable: `grep -rn "#\[test\]" engine/crates
   --include="*.rs" | wc -l` → 99 (97 runnable on Linux after run 9's
   +5 BLAKE2s tests — no cfg gates, so +5 on macOS/Windows too).
-  Local 97-green; CI-verified for the run-8 tree: 92 Linux / 91 macOS /
-  91 Windows @ 676a58c, run 44872078593 all-green (visible 82/81/81 +
-  redirected socks 10, reconciled; run-9 ledger rides its own CI poll).
+  Local 97-green; **CI-verified: 97 Linux / 96 macOS / 96 Windows @
+  e3c8304, run 44897540455 all-green (6/6; visible 87/86/86 +
+  redirected socks 10, reconciled; run-9's first push 6331952 failed
+  only the graph-coverage gate — fixed by extending graph.json).**
 - Every run ends: `bash harness/scripts/backup.sh "<summary>"`
   (WORKFLOW §1.2; push = completion). Gate records quote SHA-256 in
   the BACKUPS.md line; next record number = 0004 (S1→S2 gate,
@@ -217,7 +224,7 @@ mechanical grep-audit), ExpandLabel, bignum/RSA.
 ## Recent Progress & Git Activity
 
 ```text
+### Commit: e3c8304 - backup: run 9 fix: graph coverage — SES-2026-11-21b + 4 T-blake2s nodes + 6 edges (harness-audit had failed 44896588214 on the missing session node; all 5 test jobs were green); graph check + RAG smoke gree (maniesh-NR, 2026-11-21)
 ### Commit: 6331952 - backup: run 9: BLAKE2s RFC 7693 (S1b item 1): SIGMA dual-sourced, Appendix B trace + Appendix E self-test + 16 KATs (re-verified vs Python+OpenSSL); +5 tests, local 97-green, static 99, lock v3 held (maniesh-NR, 2026-11-21)
 ### Commit: 880661e - backup: FAILED 2026-11-21T05:44:58Z (push did not land) (maniesh-NR, 2026-11-21)
-### Commit: 6f977ad - backup: run 8 closure: CI-VERIFIED 44872078593 @ 676a58c all-green 6/6, per-OS ledger 92 Linux/91 macOS/91 Windows (visible 82/81/81 + socks 10 reconciled); README badge + Status block and ARCHITECTURE data-p (maniesh-NR, 2026-11-21)
 ```

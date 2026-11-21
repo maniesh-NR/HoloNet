@@ -31,8 +31,16 @@ Appendix E self-test grand hash-of-hashes 6a411f08ce25adcdfb02aba64
 1451cec53c598b24f4fc787fbdc88797f4c1dfe over 48 digests (outlen
 16/20/28/32 × inlen 0/3/64/65/255/1024 × keyed+unkeyed — includes the
 ≥31-byte inputs that hid the orphan's defect). Local suite **97
-green** (92 + 5), static 99, Cargo.lock v3 HELD. CI verification
-rides the run-9 push. Remaining S1b/S1c: X25519 (execution-mode
+green** (92 + 5), static 99, Cargo.lock v3 HELD. **CI-VERIFIED — in
+two rounds: first push 6331952 FAILED the harness-audit graph-coverage
+gate (missing SES-2026-11-21b node: markdown extended, graph.json not;
+all 5 test jobs green even on that tree); fixed by extending graph.json
+(+1 SES node, +4 T-blake2s nodes, +6 edges; graph check + RAG smoke
+green locally); the fix push e3c8304 = CI run 44897540455 ALL-GREEN
+(6/6) — per-OS ledger 97 Linux / 96 macOS / 96 Windows (visible
+87/86/86 + redirected socks 10, reconciled); README badge + Status
+block and ARCHITECTURE data points updated to the verified
+numbers.** Remaining S1b/S1c: X25519 (execution-mode
 decision first), AES-CFB (+ planned mechanical grep-audit),
 ExpandLabel, bignum/RSA.
 

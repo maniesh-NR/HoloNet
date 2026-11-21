@@ -7,7 +7,7 @@
 [![Rust](https://img.shields.io/badge/engine-Rust%201.77%2B-orange.svg)](engine/Cargo.toml)
 [![Platforms](https://img.shields.io/badge/platforms-Win7%20%E2%80%93%2011%20%7C%20macOS%2010.15%2B%20%7C%20Linux%20%7C%20Android%208%2B-lightgrey.svg)](#platform-matrix)
 [![Crates](https://img.shields.io/badge/dependencies-0%20third--party%20crates-success.svg)](ATTRIBUTION.md)
-[![Tests](https://img.shields.io/badge/tests-91-green-brightgreen.svg)](#status--honesty)
+[![Tests](https://img.shields.io/badge/tests-96-green-brightgreen.svg)](#status--honesty)
 
 HoloNet pairs a Rust engine (`holonetd`) with native frontends: Flutter for
 Android, Kotlin Multiplatform (Compose) for macOS, and Qt 6/QML for Windows
@@ -54,9 +54,10 @@ Flutter (Android)   Compose (macOS)   Qt6/QML (Win+Linux)
 - **Engine wiring**: `session.connect` probes the server, starts the local
   SOCKS listener from `proxy_listen`, and reports honest per-driver
   milestone errors for every protocol that is not live yet.
-- **91/91 tests green** (71 at v0.3.0 plus gate-0001 hardening tests
-  plus the S1 hardening items plus the run-8 XChaCha standardization —
-  CI-verified run 44872078593: 92 Linux / 91 macOS / 91 Windows,
+- **96/96 tests green** (71 at v0.3.0 plus gate-0001 hardening tests
+  plus the S1 hardening items plus the run-8 XChaCha standardization
+  plus the run-9 BLAKE2s primitive —
+  CI-verified run 44897540455: 97 Linux / 96 macOS / 96 Windows,
   cfg-gated counts differ),
   including 6 end-to-end integration tests over real loopback TCP
   (IPC → import → connect → SOCKS → AEAD tunnel → echo → stats →
