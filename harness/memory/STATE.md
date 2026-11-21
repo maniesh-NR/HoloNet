@@ -30,6 +30,18 @@ Cargo.lock v3 HELD. CVE status re-checked: GHSA-8h6m-w5qj-cq9g
 published, cve_id still None (pending — backfill when assigned).
 Remaining S1: BLAKE2s (S1b; SIGMA re-derivation warning applies,
 D-0020), X25519, AES-CFB, ExpandLabel, bignum/RSA (S1b/S1c).
+**CI-VERIFIED post-push: run 44872078593 @ 676a58c all-green (6/6 jobs
+incl. the 1.77.2 canary + the harness-audit graph-coverage/RAG-smoke
+checks over the extended graph) — per-OS ledger 92 Linux / 91 macOS /
+91 Windows (visible 82/81/81 + redirected socks 10, reconciled;
+README + ARCHITECTURE updated to the verified numbers). MID-RUN
+DIVERGENCE (the third): a parallel graph/RAG session pushed bcf8da1 +
+05f9906 mid-run; reconciled per WORKFLOW §1.4 (commit + rebase, one
+DECISIONS.md conflict resolved keeping BOTH sides, my XChaCha decision
+renumbered D-0027→D-0029 after theirs took D-0027/D-0028; graph.json
+extended with D-0029/SES-2026-11-21a/3 test nodes, GAP-xchacha
+closed, stale planned-test nodes flipped — graph check + RAG smoke
+green locally before the push).**
 
 Previous-run state, preserved below (run 7 — OWNER DECISIONS EXECUTED:
 D-0025 advisory+v0.3.1, D-0026 S5 creds). Run 7

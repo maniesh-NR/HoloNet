@@ -89,6 +89,13 @@ held; CI verification rides the run-8 push. Run-8 session-start
 reconciliation: the run-7 push HAD landed at 17e5b8d (CI run
 44759108489 SUCCESS) despite the BACKUPS.md FAILED tail — LANDED
 reconciliation line appended; CVE still unassigned (cve_id None).
+**CI-VERIFIED: run 44872078593 @ 676a58c all-green (6/6) — per-OS
+ledger 92 Linux / 91 macOS / 91 Windows; README + ARCHITECTURE counts
+updated. MID-RUN DIVERGENCE (third): the parallel graph/RAG session
+pushed bcf8da1+05f9906 mid-run; reconciled via commit + rebase
+(WORKFLOW §1.4) — my decision renumbered D-0027→D-0029 (theirs took
+D-0027/D-0028), graph.json extended (D-0029 + SES-2026-11-21a + 3
+test nodes; GAP-xchacha closed; graph check + RAG smoke green).**
 Next dev: BLAKE2s (S1b), X25519, AES-CFB, ExpandLabel, bignum/RSA.
 
 ## Verification contracts (how "done" is proven)
@@ -107,9 +114,10 @@ Next dev: BLAKE2s (S1b), X25519, AES-CFB, ExpandLabel, bignum/RSA.
   --include="*.rs" | wc -l` → 94 (92 runnable on Linux after run 8's
   +3 holo-crypto draft vectors + 2 holo-ss wire tests — no cfg gates,
   so +5 on macOS/Windows too; run 6's +1 audit test included in the
-  base). Local 92-green; the CI-verified per-OS ledger rides the run-8
-  push (expect 92/91/91; previously 87/86/86 @ 937554f, run
-  44728988531).
+  base). Local 92-green; **CI-verified: 92 Linux / 91 macOS / 91
+  Windows @ 676a58c, run 44872078593 all-green (6/6; visible
+  82/81/81 + redirected socks 10, reconciled; previously 87/86/86 @
+  937554f, run 44728988531).**
 - Every run ends: `bash harness/scripts/backup.sh "<summary>"`
   (WORKFLOW §1.2; push = completion). Gate records quote SHA-256 in
   the BACKUPS.md line; next record number = 0004 (S1→S2 gate,
@@ -192,7 +200,7 @@ Next dev: BLAKE2s (S1b), X25519, AES-CFB, ExpandLabel, bignum/RSA.
 ## Recent Progress & Git Activity
 
 ```text
+### Commit: 676a58c - backup: FAILED 2026-11-21T05:41:44Z (push did not land) (maniesh-NR, 2026-11-21)
 ### Commit: 84dbf83 - backup: run 8: XChaCha wire fix D-0029 (standard XChaCha20-Poly1305-IETF, 24-byte LE SIP004 counter; draft-irtf-cfrg-xchacha-03 vectors 2.2.1/A.2.1/A.1; +5 tests, rebased-tree 92-green, static 94); mid-run di (maniesh-NR, 2026-11-21)
 ### Commit: e2e3a83 - run 8: XChaCha20 wire fix — standard XChaCha20-Poly1305-IETF (24-byte LE SIP004 counter) + draft-irtf-cfrg-xchacha vectors; +5 tests, local 92-green (maniesh-NR, 2026-11-21)
-### Commit: 05f9906 - graph+RAG post-rebase reconciliation: curate parallel-run decisions D-0019..D-0026 + REVIEW-0003 + sessions 2026-11-20b..f; statuses updated (A2-C1/A3-C4/A2-C3/A3-C7 closed; GAP-replay/probeguard closed; OD-v031/OD-s5creds decided); my entries renumbered D-0027(graph)/D-0028(RAG); DECISIONS conflict resolved with numbering note (maniesh-NR, 2026-11-21)
 ```

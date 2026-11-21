@@ -138,3 +138,60 @@ LESSONS (+2), STATE (run-8 header, run-7 preserved), PROJECT_MEMORY
 4. After CI: README/ARCHITECTURE test-count citations → 92/91/91
    (pending the actual per-OS ledger parse, socks redirect
    reconciled).
+
+## Addendum (post-divergence, written after the sections above)
+
+- **MID-RUN DIVERGENCE (the project's third).** The first backup.sh
+  REFUSED: origin/main had moved to 05f9906 — a PARALLEL SESSION had
+  landed the agentic memory graph + RAG (bcf8da1: graph.json +
+  memory_graph.py + memory_rag.py + CI integration; 05f9906: their own
+  reconciliation curation, renumbering THEIR entries to D-0027(graph)
+  / D-0028(RAG)). My run-8 work was uncommitted local at that point.
+  Reconciled per WORKFLOW §1.4: committed the run-8 work (586603a),
+  `git rebase origin/main`, ONE conflict (DECISIONS.md, both sides had
+  appended at the tail) resolved keeping BOTH sides — with the
+  numbering fixed honestly:
+  - their D-0027 (graph) + D-0028 (RAG) entries stand as pushed;
+  - MY XChaCha decision, drafted as D-0027 in this sandbox, is
+    renumbered **D-0029** (a numbering note is recorded inside the
+    entry);
+  - their pushed file carried a stray pasted commit-message line
+    ("dd6f4ba (…)") at the tail and a duplicated misplaced NUMBERING
+    NOTE — both removed in the resolution, disposition recorded in the
+    D-0029 numbering note.
+  - D-0027 references in my ROADMAP/THREAT-MODEL/STATE/PROJECT_MEMORY/
+    journal renumbered to D-0029 (their D-0027/D-0028 mentions in
+    PROJECT_MEMORY's agent-guidance line left untouched).
+- **Graph coverage extension (required by their D-0027: the
+  harness-audit CI job fails on any source D-NNNN/session missing
+  from graph.json).** Ran their check FIRST — it failed with exactly
+  2 gaps (D-0029, session 2026-11-21a), proving the mechanism works on
+  MY additions too. Then extended the graph (139 nodes/95 edges):
+  +D-0029 decision node, +SES-2026-11-21a session node, +3 test nodes
+  (the interop lock, the divergence lock, the draft vectors), GAP-xchacha
+  flipped closed, holo-ss/holo-crypto/S1/A2-C4 summaries refreshed, two
+  STALE nodes fixed (T-salt-replay-planned / T-loopback-refusal-planned
+  were still "planned" though shipped runs 4-5 — flipped to passing
+  with the shipped test names), edges added (D-0029 closes GAP-xchacha;
+  authored/implements/tested_by/verified_by). Both dangling renamed-src
+  edges fixed; `check` OK and `rag smoke` OK before the push.
+- **backup.sh second refusal (found + cleared):** after the successful
+  rebase, `REBASE_HEAD` lingers and the guard treats its existence as
+  an in-progress rebase — cleared with `git update-ref -d REBASE_HEAD`
+  (safe post-completion; disposition recorded in the backup summary).
+- **Backup + push + CI:** backup.sh committed 84dbf83 (in-script push
+  FAILED as usual — no terminal); manual retry via the env-var
+  credential helper LANDED 05f9906..676a58c. **CI-VERIFIED: run
+  44872078593 @ 676a58c all-green (6/6 jobs: ubuntu, macos, windows,
+  1.77.2 canary, cross-compile, harness-audit incl. the graph coverage
+  check + RAG smoke over the EXTENDED graph) — per-OS ledger 92 Linux
+  / 91 macOS / 91 Windows** (job-log sums 82/81/81 visible + the
+  redirected socks 10, reconciled — the log lines carry timestamp
+  prefixes, so ledger greps must NOT anchor at line start; recorded as
+  a mini-lesson here). Closure updates (README badge + Status block,
+  ARCHITECTURE data-plane paragraph, STATE/PROJECT_MEMORY verified
+  sentences, this addendum, BACKUPS LANDED line) ride the closure
+  backup push.
+- The suite was re-verified on the REBASED tree before pushing (92
+  green, Cargo.lock v3 held) — the rebase brought harness/ci.yml/
+  memory changes only, no engine deltas.
