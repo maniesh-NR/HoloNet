@@ -266,3 +266,22 @@
   and the standard wire COINCIDE at chunk 0 (both nonces all-zero);
   equivalence must be asserted per-chunk-k and divergence tested at
   k>=1, or the test proves nothing.
+## Run 9 additions (2026-11-21 BLAKE2s)
+
+- A spec's own intermediate-value trace is the cheapest round-exact
+  guard for a permutation-driven primitive: RFC 7693 Appendix B prints
+  v[16] after every round, so replaying all 11 states pins SIGMA and G
+  to the exact round where an error would first act — strictly stronger
+  than digest-only KATs (the D-0020 orphan passed short-input KATs with
+  a wrong SIGMA[3]). Enabling this without a second code path: the
+  production compression fn takes `Option<&mut Vec<[u32;16]>>` and
+  pushes each state — the test then exercises THE production path, not
+  a reimplementation that could drift from it.
+- Transcribing a constant TABLE from a spec: take it from two
+  independent in-document sources and diff them by eye before writing
+  (RFC 7693 §2.7's SIGMA prose table vs Appendix D's blake2s.c
+  sigma[10][16] — identical, and both differ from what a from-memory
+  transcription tends to produce). Then still add a structural check
+  (each row a permutation of 0..15) plus the spec's own self-test if
+  it has one — the Appendix E hash-of-hashes covers every mode the
+  hand-picked KAT subset skips.

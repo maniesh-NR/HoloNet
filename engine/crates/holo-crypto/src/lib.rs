@@ -3,6 +3,7 @@
 //! Everything here is implemented from the specifications and validated
 //! against official test vectors:
 //! - SHA-256 / SHA-1 / MD5 (FIPS 180-4, RFC 1321)
+//! - BLAKE2s (RFC 7693) — unkeyed hash + native keyed MAC
 //! - HMAC-SHA256 (RFC 4231) and HMAC-SHA1
 //! - HKDF-SHA256 / HKDF-SHA1 (RFC 5869)
 //! - ChaCha20 (RFC 8439 §2), Poly1305 (RFC 8439 §2.5),
@@ -328,6 +329,186 @@ where
     }
     okm.truncate(out_len);
     okm
+}
+
+// ---------------------------------------------------------------------------
+// BLAKE2s (RFC 7693)
+// ---------------------------------------------------------------------------
+
+/// BLAKE2s — the 32-bit BLAKE2 hash/MAC (RFC 7693), landed as the S1b
+/// primitive for the S2 WireGuard transport (Noise-IK hashing and the
+/// keyed-MAC construction). Rotations are RIGHT (`rotate_right`, R1..R4
+/// = 16, 12, 8, 7) — RFC 7693 §3.1 `>>>`, NOT the ChaCha family's left
+/// rotations.
+pub mod blake2s {
+    /// Initialization vector (RFC 7693 §2.6 — the SHA-256 IV).
+    const IV: [u32; 8] = [
+        0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab,
+        0x5be0cd19,
+    ];
+
+    /// Message-word schedule SIGMA (RFC 7693 §2.7), taken from the §2.7
+    /// table AND cross-checked verbatim against the `sigma[10][16]` table
+    /// of the blake2s.c reference source in RFC Appendix D — two
+    /// independent in-document sources, never a from-memory transcription
+    /// (record-0003 A1-F5 / D-0020: one mis-transcribed SIGMA[3][8] killed
+    /// the crashed session's orphan while its short-input KATs still
+    /// passed). Guarded mechanically in the test module: the row
+    /// permutation check (structure), the full Appendix B round trace
+    /// (function, round-exact), and the Appendix E self-test (function,
+    /// 48 digests including keyed and lengths ≥ 31 bytes).
+    pub(crate) const SIGMA: [[usize; 16]; 10] = [
+        [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+        [14, 10, 4, 8, 9, 15, 13, 6, 1, 12, 0, 2, 11, 7, 5, 3],
+        [11, 8, 12, 0, 5, 2, 15, 13, 10, 14, 3, 6, 7, 1, 9, 4],
+        [7, 9, 3, 1, 13, 12, 11, 14, 2, 6, 5, 10, 4, 0, 15, 8],
+        [9, 0, 5, 7, 2, 4, 10, 15, 14, 1, 11, 12, 6, 8, 3, 13],
+        [2, 12, 6, 10, 0, 11, 8, 3, 4, 13, 7, 5, 15, 14, 1, 9],
+        [12, 5, 1, 15, 14, 13, 4, 10, 0, 7, 6, 3, 9, 2, 8, 11],
+        [13, 11, 7, 14, 12, 1, 3, 9, 5, 0, 15, 4, 8, 6, 2, 10],
+        [6, 15, 14, 9, 11, 3, 0, 8, 12, 2, 13, 7, 1, 4, 10, 5],
+        [10, 2, 8, 4, 7, 6, 1, 5, 15, 11, 9, 14, 3, 12, 13, 0],
+    ];
+
+    /// One-shot BLAKE2s (RFC 7693 §3.3). `key` up to 32 bytes (empty =
+    /// unkeyed); `out_len` 1..=32. When keyed, the zero-padded key block
+    /// is d[0]; non-final blocks get t = (i+1)*64 over the global block
+    /// index (key block included), the final block gets t = ll (+64 when
+    /// keyed); an unkeyed empty message hashes one all-zero block, t = 0.
+    pub fn hash(key: &[u8], data: &[u8], out_len: usize) -> Vec<u8> {
+        assert!(key.len() <= 32, "blake2s: key too long");
+        assert!((1..=32).contains(&out_len), "blake2s: bad out_len");
+        let ll = data.len() as u64;
+        let kk = key.len();
+        let mut h = IV;
+        // Parameter block p[0] = 0x0101kknn (RFC 7693 §2.5, §3.3).
+        h[0] ^= 0x0101_0000 ^ ((kk as u32) << 8) ^ (out_len as u32);
+
+        let keyed = kk > 0;
+        let data_blocks = if data.is_empty() { 0 } else { (data.len() + 63) / 64 };
+        let mut block = [0u8; 64];
+
+        if keyed {
+            block[..kk].copy_from_slice(key); // zero-padded to bb (§3.3)
+            if data_blocks == 0 {
+                // keyed empty message: the key block IS the final block.
+                compress(&mut h, &block, ll + 64, true, None);
+            } else {
+                compress(&mut h, &block, 64, false, None);
+            }
+        }
+        for (j, chunk) in data.chunks(64).enumerate() {
+            block = [0u8; 64];
+            block[..chunk.len()].copy_from_slice(chunk);
+            let last = j + 1 == data_blocks;
+            let t: u64 = if last {
+                ll + if keyed { 64 } else { 0 }
+            } else {
+                (((keyed as usize) + j + 1) * 64) as u64
+            };
+            compress(&mut h, &block, t, last, None);
+        }
+        if !keyed && data_blocks == 0 {
+            compress(&mut h, &[0u8; 64], 0, true, None);
+        }
+
+        // First out_len bytes of h, little-endian (§3.3).
+        let mut out = Vec::with_capacity(out_len);
+        for word in h.iter() {
+            out.extend_from_slice(&word.to_le_bytes());
+        }
+        out.truncate(out_len);
+        out
+    }
+
+    /// Unkeyed BLAKE2s-256.
+    pub fn digest(data: &[u8]) -> [u8; 32] {
+        let v = hash(&[], data, 32);
+        v.try_into().unwrap()
+    }
+
+    /// Unkeyed BLAKE2s-256 as lowercase hex.
+    pub fn hex(data: &[u8]) -> String {
+        crate::to_hex(&digest(data))
+    }
+
+    /// Keyed BLAKE2s-256 — RFC 7693's native MAC construction (the
+    /// WireGuard `BLAKE2s(key, ..)` shape; keys are 32 bytes).
+    pub fn mac(key: &[u8; 32], data: &[u8]) -> [u8; 32] {
+        let v = hash(key, data, 32);
+        v.try_into().unwrap()
+    }
+
+    /// Compression function F (RFC 7693 §3.2). `trace` collects v[0..15]
+    /// before round 0 and after each of the 10 rounds — the exact shape
+    /// of the RFC's Appendix B trace; production passes `None`, so the
+    /// trace test exercises the one and only compression code path.
+    fn compress(
+        h: &mut [u32; 8],
+        block: &[u8; 64],
+        t: u64,
+        last: bool,
+        mut trace: Option<&mut Vec<[u32; 16]>>,
+    ) {
+        let mut v = [0u32; 16];
+        v[..8].copy_from_slice(h);
+        v[8..].copy_from_slice(&IV);
+        v[12] ^= t as u32; // low word of the offset counter
+        v[13] ^= (t >> 32) as u32; // high word
+        if last {
+            v[14] = !v[14]; // f0 = ~0
+        }
+        if let Some(tr) = trace.as_deref_mut() {
+            tr.push(v);
+        }
+        let mut m = [0u32; 16];
+        for (i, word) in m.iter_mut().enumerate() {
+            *word = u32::from_le_bytes(block[4 * i..4 * i + 4].try_into().unwrap());
+        }
+        for r in 0..10 {
+            let s = SIGMA[r];
+            g(&mut v, 0, 4, 8, 12, m[s[0]], m[s[1]]);
+            g(&mut v, 1, 5, 9, 13, m[s[2]], m[s[3]]);
+            g(&mut v, 2, 6, 10, 14, m[s[4]], m[s[5]]);
+            g(&mut v, 3, 7, 11, 15, m[s[6]], m[s[7]]);
+            g(&mut v, 0, 5, 10, 15, m[s[8]], m[s[9]]);
+            g(&mut v, 1, 6, 11, 12, m[s[10]], m[s[11]]);
+            g(&mut v, 2, 7, 8, 13, m[s[12]], m[s[13]]);
+            g(&mut v, 3, 4, 9, 14, m[s[14]], m[s[15]]);
+            if let Some(tr) = trace.as_deref_mut() {
+                tr.push(v);
+            }
+        }
+        for i in 0..8 {
+            h[i] ^= v[i] ^ v[i + 8];
+        }
+    }
+
+    /// Mixing function G (RFC 7693 §3.1) — rotations are RIGHT.
+    fn g(v: &mut [u32; 16], a: usize, b: usize, c: usize, d: usize, x: u32, y: u32) {
+        v[a] = v[a].wrapping_add(v[b]).wrapping_add(x);
+        v[d] = (v[d] ^ v[a]).rotate_right(16);
+        v[c] = v[c].wrapping_add(v[d]);
+        v[b] = (v[b] ^ v[c]).rotate_right(12);
+        v[a] = v[a].wrapping_add(v[b]).wrapping_add(y);
+        v[d] = (v[d] ^ v[a]).rotate_right(8);
+        v[c] = v[c].wrapping_add(v[d]);
+        v[b] = (v[b] ^ v[c]).rotate_right(7);
+    }
+
+    /// Test-only: F over one block, returning (h', the 11 traced v states).
+    #[cfg(test)]
+    pub(crate) fn compress_round_trace(
+        h: &[u32; 8],
+        block: &[u8; 64],
+        t: u64,
+        last: bool,
+    ) -> ([u32; 8], Vec<[u32; 16]>) {
+        let mut hh = *h;
+        let mut states = Vec::with_capacity(11);
+        compress(&mut hh, block, t, last, Some(&mut states));
+        (hh, states)
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1396,5 +1577,153 @@ mod tests {
         assert!(!ct_eq(b"abc", b"abd"));
         assert_eq!(to_hex(&[0x01, 0xff]), "01ff");
         assert_eq!(from_hex("01ff"), vec![0x01, 0xff]);
+    }
+
+    // -----------------------------------------------------------------------
+    // BLAKE2s (RFC 7693)
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn blake2s_sigma_rows_are_permutations() {
+        for (r, row) in blake2s::SIGMA.iter().enumerate() {
+            let mut seen = [false; 16];
+            for &v in row {
+                assert!(v < 16, "SIGMA[{r}] value {v} out of range");
+                assert!(!seen[v], "SIGMA[{r}] duplicates {v}");
+                seen[v] = true;
+            }
+            assert!(seen.iter().all(|&s| s), "SIGMA[{r}] is not a permutation");
+        }
+    }
+
+    /// RFC 7693 Appendix B: the unkeyed BLAKE2s-256 trace of "abc",
+    /// replayed v[16]-state by v[16]-state — before round 0 and after each
+    /// of the 10 rounds, then the final h[8]. A wrong SIGMA row or G
+    /// rotation diverges at the exact round where it first acts.
+    #[test]
+    fn blake2s_rfc7693_appendix_b_trace() {
+        fn words<const N: usize>(s: &str) -> [u32; N] {
+            let mut out = [0u32; N];
+            for (w, t) in out.iter_mut().zip(s.split_whitespace()) {
+                *w = u32::from_str_radix(t, 16).unwrap();
+            }
+            out
+        }
+        let expected = [
+            words::<16>("6B08E647 BB67AE85 3C6EF372 A54FF53A 510E527F 9B05688C 1F83D9AB 5BE0CD19 6A09E667 BB67AE85 3C6EF372 A54FF53A 510E527C 9B05688C E07C2654 5BE0CD19"),
+            words::<16>("16A3242E D7B5E238 CE8CE24B 927AEDE1 A7B430D9 93A4A14E A44E7C31 41D4759B 95BF33D3 9A99C181 608A3A6B B666383E 7A8DD50F BE378ED7 353D1EE6 3BB44C6B"),
+            words::<16>("3AE30FE3 0982A96B E88185B4 3E339B16 F24338CD 0E66D326 E005ED0C D591A277 180B1F3A FCF43914 30DB62D6 4847831C 7F00C58E FB847886 C544E836 524AB0E2"),
+            words::<16>("7A3BE783 997546C1 D45246DF EDB5F821 7F98A742 10E864E2 D4AB70D0 C63CB1AB 6038DA9E 414594B0 F2C218B5 8DA0DCB7 D7CD7AF5 AB4909DF 85031A52 C4EDFC98"),
+            words::<16>("2A8B8CB7 1ACA82B2 14045D7F CC7258ED 383CF67C E090E7F9 3025D276 57D04DE4 994BACF0 F0982759 F17EE300 D48FC2D5 DC854C10 523898A9 C03A0F89 47D6CD88"),
+            words::<16>("C4AA2DDB 111343A3 D54A700A 574A00A9 857D5A48 B1E11989 6F5C52DF DD2C53A3 678E5F8E 9718D4E9 622CB684 92976076 0E41A517 359DC2BE 87A87DDD 643F9CEC"),
+            words::<16>("3453921C D7595EE1 592E776D 3ED6A974 4D997CB3 DE9212C3 35ADF5C9 9916FD65 96562E89 4EAD0792 EBFC2712 2385F5B2 F34600FB D7BC20FB EB452A7B ECE1AA40"),
+            words::<16>("BE851B2D A85F6358 81E6FC3B 0BB28000 FA55A33A 87BE1FAD 4119370F 1E2261AA A1318FD3 F4329816 071783C2 6E536A8D 9A81A601 E7EC80F1 ACC09948 F849A584"),
+            words::<16>("07E5B85A 069CC164 F9DE3141 A56F4680 9E440AD2 9AB659EA 3C84B971 21DBD9CF 46699F8C 765257EC AF1D998C 75E4C3B6 523878DC 30715015 397FEE81 4F1FA799"),
+            words::<16>("435148C4 A5AA2D11 4B354173 D543BC9E BDA2591C BF1D2569 4FCB3120 707ADA48 565B3FDE 32C9C916 EAF4A1AB B1018F28 8078D978 68ADE4B5 9778FDA3 2863B92E"),
+            words::<16>("D9C994AA CFEC3AA6 700D0AB2 2C38670E AF6A1F66 1D023EF3 1D9EC27D 945357A5 3E9FFEBD 969FE811 EF485E21 A632797A DEEF082E AF3D80E1 4E86829B 4DEAFD3A"),
+        ];
+        // h before F = the first 8 words of the (i=0) trace state — the
+        // RFC prints v[0..8] = h after the parameter-block XOR.
+        let h: [u32; 8] = expected[0][..8].try_into().unwrap();
+        let mut block = [0u8; 64];
+        block[..3].copy_from_slice(b"abc");
+        let (h_final, states) = blake2s::compress_round_trace(&h, &block, 3, true);
+        assert_eq!(states.len(), 11);
+        for (i, st) in states.iter().enumerate() {
+            assert_eq!(st, &expected[i], "Appendix B trace diverges at state i={i}");
+        }
+        let expect_h: [u32; 8] =
+            words::<8>("8C5E8C50 E2147C32 A32BA7E1 2F45EB4E 208B4537 293AD69E 4C9B994D 82596786");
+        assert_eq!(h_final, expect_h);
+        assert_eq!(
+            blake2s::hex(b"abc"),
+            "508c5e8c327c14e2e1a72ba34eeb452f37458b209ed63a294d999b4c86675982"
+        );
+    }
+
+    /// Official BLAKE2s KAT, unkeyed (D-0020 orphan's expectations,
+    /// re-verified this run against Python hashlib.blake2s AND OpenSSL
+    /// 3.5.7 `dgst -blake2s256`). Input = bytes 0..len-1.
+    #[test]
+    fn blake2s_kat_unkeyed() {
+        let cases: &[(usize, &str)] = &[
+            (0, "69217a3079908094e11121d042354a7c1f55b6482ca1a51e1b250dfd1ed0eef9"),
+            (1, "e34d74dbaf4ff4c6abd871cc220451d2ea2648846c7757fbaac82fe51ad64bea"),
+            (3, "e8f91c6ef232a041452ab0e149070cdd7dd1769e75b3a5921be37876c45c9900"),
+            (64, "56f34e8b96557e90c1f24b52d0c89d51086acf1b00f634cf1dde9233b8eaaa3e"),
+            (65, "1b53ee94aaf34e4b159d48de352c7f0661d0a40edff95a0b1639b4090e974472"),
+            (127, "f18417b39d617ab1c18fdf91ebd0fc6d5516bb34cf39364037bce81fa04cecb1"),
+            (128, "1fa877de67259d19863a2a34bcc6962a2b25fcbf5cbecd7ede8f1fa36688a796"),
+            (255, "f03f5789d3336b80d002d59fdf918bdb775b00956ed5528e86aa994acb38fe2d"),
+        ];
+        for (len, expect) in cases {
+            let input: Vec<u8> = (0u8..(*len as u8)).collect();
+            assert_eq!(&blake2s::hex(&input), expect, "blake2s unkeyed inlen {len}");
+        }
+    }
+
+    /// Official BLAKE2s KAT, keyed with 00..1f — pins the RFC 7693 §3.3
+    /// keyed counter semantics (final block t = ll + bb, key block first).
+    #[test]
+    fn blake2s_kat_keyed() {
+        let key: Vec<u8> = (0u8..32).collect();
+        let key: &[u8; 32] = key[..].try_into().unwrap();
+        let cases: &[(usize, &str)] = &[
+            (0, "48a8997da407876b3d79c0d92325ad3b89cbb754d86ab71aee047ad345fd2c49"),
+            (1, "40d15fee7c328830166ac3f918650f807e7e01e177258cdc0a39b11f598066f1"),
+            (3, "1d220dbe2ee134661fdf6d9e74b41704710556f2f6e5a091b227697445dbea6b"),
+            (64, "8975b0577fd35566d750b362b0897a26c399136df07bababbde6203ff2954ed4"),
+            (65, "21fe0ceb0052be7fb0f004187cacd7de67fa6eb0938d927677f2398c132317a8"),
+            (127, "ddbfea75cc467882eb3483ce5e2e756a4f4701b76b445519e89f22d60fa86e06"),
+            (128, "0c311f38c35a4fb90d651c289d486856cd1413df9b0677f53ece2cd9e477c60a"),
+            (255, "3fb735061abc519dfe979e54c1ee5bfad0a9d858b3315bad34bde999efd724dd"),
+        ];
+        for (len, expect) in cases {
+            let input: Vec<u8> = (0u8..(*len as u8)).collect();
+            let out = blake2s::mac(key, &input);
+            assert_eq!(&to_hex(&out), expect, "blake2s keyed inlen {len}");
+        }
+    }
+
+    /// RFC 7693 Appendix E `blake2s_selftest()`: 4 output lengths × 6
+    /// input lengths × (unkeyed + keyed with keylen == outlen); the grand
+    /// hash of all 48 digests must equal `blake2s_res`. This is the RFC's
+    /// own exhaustive functional vector — it covers empty input, 3, 64,
+    /// 65, 255 and 1024 bytes (multi-block, partial final block, the
+    /// ≥31-byte inputs that exposed the orphan's SIGMA[3][8] defect) in
+    /// both unkeyed and keyed modes.
+    #[test]
+    fn blake2s_selftest_rfc7693_appendix_e() {
+        // Deterministic sequence generator (Appendix E, Fibonacci):
+        fn selftest_seq(out: &mut [u8], seed: u32) {
+            let mut a = 0xDEAD4BADu32.wrapping_mul(seed);
+            let mut b = 1u32;
+            for slot in out.iter_mut() {
+                let t = a.wrapping_add(b);
+                a = b;
+                b = t;
+                *slot = (t >> 24) as u8;
+            }
+        }
+        let md_len = [16usize, 20, 28, 32];
+        let in_len = [0usize, 3, 64, 65, 255, 1024];
+        let mut ctx_input = Vec::new();
+        for &outlen in &md_len {
+            for &inlen in &in_len {
+                let mut input = vec![0u8; inlen];
+                selftest_seq(&mut input, inlen as u32);
+                let md = blake2s::hash(&[], &input, outlen);
+                ctx_input.extend_from_slice(&md);
+                let mut key = vec![0u8; outlen];
+                selftest_seq(&mut key, outlen as u32);
+                let md = blake2s::hash(&key, &input, outlen);
+                ctx_input.extend_from_slice(&md);
+            }
+        }
+        assert_eq!(
+            blake2s::hex(&ctx_input),
+            "6a411f08ce25adcdfb02aba641451cec53c598b24f4fc787fbdc88797f4c1dfe",
+            "RFC 7693 Appendix E blake2s grand hash of hashes"
+        );
     }
 }

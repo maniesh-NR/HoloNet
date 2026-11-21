@@ -1,7 +1,43 @@
 # HoloNet State Snapshot
 
-Last updated: 2026-11-21 (UTC, run 8 — XChaCha20 WIRE FIX, binding
-condition 8 / D-0029; S1a now FULLY CLOSED). Restore ritual: warm path
+Last updated: 2026-11-21 (UTC, run 9 — S1b OPENS: BLAKE2s shipped,
+first S1b/S1c crypto primitive). Restore ritual: warm path (runbook
+0/0b) — remote reconciliation MATCH at 880661e == origin/main (the
+run-8 closure retry push landed; its LANDED ledger line was found
+uncommitted in the working tree and rides THIS run's backup).
+Working-tree strays triaged: only that BACKUPS.md line, inside
+harness/ (allowed). Toolchain REINSTALLED via rustup a FOURTH time
+(rustc 1.100.0 — the recycle wipes ~/.cargo reliably; runbook step 2
+is the proven path); baseline re-verified **92/92 green BEFORE
+changes** (static 94), matching the CI-verified run-8 ledger; lock v3
+held throughout. **BLAKE2s SHIPPED (RFC 7693, ROADMAP S1b item 1; the
+D-0020 orphan's code NOT reused — only its KAT expectations, each
+re-verified this run against Python hashlib.blake2s AND OpenSSL 3.5.7
+`dgst -blake2s256`):** `holo-crypto::blake2s` with `hash(key, data,
+out_len)` one-shot (§3.3 semantics: key block d[0] when keyed,
+non-final t = (i+1)*64 over the global block index, final t = ll (+64
+keyed), unkeyed-empty → one zero block t=0), `digest`/`hex` unkeyed
+BLAKE2s-256, and `mac(key32)` for the S2 WireGuard shape. SIGMA taken
+from RFC §2.7 AND cross-checked against Appendix D's blake2s.c
+sigma[10][16] (two in-document sources; SIGMA[3] = the orphan's
+killer row, index [8] = 2). Rotations RIGHT (rotate_right 16/12/8/7).
+Verification layers (5 named tests, +5): row permutation check; the
+full Appendix B "abc" trace replayed state-by-state through the ONE
+production compression fn (an `Option<&mut Vec>` trace hook — the
+test exercises the production code path, not a reimplementation):
+11 v[16] states + final h + digest 508c5e8c327c14e2…86 6759 82;
+KATs unkeyed+keyed (8+8 lengths 0..255, inputs 0..len-1); the RFC
+Appendix E self-test grand hash-of-hashes 6a411f08ce25adcdfb02aba64
+1451cec53c598b24f4fc787fbdc88797f4c1dfe over 48 digests (outlen
+16/20/28/32 × inlen 0/3/64/65/255/1024 × keyed+unkeyed — includes the
+≥31-byte inputs that hid the orphan's defect). Local suite **97
+green** (92 + 5), static 99, Cargo.lock v3 HELD. CI verification
+rides the run-9 push. Remaining S1b/S1c: X25519 (execution-mode
+decision first), AES-CFB (+ planned mechanical grep-audit),
+ExpandLabel, bignum/RSA.
+
+Previous-run state, preserved below (run 8 — XChaCha20 WIRE FIX,
+binding condition 8 / D-0029; S1a now FULLY CLOSED). Restore ritual: warm path
 (runbook 0/0b) — remote reconciliation MATCH at 17e5b8d == origin/main
 (the run-7 push DID land; the BACKUPS.md FAILED tail was an in-script
 attempt only, reconciled + LANDED line appended this run; CI of the

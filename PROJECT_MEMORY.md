@@ -96,7 +96,23 @@ pushed bcf8da1+05f9906 mid-run; reconciled via commit + rebase
 (WORKFLOW §1.4) — my decision renumbered D-0027→D-0029 (theirs took
 D-0027/D-0028), graph.json extended (D-0029 + SES-2026-11-21a + 3
 test nodes; GAP-xchacha closed; graph check + RAG smoke green).**
-Next dev: BLAKE2s (S1b), X25519, AES-CFB, ExpandLabel, bignum/RSA.
+RUN 9 (2026-11-21, S1b opens — BLAKE2s, RFC 7693, ROADMAP S1b item 1):
+`holo-crypto::blake2s` shipped (hash/mac/digest one-shot, §3.3 counter
+semantics keyed+unkeyed). D-0020 honored: the orphan's CODE unused;
+its 16 KAT expectations each RE-verified against Python hashlib AND
+OpenSSL 3.5.7 BEFORE reuse. SIGMA dual-sourced (§2.7 table == Appendix
+D blake2s.c table). Layered mechanical guards, +5 tests: SIGMA row
+permutation check; the FULL Appendix B "abc" round trace replayed
+state-by-state THROUGH the production compression fn (Option trace
+hook — no second code path); 16 KATs (8 unkeyed + 8 keyed); the
+Appendix E self-test grand hash-of-hashes 6a411f08…4c1dfe over 48
+digests (16/20/28/32-byte out × 0/3/64/65/255/1024-byte in ×
+keyed+unkeyed — covers the ≥31-byte inputs that hid the orphan's
+SIGMA[3][8] defect). Local 97-green (+5), static 99, lock v3 HELD;
+CI verification rides the run-9 push.
+
+Next dev: X25519 (execution-mode decision first), AES-CFB (+ planned
+mechanical grep-audit), ExpandLabel, bignum/RSA.
 
 ## Verification contracts (how "done" is proven)
 
@@ -110,14 +126,12 @@ Next dev: BLAKE2s (S1b), X25519, AES-CFB, ExpandLabel, bignum/RSA.
   integration test, cfg-gated util/config deltas).
 - Memory regression budget: RSS growth < 8 MB over 64 MB relayed
   (D-0015; local reference +88–376 KB; runner variance absorbed).
-- 89→94 `#[test]` countable: `grep -rn "#\[test\]" engine/crates
-  --include="*.rs" | wc -l` → 94 (92 runnable on Linux after run 8's
-  +3 holo-crypto draft vectors + 2 holo-ss wire tests — no cfg gates,
-  so +5 on macOS/Windows too; run 6's +1 audit test included in the
-  base). Local 92-green; **CI-verified: 92 Linux / 91 macOS / 91
-  Windows @ 676a58c, run 44872078593 all-green (6/6; visible
-  82/81/81 + redirected socks 10, reconciled; previously 87/86/86 @
-  937554f, run 44728988531).**
+- 89→99 `#[test]` countable: `grep -rn "#\[test\]" engine/crates
+  --include="*.rs" | wc -l` → 99 (97 runnable on Linux after run 9's
+  +5 BLAKE2s tests — no cfg gates, so +5 on macOS/Windows too).
+  Local 97-green; CI-verified for the run-8 tree: 92 Linux / 91 macOS /
+  91 Windows @ 676a58c, run 44872078593 all-green (visible 82/81/81 +
+  redirected socks 10, reconciled; run-9 ledger rides its own CI poll).
 - Every run ends: `bash harness/scripts/backup.sh "<summary>"`
   (WORKFLOW §1.2; push = completion). Gate records quote SHA-256 in
   the BACKUPS.md line; next record number = 0004 (S1→S2 gate,
@@ -144,8 +158,11 @@ Next dev: BLAKE2s (S1b), X25519, AES-CFB, ExpandLabel, bignum/RSA.
    remaining: ~~XChaCha standard switch (waits on D-0009/D-0013)~~
    DONE 2026-11-21 run 8 (D-0029 — standard 24-byte-counter wire +
    draft vectors; the zero-IV mislabel retired),
-   BLAKE2s (BLAKE2b cut unless justified), X25519 (1M-vector execution
-   mode decided first), AES-CFB, ExpandLabel, bignum/RSA. Rand-split
+   ~~BLAKE2s (BLAKE2b cut unless justified)~~ DONE 2026-11-21 run 9
+   (RFC 7693; SIGMA dual-sourced; Appendix B trace + Appendix E
+   self-test + 16 KATs; +5 tests, local 97-green),
+   X25519 (1M-vector execution mode decided first), AES-CFB,
+   ExpandLabel, bignum/RSA. Rand-split
    enforcement DONE 2026-11-20 run 6 (D-0024).
 6. [dev] ~~A4-C2 harness-audit~~ DONE 2026-11-19 (full-tree integrity
    audit, D-0017); ~~A4-C3 backup.sh guards~~ DONE (rebase/unmerged
@@ -200,7 +217,7 @@ Next dev: BLAKE2s (S1b), X25519, AES-CFB, ExpandLabel, bignum/RSA.
 ## Recent Progress & Git Activity
 
 ```text
+### Commit: 880661e - backup: FAILED 2026-11-21T05:44:58Z (push did not land) (maniesh-NR, 2026-11-21)
 ### Commit: 6f977ad - backup: run 8 closure: CI-VERIFIED 44872078593 @ 676a58c all-green 6/6, per-OS ledger 92 Linux/91 macOS/91 Windows (visible 82/81/81 + socks 10 reconciled); README badge + Status block and ARCHITECTURE data-p (maniesh-NR, 2026-11-21)
 ### Commit: 676a58c - backup: FAILED 2026-11-21T05:41:44Z (push did not land) (maniesh-NR, 2026-11-21)
-### Commit: 84dbf83 - backup: run 8: XChaCha wire fix D-0029 (standard XChaCha20-Poly1305-IETF, 24-byte LE SIP004 counter; draft-irtf-cfrg-xchacha-03 vectors 2.2.1/A.2.1/A.1; +5 tests, rebased-tree 92-green, static 94); mid-run di (maniesh-NR, 2026-11-21)
 ```

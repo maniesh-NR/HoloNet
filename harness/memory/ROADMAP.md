@@ -82,6 +82,16 @@ annotations: BLAKE2b cut-or-justify, constant-time bar for X25519/bignum.
    message schedule from RFC 7693 §3.3 — never transcribe it by eye.
    The orphan's 32 KAT expectations were independently verified against
    OpenSSL and ARE reusable; the orphan's code is NOT (D-0020).**
+   **DONE 2026-11-21 run 9 — `holo-crypto::blake2s` (hash/mac/digest, one
+   compression code path with an optional round-trace hook): SIGMA taken
+   from §2.7 AND cross-checked against Appendix D's blake2s.c table
+   (two in-RFC sources); Appendix B "abc" trace replayed state-by-state
+   (11 v[16] states + h + digest, round-exact); Appendix E self-test
+   grand hash-of-hashes = 6a411f08ce25adcdfb02aba641451cec53c598b24f4f
+   c787fbdc88797f4c1dfe over 48 digests (outlen 16/20/28/32 × inlen
+   0/3/64/65/255/1024 × keyed+unkeyed); the D-0020 KAT table re-verified
+   against Python hashlib + OpenSSL 3.5.7 before reuse; +5 named tests,
+   local 97-green.**
 2. X25519 (RFC 7748) — a24 = 121665; inversion exponent p−2 with limb 0
    0xffffffeb…; reject the all-zero shared secret.
    **Contributory-behavior policy (A2): all-zero-output check ONLY,
@@ -246,8 +256,8 @@ Acceptance criteria (all measurable):
   over the whole unauthenticated phase, cleared post-auth, named test
   `silent_after_valid_length_times_out`; the remaining S1 crypto items
   (XChaCha wire fix **DONE 2026-11-21 run 8**, rand-split enforcement
-  **DONE 2026-11-20 run 6**, BLAKE2s, X25519, AES-CFB,
-  ExpandLabel, bignum/RSA) are the next runs' work**.
+  **DONE 2026-11-20 run 6**, BLAKE2s **DONE 2026-11-21 run 9**, X25519,
+  AES-CFB, ExpandLabel, bignum/RSA) are the next runs' work**.
 - OpenSSL cross-checks during development, recorded in the session
   journal WITH the exact command lines and ≥16 hex characters of each
   digest quoted (a bare "cross-checked" note does not satisfy this —
