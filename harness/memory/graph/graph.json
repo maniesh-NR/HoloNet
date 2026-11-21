@@ -48,8 +48,8 @@
       "harness/adversarial/verdicts/",
       "docs/THREAT-MODEL.md"
     ],
-    "updated": "2026-11-20",
-    "updated_by": "run 2026-11-21 (RAG layer, D-0028; renumbered from draft D-0019/D-0020 after divergence)"
+    "updated": "2026-11-21",
+    "updated_by": "run 2026-11-21 (divergence reconciliation: parallel-run decisions D-0019..D-0026 curated; my graph/RAG entries renumbered D-0027/D-0028)"
   },
   "nodes": [
     {
@@ -139,7 +139,7 @@
       "type": "decision",
       "label": "Stale-binaries disclosure (v1)",
       "status": "superseded",
-      "summary": "Escalated 2026-11-13: published v0.2.0/v0.3.0 Windows binaries predate entropy hardening; advisory-vs-v0.3.1 pending.",
+      "summary": "Escalated 2026-11-13: published v0.2.0/v0.3.0 Windows binaries predate entropy hardening; advisory-vs-v0.3.1 pending. RESOLVED by D-0025.",
       "refs": [
         "harness/memory/DECISIONS.md"
       ]
@@ -263,7 +263,7 @@
       "type": "stage",
       "label": "Entropy + crypto extensions",
       "status": "in_progress",
-      "summary": "Item 0 (Windows FFI + data-dir) DONE 2026-11-20; remaining: salt-replay cache, off-loopback refusal, ProbeGuard decay, CSPRNG slow-close, close-vs-hang, XChaCha standard switch, rand-split enforcement, BLAKE2s, X25519, AES-CFB, ExpandLabel, bignum/RSA.",
+      "summary": "Item 0 + server-path hardening + rand-split DONE (D-0018/D-0023/D-0024; ledger 87/86/86). Remaining: BLAKE2s (orphan KATs reusable per D-0020), X25519, AES-CFB, ExpandLabel, bignum/RSA, XChaCha standard switch (now unblocked).",
       "refs": [
         "harness/memory/ROADMAP.md"
       ]
@@ -412,8 +412,8 @@
       "id": "A2-C1",
       "type": "condition",
       "label": "A2-C1 salt-replay cache",
-      "status": "open_s1",
-      "summary": "Bounded exact-match seen-salt LRU (NO Bloom filter), opaque rejection, named test. Doc half done (THREAT-MODEL C); code pending in S1.",
+      "status": "closed",
+      "summary": "CLOSED: SaltCache landed (D-0023, cap-1024 FIFO, opaque refusal, named test); THREAT-MODEL C amended.",
       "refs": [
         "docs/THREAT-MODEL.md",
         "harness/memory/ROADMAP.md"
@@ -433,8 +433,8 @@
       "id": "A2-C3",
       "type": "condition",
       "label": "A2-C3 D-0009 deadline",
-      "status": "open_owner",
-      "summary": "Close D-0009/D-0013 before S1 DONE (advisory and/or v0.3.1, or dated no-go).",
+      "status": "closed",
+      "summary": "CLOSED: D-0025 (advisory + GHSA + v0.3.1 supersession) before the XChaCha wire change.",
       "refs": [
         "harness/memory/DECISIONS.md"
       ]
@@ -444,7 +444,7 @@
       "type": "condition",
       "label": "A2-C4 carried checks at gate 0003",
       "status": "open_gate0003",
-      "summary": "rand-split enforcement, ProbeGuard bounding, jittered slow-close, close-vs-hang, off-loopback refusal, XChaCha switch.",
+      "summary": "Gate-0003(now 0004) checklist; most carried checks LANDED (rand-split D-0024, ProbeGuard decay + jittered slow-close D-0023, off-loopback A3-C4); residual: close-vs-hang uniformity, XChaCha standard switch.",
       "refs": [
         "harness/memory/ROADMAP.md"
       ]
@@ -483,8 +483,8 @@
       "id": "A3-C4",
       "type": "condition",
       "label": "A3-C4 off-loopback refusal in S1",
-      "status": "open_s1",
-      "summary": "Refuse non-loopback proxy_listen binds without explicit override; named test.",
+      "status": "closed",
+      "summary": "CLOSED: loopback-only proxy_listen bind (D-0023) with HOLONET_PROXY_LISTEN_ANY override + named tests.",
       "refs": [
         "harness/memory/ROADMAP.md"
       ]
@@ -513,8 +513,8 @@
       "id": "A3-C7",
       "type": "condition",
       "label": "A3-C7 owner decisions at session start",
-      "status": "open_owner",
-      "summary": "D-0009/D-0013 + S5 credentials; S5 split chartered.",
+      "status": "closed",
+      "summary": "CLOSED: owner decisions made (D-0025 release resolution; D-0026 S5 credentials embedded-with-risk-acceptance).",
       "refs": [
         "harness/memory/ROADMAP.md"
       ]
@@ -593,8 +593,8 @@
       "id": "OD-v031",
       "type": "owner_decision",
       "label": "Advisory vs v0.3.1",
-      "status": "pending",
-      "summary": "Publish advisory and/or signed checksummed v0.3.1 + republish-or-delete invisible per-OS releases; before S1 DONE; before XChaCha wire change.",
+      "status": "decided",
+      "summary": "DECIDED via D-0025: advisory + GHSA + v0.3.1 (4 per-OS tags, signed, checksummed); stale drafts deleted.",
       "refs": [
         "harness/memory/DECISIONS.md"
       ]
@@ -603,8 +603,8 @@
       "id": "OD-s5creds",
       "type": "owner_decision",
       "label": "S5 credentials model",
-      "status": "pending",
-      "summary": "Embedded shared creds (risk-accepted) vs user-supplied-at-runtime; blocks S5 chartering.",
+      "status": "decided",
+      "summary": "DECIDED via D-0026: embedded with recorded risk-acceptance (operational only; fixtures synthetic).",
       "refs": [
         "harness/memory/ROADMAP.md"
       ]
@@ -955,8 +955,8 @@
       "id": "GAP-replay",
       "type": "gap",
       "label": "No salt-replay cache",
-      "status": "chartered_s1",
-      "summary": "Server accepts replayed salts; IMC'20 fingerprint; A2-C1.",
+      "status": "closed",
+      "summary": "CLOSED by D-0023 SaltCache (cap-1024 FIFO, opaque replay refusal, named test).",
       "refs": [
         "docs/THREAT-MODEL.md"
       ]
@@ -975,8 +975,8 @@
       "id": "GAP-probeguard",
       "type": "gap",
       "label": "ProbeGuard unbounded maps",
-      "status": "chartered_s1",
-      "summary": "No decay/eviction; memory DoS on long-running server.",
+      "status": "closed",
+      "summary": "CLOSED by D-0023 (decay, cap-1024).",
       "refs": [
         "engine/crates/holo-net/src/lib.rs"
       ]
@@ -985,8 +985,8 @@
       "id": "GAP-slowclose",
       "type": "gap",
       "label": "Deterministic slow-close + close-vs-hang",
-      "status": "chartered_s1",
-      "summary": "Deterministic delay is a fingerprint (NDSS'20); uniformization chartered.",
+      "status": "open_residual",
+      "summary": "PARTIALLY closed by D-0023 (CSPRNG full-jitter + explicit 2s ceiling, read deadline 10s); close-vs-hang uniformity residual.",
       "refs": [
         "docs/THREAT-MODEL.md"
       ]
@@ -1237,6 +1237,168 @@
       "label": "memory_rag.py",
       "status": "live",
       "summary": "RAG over the corpus + graph (D-0028): BM25 chunk retrieval (heading-chunked, id-preserving tokens) + graph-context expansion; ask/--json/smoke; index built per invocation (no staleness); smoke runs in CI.",
+      "refs": [
+        "harness/memory/graph/memory_rag.py",
+        "harness/memory/DECISIONS.md"
+      ]
+    },
+    {
+      "id": "D-0019",
+      "type": "decision",
+      "label": "Cross-validation review 0003 PASSED",
+      "status": "recorded",
+      "summary": "Second independent panel (different sandbox) reviewed the same baseline: 4/4 PROCEED_WITH_CONDITIONS, matching 0002. Mid-run remote divergence documented verbatim; residual conditions applied; WORKFLOW 4.4 (untracked-stray triage) added. S1->S2 gate will be record 0004 (D-0011 numbering).",
+      "refs": [
+        "harness/adversarial/verdicts/0003-cross-validation.md"
+      ]
+    },
+    {
+      "id": "D-0020",
+      "type": "decision",
+      "label": "Orphan blake2.rs disposition",
+      "status": "recorded",
+      "summary": "Untracked holo-crypto/src/blake2.rs was doubly broken (SIGMA E0425; 3/5 own KATs fail when m[2]!=m[8] -> mis-transcribed SIGMA row) and never compiled; moved OUT of every tree. Its 32 KAT expectations ARE authentic (OpenSSL-verified) and reusable in S1; the code is not.",
+      "refs": [
+        "harness/memory/DECISIONS.md"
+      ]
+    },
+    {
+      "id": "D-0021",
+      "type": "decision",
+      "label": "pstack re-affirmed + memory hooks",
+      "status": "binding",
+      "summary": "Owner re-affirmed the protocol; memory hooks with --check gate; PROJECT_MEMORY refreshed; Cargo.lock v4 regression on origin/main restored to v3.",
+      "refs": [
+        "harness/memory/DECISIONS.md"
+      ]
+    },
+    {
+      "id": "D-0022",
+      "type": "decision",
+      "label": "backup.sh retry mechanics",
+      "status": "binding",
+      "summary": "Push-retry path recorded after run-4/5 push failures (FAILED markers + retry landed).",
+      "refs": [
+        "harness/memory/DECISIONS.md"
+      ]
+    },
+    {
+      "id": "D-0023",
+      "type": "decision",
+      "label": "S1 server-path hardening",
+      "status": "shipped",
+      "summary": "A2-C1 SaltCache (cap-1024 FIFO, opaque replay refusal, named test), A3-C4 loopback-only proxy_listen bind (HOLONET_PROXY_LISTEN_ANY override, named tests), ProbeGuard decay cap-1024, CSPRNG full-jitter slow-close with explicit 2s ceiling, A2-F6 auth read deadline 10s.",
+      "refs": [
+        "engine/crates/holo-ss/src/lib.rs",
+        "engine/crates/holo-net/src/lib.rs"
+      ]
+    },
+    {
+      "id": "D-0024",
+      "type": "decision",
+      "label": "rand-split enforcement",
+      "status": "shipped",
+      "summary": "Weak PRNG behind rand::nosec (doc-hidden), re-exports closed, workspace audit test allowlist-enforced; negative demos live (audit FAIL with file:line + E0425). Closes the gate-0001 A2-C3 binding condition.",
+      "refs": [
+        "engine/crates/holo-util/src/rand.rs"
+      ]
+    },
+    {
+      "id": "D-0025",
+      "type": "decision",
+      "label": "RESOLVED: advisory + GHSA + v0.3.1",
+      "status": "shipped",
+      "summary": "Owner resolved D-0009/D-0013: security advisory + GHSA published, v0.3.1 cut from CI-verified tree as 4 per-OS tags + main release (advisory + checksum manifest + signature; ssh-keygen minisign-style, private key not in repo), stale drafts deleted. Pure security re-release - decided BEFORE the XChaCha wire change, which is now UNBLOCKED.",
+      "refs": [
+        "harness/memory/DECISIONS.md"
+      ]
+    },
+    {
+      "id": "D-0026",
+      "type": "decision",
+      "label": "S5 credentials model decided",
+      "status": "binding",
+      "summary": "Owner chose embedded-with-recorded-risk-acceptance; AMENDS D-0001 for S5 operational credentials only (session secrets stay env-var-only; S5 test fixtures stay synthetic; one documented config module with rotation/burn path in THREAT-MODEL E; VPN Gate first).",
+      "refs": [
+        "harness/memory/DECISIONS.md"
+      ]
+    },
+    {
+      "id": "REVIEW-0003",
+      "type": "gate_record",
+      "label": "Cross-validation review 0003",
+      "status": "passed",
+      "summary": "Independent panel, 4/4 PROCEED_WITH_CONDITIONS; no transition authority (S1->S2 = record 0004). Conditions archived in verdicts/0003-*.",
+      "refs": [
+        "harness/adversarial/verdicts/0003-cross-validation.md"
+      ]
+    },
+    {
+      "id": "SES-2026-11-20b",
+      "type": "session",
+      "label": "pstack re-affirm + hooks",
+      "status": "recorded",
+      "summary": "Memory hooks + --check gate; lockfile regression fixed on origin.",
+      "refs": [
+        "harness/memory/sessions/2026-11-20b-pstack-reaffirm.md"
+      ]
+    },
+    {
+      "id": "SES-2026-11-20c",
+      "type": "session",
+      "label": "S1 hardening run 4",
+      "status": "recorded",
+      "summary": "SaltCache + loopback-only bind; suite 76->83 local green.",
+      "refs": [
+        "harness/memory/sessions/2026-11-20c-s1-hardening.md"
+      ]
+    },
+    {
+      "id": "SES-2026-11-20d",
+      "type": "session",
+      "label": "S1 hardening run 5",
+      "status": "recorded",
+      "summary": "ProbeGuard decay, jittered slow-close + ceiling, read deadline; ledger 86/85/85.",
+      "refs": [
+        "harness/memory/sessions/2026-11-20d-s1-hardening2.md"
+      ]
+    },
+    {
+      "id": "SES-2026-11-20e",
+      "type": "session",
+      "label": "S1a rand-split",
+      "status": "recorded",
+      "summary": "rand::nosec + audit test; ledger 87/86/86 (run 44728988531 all-green).",
+      "refs": [
+        "harness/memory/sessions/2026-11-20e-rand-split.md"
+      ]
+    },
+    {
+      "id": "SES-2026-11-20f",
+      "type": "session",
+      "label": "Decisions + v0.3.1",
+      "status": "recorded",
+      "summary": "D-0025 advisory+GHSA+v0.3.1 cut; D-0026 S5 creds; signing keypair (private key not in repo).",
+      "refs": [
+        "harness/memory/sessions/2026-11-20f-decisions-and-v031.md"
+      ]
+    },
+    {
+      "id": "SES-2026-11-21",
+      "type": "session",
+      "label": "Memory graph + RAG",
+      "status": "recorded",
+      "summary": "D-0027/D-0028; graph.json + memory_graph.py + memory_rag.py; CI check+smoke.",
+      "refs": [
+        "harness/memory/sessions/2026-11-21-memory-graph-rag.md"
+      ]
+    },
+    {
+      "id": "D-0028",
+      "type": "decision",
+      "label": "RAG over the memory graph",
+      "status": "binding",
+      "summary": "memory_rag.py: BM25 chunk retrieval over the binding markdown corpus (heading-chunked; ids tokenize whole) + graph-context expansion (summary + 1-hop edges). ask [--json][-k]; smoke = retrieval regressions, runs in CI; per-invocation index (no staleness); lexical-not-semantic limitation stated. Read layer - markdown/graph stay authoritative.",
       "refs": [
         "harness/memory/graph/memory_rag.py",
         "harness/memory/DECISIONS.md"
@@ -1632,6 +1794,89 @@
       "src": "TOOL-memory-rag",
       "rel": "part_of",
       "dst": "D-0027"
+    },
+    {
+      "src": "D-0025",
+      "rel": "supersedes",
+      "dst": "D-0009",
+      "note": "resolution: advisory + GHSA + v0.3.1"
+    },
+    {
+      "src": "D-0025",
+      "rel": "supersedes",
+      "dst": "D-0013",
+      "note": "resolved with reconciled facts + deadline met"
+    },
+    {
+      "src": "D-0025",
+      "rel": "satisfies",
+      "dst": "A2-C3"
+    },
+    {
+      "src": "D-0026",
+      "rel": "amends",
+      "dst": "D-0001",
+      "note": "S5 operational credentials only"
+    },
+    {
+      "src": "D-0023",
+      "rel": "satisfies",
+      "dst": "A2-C1"
+    },
+    {
+      "src": "D-0023",
+      "rel": "satisfies",
+      "dst": "A3-C4"
+    },
+    {
+      "src": "D-0023",
+      "rel": "closes",
+      "dst": "GAP-replay"
+    },
+    {
+      "src": "D-0023",
+      "rel": "closes",
+      "dst": "GAP-probeguard"
+    },
+    {
+      "src": "D-0023",
+      "rel": "closes",
+      "dst": "GAP-slowclose",
+      "note": "partial: uniformity residual"
+    },
+    {
+      "src": "D-0024",
+      "rel": "implements",
+      "dst": "D-0008",
+      "note": "rand-split mechanical enforcement (gate-0001 A2-C3)"
+    },
+    {
+      "src": "D-0025",
+      "rel": "ships",
+      "dst": "OD-v031",
+      "note": "v0.3.1 release tags"
+    },
+    {
+      "src": "D-0026",
+      "rel": "closes",
+      "dst": "OD-s5creds"
+    },
+    {
+      "src": "D-0019",
+      "rel": "cites",
+      "dst": "REVIEW-0003"
+    },
+    {
+      "src": "REVIEW-0003",
+      "rel": "gates",
+      "dst": "S1",
+      "note": "cross-validation of the S0->S1 authorization"
+    },
+    {
+      "src": "D-0028",
+      "rel": "amends",
+      "dst": "D-0027",
+      "note": "RAG read layer over the graph"
     }
   ]
 }

@@ -356,6 +356,23 @@
   divergence was discovered; the pushed tree's D-0019..D-0026
   (cross-validation 0003 / orphan disposition / D-0021..D-0026)
   keep their numbers, so these were renumbered to D-0027/D-0028.
+- **D-0027 (2026-11-20/21, owner instruction — agentic memory as a data
+  graph accessible to all agents)**: `harness/memory/graph/` holds
+  `graph.json` — a typed node/edge view of the binding memory
+  (decisions, stages, gate records, review conditions with statuses,
+  components, tests, CI jobs, threats, gaps, lessons, sessions, owner
+  decisions, tools, panel roles) with per-node source refs — plus
+  `memory_graph.py` (`check`/`stats`/`query`/`dot`, std-only). The
+  markdown memory remains AUTHORITATIVE; the graph is a derived,
+  curated view. `check` enforces COVERAGE in the harness-audit CI job:
+  a D-NNNN / stage / record / session present in the sources but
+  missing from the graph fails CI, so the graph cannot silently rot.
+  Hash-anchors unaffected (D-0011 blob rule still applies).
+  NUMBERING NOTE (2026-11-21 reconciliation): this entry and D-0028
+  were drafted as D-0019/D-0020 in a parallel session BEFORE the
+  divergence was discovered; the pushed tree's D-0019..D-0026
+  (cross-validation 0003 / orphan disposition / D-0021..D-0026) keep
+  their numbers, so these were renumbered to D-0027/D-0028.
 - **D-0028 (2026-11-21, owner instruction — RAG over the memory graph)**:
   `harness/memory/graph/memory_rag.py` gives every agent (and human)
   retrieval-augmented access to project memory: BM25 chunk retrieval over

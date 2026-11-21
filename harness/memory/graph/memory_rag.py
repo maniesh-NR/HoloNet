@@ -1,5 +1,5 @@
 """memory_rag.py — retrieval-augmented generation over the HoloNet memory
-graph + markdown corpus (D-0020, extends D-0019).
+graph + markdown corpus (D-0028, extends D-0027).
 
 Agents should RETRIEVE with this tool instead of loading whole files:
 
