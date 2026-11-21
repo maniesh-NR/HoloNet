@@ -38,3 +38,4 @@ UTC time | prev-commit | run summary
 2026-11-21T05:44:58Z | FAILED | push did not land — run incomplete
 2026-11-21T05:52:00Z | LANDED | retry push (env-var credential helper) carried 676a58c..880661e — the run-8 CLOSURE commits (README/ARCHITECTURE/STATE/PROJECT_MEMORY verified count citations + journal addendum + this ledger line). **Closure CI: run 44872322171 @ 880661e SUCCESS** (docs/harness-only on top of the CI-verified 92-tree). RUN 8 COMPLETE: XChaCha wire fix D-0029 shipped, S1a FULLY CLOSED
 2026-11-21T10:55:04Z | prev=880661e | run 9: BLAKE2s RFC 7693 (S1b item 1): SIGMA dual-sourced, Appendix B trace + Appendix E self-test + 16 KATs (re-verified vs Python+OpenSSL); +5 tests, local 97-green, static 99, lock v3 held
+2026-11-21T11:06:52Z | prev=6331952 | run 9 fix: graph coverage — SES-2026-11-21b + 4 T-blake2s nodes + 6 edges (harness-audit had failed 44896588214 on the missing session node; all 5 test jobs were green); graph check + RAG smoke gree

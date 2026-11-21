@@ -285,3 +285,10 @@
   (each row a permutation of 0..15) plus the spec's own self-test if
   it has one — the Appendix E hash-of-hashes covers every mode the
   hand-picked KAT subset skips.
+- (run 9, CI-caught) Extending the markdown memory without extending
+  graph.json fails the harness-audit coverage gate in CI: every new
+  session journal needs its SES-* node BEFORE the push, and new
+  named tests should get T-* nodes (grouped) with tested_by edges —
+  the graph is part of "done", not optional bookkeeping. The local
+  pre-push ritual is `memory_graph.py check` + `memory_rag.py smoke`
+  alongside `cargo test`.

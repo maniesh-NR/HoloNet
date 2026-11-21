@@ -217,7 +217,7 @@ mechanical grep-audit), ExpandLabel, bignum/RSA.
 ## Recent Progress & Git Activity
 
 ```text
+### Commit: 6331952 - backup: run 9: BLAKE2s RFC 7693 (S1b item 1): SIGMA dual-sourced, Appendix B trace + Appendix E self-test + 16 KATs (re-verified vs Python+OpenSSL); +5 tests, local 97-green, static 99, lock v3 held (maniesh-NR, 2026-11-21)
 ### Commit: 880661e - backup: FAILED 2026-11-21T05:44:58Z (push did not land) (maniesh-NR, 2026-11-21)
 ### Commit: 6f977ad - backup: run 8 closure: CI-VERIFIED 44872078593 @ 676a58c all-green 6/6, per-OS ledger 92 Linux/91 macOS/91 Windows (visible 82/81/81 + socks 10 reconciled); README badge + Status block and ARCHITECTURE data-p (maniesh-NR, 2026-11-21)
-### Commit: 676a58c - backup: FAILED 2026-11-21T05:41:44Z (push did not land) (maniesh-NR, 2026-11-21)
 ```

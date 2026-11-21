@@ -1455,6 +1455,56 @@
    "refs": [
     "engine/crates/holo-crypto/src/lib.rs"
    ]
+  },
+  {
+   "id": "SES-2026-11-21b",
+   "type": "session",
+   "label": "BLAKE2s shipped (S1b item 1)",
+   "status": "recorded",
+   "summary": "holo-crypto::blake2s (RFC 7693): hash/mac/digest one-shot, keyed+unkeyed §3.3 counter semantics; SIGMA dual-sourced (§2.7 == Appendix D blake2s.c); Appendix B trace replayed state-by-state through the production compression path; Appendix E self-test grand hash + 16 KATs (orphan expectations re-verified vs Python hashlib + OpenSSL 3.5.7); +5 tests, local 97-green, static 99, lock v3 held; run-9 push 6331952 — harness-audit first flagged the missing SES node (this fix closes it), all test jobs green.",
+   "refs": [
+    "harness/memory/sessions/2026-11-21b-blake2s.md"
+   ]
+  },
+  {
+   "id": "T-blake2s-schedule",
+   "type": "test",
+   "label": "blake2s_sigma_rows_are_permutations",
+   "status": "passing",
+   "summary": "Structural guard: every SIGMA row is a permutation of 0..15 (no duplicates/omissions).",
+   "refs": [
+    "engine/crates/holo-crypto/src/lib.rs"
+   ]
+  },
+  {
+   "id": "T-blake2s-trace",
+   "type": "test",
+   "label": "blake2s_rfc7693_appendix_b_trace",
+   "status": "passing",
+   "summary": "Round-exact replay of the RFC's 'abc' trace: all 11 v[16] states + final h + digest, through the ONE production compression fn (Option trace hook — no second code path).",
+   "refs": [
+    "engine/crates/holo-crypto/src/lib.rs"
+   ]
+  },
+  {
+   "id": "T-blake2s-kat",
+   "type": "test",
+   "label": "blake2s_kat_unkeyed / blake2s_kat_keyed",
+   "status": "passing",
+   "summary": "16 KATs (8+8, lengths 0..255, keyed with 00..1f) — D-0020 orphan's expectations, each re-verified against Python hashlib.blake2s and OpenSSL 3.5.7 dgst -blake2s256 before reuse; pins the keyed counter semantics (final t = ll + bb).",
+   "refs": [
+    "engine/crates/holo-crypto/src/lib.rs"
+   ]
+  },
+  {
+   "id": "T-blake2s-selftest",
+   "type": "test",
+   "label": "blake2s_selftest_rfc7693_appendix_e",
+   "status": "passing",
+   "summary": "The RFC's own exhaustive vector: grand hash-of-hashes 6a411f08...4c1dfe over 48 digests (outlen 16/20/28/32 x inlen 0/3/64/65/255/1024 x keyed+unkeyed) — includes the >=31-byte inputs that hid the orphan's SIGMA[3][8] defect.",
+   "refs": [
+    "engine/crates/holo-crypto/src/lib.rs"
+   ]
   }
  ],
  "edges": [
@@ -1967,6 +2017,38 @@
    "rel": "verified_by",
    "dst": "T-xchacha-interop",
    "note": "local 92-green; CI ledger rides the run-8 push"
+  },
+  {
+   "src": "SES-2026-11-21b",
+   "rel": "implements",
+   "dst": "S1",
+   "note": "S1b item 1 (BLAKE2s, RFC 7693); BLAKE2b stays CUT (A3-C6/F13)"
+  },
+  {
+   "src": "SES-2026-11-21b",
+   "rel": "cites",
+   "dst": "D-0020",
+   "note": "orphan's KAT expectations reused only after re-verification; orphan code NOT reused"
+  },
+  {
+   "src": "holo-crypto",
+   "rel": "tested_by",
+   "dst": "T-blake2s-schedule"
+  },
+  {
+   "src": "holo-crypto",
+   "rel": "tested_by",
+   "dst": "T-blake2s-trace"
+  },
+  {
+   "src": "holo-crypto",
+   "rel": "tested_by",
+   "dst": "T-blake2s-kat"
+  },
+  {
+   "src": "holo-crypto",
+   "rel": "tested_by",
+   "dst": "T-blake2s-selftest"
   }
  ]
 }
