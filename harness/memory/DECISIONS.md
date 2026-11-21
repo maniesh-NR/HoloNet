@@ -350,12 +350,6 @@
   stands — VPN Gate first (official CSV, needs NO credentials),
   Opera's embedded creds land with the risk note attached.
 
-
-  NUMBERING NOTE (2026-11-21 reconciliation): this entry and D-0027
-  were drafted as D-0019/D-0020 in a parallel session BEFORE the
-  divergence was discovered; the pushed tree's D-0019..D-0026
-  (cross-validation 0003 / orphan disposition / D-0021..D-0026)
-  keep their numbers, so these were renumbered to D-0027/D-0028.
 - **D-0027 (2026-11-20/21, owner instruction — agentic memory as a data
   graph accessible to all agents)**: `harness/memory/graph/` holds
   `graph.json` — a typed node/edge view of the binding memory
@@ -388,4 +382,33 @@
   (D-0019) and `smoke` both run in the harness-audit CI job so neither
   the graph nor the retrieval anchors can silently rot. The graph and
   markdown remain authoritative; this is a READ layer over them.
- dd6f4ba (agentic memory graph + RAG (D-0019/D-0020): graph.json 118 nodes/74 typed edges; memory_graph.py check/stats/query/dot (coverage-enforced); memory_rag.py BM25+graph-context ask/json/smoke; harness-audit CI runs check+smoke; PROJECT_MEMORY agent guidance; session journal)
+- **D-0029 (2026-11-21, run 8 — execution of binding condition 8,
+  record-0003 A3-C3, sequenced by D-0025/D-0013; executor-recorded):**
+  the xchacha20-ietf-poly1305 wire switched to the STANDARD
+  construction — a method-sized SIP004 nonce (12 or 24 bytes) with the
+  24-byte LE counter fed to holo-crypto's (now draft-vector-proven)
+  `aead_xchacha20poly1305_*`; the mislabeled zero-IV re-key
+  (HChaCha20(subkey, 0^16) + plain ChaCha20-Poly1305 over a 12-byte
+  counter — record-0003 A2-F8) and the dead `n24` store are RETIRED,
+  not kept as a compat mode: that construction never interoperated
+  with ANY standard shadowsocks peer under the xchacha name, so there
+  is nothing to stay compatible WITH — a dual-stack would only
+  preserve the defect. Compat consequence, recorded honestly: chunk 0
+  of a session coincidentally matches the retired construction (both
+  nonces all-zero); divergence begins at the second AEAD operation —
+  v0.3.1-and-earlier xchacha sessions cannot interop with post-run-8
+  builds, exactly as they could not with any standard peer. Explicit
+  non-goals: no cipher de-scope (the charter's alternative), no
+  negotiation/versioning handshake (single-cipher-label wire;
+  migration mechanics belong to a future protocol version if one is
+  ever chartered). Vectors: draft-irtf-cfrg-xchacha-03 §2.2.1 /
+  A.2.1 / A.1 fetched verbatim from the IETF archive this run — the
+  crate's primitives were already draft-correct; the run's value was
+  PROOF (no vector, no merge) plus the wire switch itself.
+  NUMBERING NOTE (2026-11-21, run-8 rebase): this entry was drafted as
+  D-0027 in the run-8 sandbox before the mid-run divergence on the
+  parallel graph/RAG session was discovered; that session lawfully took
+  D-0027/D-0028, so this is renumbered D-0029. Rebase also removed a
+  stray pasted commit-message line ("dd6f4ba (…)") that had ridden to
+  the top of the D-0028 entry on origin/main, and the duplicated
+  misplaced NUMBERING NOTE above D-0027.

@@ -1,1882 +1,1972 @@
 {
-  "_meta": {
-    "schema": "holonet-memory-graph/1",
-    "purpose": "Agentic memory as a queryable data graph (D-0019). DERIVED, curated view over the binding markdown memory; on conflict the harness files are authoritative. Every node cites its sources.",
-    "node_types": [
-      "decision",
-      "stage",
-      "gate_record",
-      "condition",
-      "component",
-      "test",
-      "ci_job",
-      "threat",
-      "gap",
-      "lesson",
-      "session",
-      "owner_decision",
-      "tool",
-      "role"
-    ],
-    "relations": {
-      "supersedes": "this decision replaces the target (target stays for history)",
-      "amends": "adds conditions/annotations to the target without replacing it",
-      "implements": "code/artifact realizing a decision or condition",
-      "satisfies": "evidence (commit/run/test) closing a condition",
-      "gates": "review that must pass before the target proceeds",
-      "ships": "stage/component delivered as a release",
-      "part_of": "structural containment",
-      "verified_by": "CI run/test/script proving the claim",
-      "blocks": "open item blocking the target",
-      "requires_decision": "owner decision needed before the target proceeds",
-      "affects": "risk/lesson bearing on the target",
-      "cites": "points at source material",
-      "reviewed_in": "was examined by this gate/panel",
-      "tested_by": "has this test as its regression",
-      "runs_on": "execution environment",
-      "learned_in": "session where the lesson originated",
-      "closes": "condition, when satisfied, resolves the target gap",
-      "authored": "session that produced the target record/artifact"
-    },
-    "authoritative_sources": [
-      "harness/memory/DECISIONS.md",
-      "harness/memory/ROADMAP.md",
-      "harness/memory/STATE.md",
-      "harness/memory/LESSONS.md",
-      "harness/memory/BACKUPS.md",
-      "harness/memory/sessions/",
-      "harness/adversarial/verdicts/",
-      "docs/THREAT-MODEL.md"
-    ],
-    "updated": "2026-11-21",
-    "updated_by": "run 2026-11-21 (divergence reconciliation: parallel-run decisions D-0019..D-0026 curated; my graph/RAG entries renumbered D-0027/D-0028)"
-  },
-  "nodes": [
-    {
-      "id": "D-0001",
-      "type": "decision",
-      "label": "Project charter",
-      "status": "binding",
-      "summary": "GPL-3.0 monorepo; Win7 SP1+/macOS 10.15+/Android 8+/Linux Mint 20+; portable builds; client-only — no servers, no embedded credentials.",
-      "refs": [
-        "harness/memory/DECISIONS.md"
-      ]
-    },
-    {
-      "id": "D-0002",
-      "type": "decision",
-      "label": "Zero third-party crates",
-      "status": "binding",
-      "summary": "Engine is pure-std Rust; clean-room crypto/TLS/QUIC accepted cost, mitigated by RFC/NIST vectors + OpenSSL cross-checks.",
-      "refs": [
-        "harness/memory/DECISIONS.md"
-      ]
-    },
-    {
-      "id": "D-0003",
-      "type": "decision",
-      "label": "Material You pipeline",
-      "status": "shipped",
-      "summary": "One verified Rust color engine ported to Dart/Kotlin/C++; byte-identical M3 palettes via golden vectors.",
-      "refs": [
-        "harness/memory/DECISIONS.md",
-        "docs/MATERIAL_YOU.md"
-      ]
-    },
-    {
-      "id": "D-0004",
-      "type": "decision",
-      "label": "Rebuild order after recycle",
-      "status": "executed",
-      "summary": "Compact core -> crypto foundation -> first live data plane (SS) -> breadth; pitfalls preserved in LESSONS/RESTORE.",
-      "refs": [
-        "docs/RESTORE.md"
-      ]
-    },
-    {
-      "id": "D-0005",
-      "type": "decision",
-      "label": "Harness installed",
-      "status": "binding",
-      "summary": "Binding execution workflow: every run ends with backup.sh push; stage gates need adversarial consensus.",
-      "refs": [
-        "harness/WORKFLOW.md"
-      ]
-    },
-    {
-      "id": "D-0006",
-      "type": "decision",
-      "label": "Git identity",
-      "status": "binding",
-      "summary": "Commits use the owner's identity (maniesh-NR), never the anonymous sandbox default.",
-      "refs": [
-        "harness/memory/DECISIONS.md"
-      ]
-    },
-    {
-      "id": "D-0007",
-      "type": "decision",
-      "label": "Consensus = role-separated blind review",
-      "status": "binding",
-      "summary": "Procedural separation only; correlated blind spots disclosed; reviewer prompts archived verbatim.",
-      "refs": [
-        "harness/ADVERSARIAL.md"
-      ]
-    },
-    {
-      "id": "D-0008",
-      "type": "decision",
-      "label": "Fail-closed entropy + contained FFI",
-      "status": "shipped",
-      "summary": "All security material from OS entropy, fail-closed; splitmix64 non-security only; Windows FFI scoped to holo-util/src/rand.rs ONLY (sole unsafe), re-reviewed at every gate.",
-      "refs": [
-        "harness/memory/DECISIONS.md",
-        "docs/THREAT-MODEL.md"
-      ]
-    },
-    {
-      "id": "D-0009",
-      "type": "decision",
-      "label": "Stale-binaries disclosure (v1)",
-      "status": "superseded",
-      "summary": "Escalated 2026-11-13: published v0.2.0/v0.3.0 Windows binaries predate entropy hardening; advisory-vs-v0.3.1 pending. RESOLVED by D-0025.",
-      "refs": [
-        "harness/memory/DECISIONS.md"
-      ]
-    },
-    {
-      "id": "D-0010",
-      "type": "decision",
-      "label": "Gate 0001 PASSED",
-      "status": "recorded",
-      "summary": "S0->S1 transition authorized on unanimous round-2 non-BLOCK verdicts.",
-      "refs": [
-        "harness/adversarial/verdicts/0001-S1-gate.md"
-      ]
-    },
-    {
-      "id": "D-0011",
-      "type": "decision",
-      "label": "Record numbering + blob hashes",
-      "status": "binding",
-      "summary": "Record numbers are sequence numbers; progress reviews have no transition authority; hashes are BLOB sha256; harness/** LF-pinned via .gitattributes.",
-      "refs": [
-        "harness/WORKFLOW.md",
-        ".gitattributes"
-      ]
-    },
-    {
-      "id": "D-0012",
-      "type": "decision",
-      "label": "Progress review 0002 consensus",
-      "status": "recorded",
-      "summary": "4x PROCEED_WITH_CONDITIONS; per-host re-verify wording; 21 binding conditions copied into ROADMAP.",
-      "refs": [
-        "harness/adversarial/verdicts/0002-progress-review.md"
-      ]
-    },
-    {
-      "id": "D-0013",
-      "type": "decision",
-      "label": "Stale-binaries disclosure (v2)",
-      "status": "open_owner",
-      "summary": "Re-escalated with API-verified facts: per-OS binaries not publicly downloadable; deadline = before S1 DONE; v0.3.1 (if chosen) must precede the XChaCha20 wire change.",
-      "refs": [
-        "harness/memory/DECISIONS.md"
-      ]
-    },
-    {
-      "id": "D-0014",
-      "type": "decision",
-      "label": "Descope rule NAMED",
-      "status": "default_recorded",
-      "summary": "v1.0 ships SS + trojan over holo-tls (owner may override); tripwire N=4 session journals; terminal gate chartered.",
-      "refs": [
-        "harness/memory/ROADMAP.md"
-      ]
-    },
-    {
-      "id": "D-0015",
-      "type": "decision",
-      "label": "Memory budget 2->8 MB",
-      "status": "binding",
-      "summary": "Memory regression ceiling raised for shared-runner variance (+2520 KB observed vs 2 MB assert; local +88-376 KB); catches per-chunk allocation regressions.",
-      "refs": [
-        "engine/crates/holo-engine/tests/integration.rs"
-      ]
-    },
-    {
-      "id": "D-0016",
-      "type": "decision",
-      "label": "pstack protocol",
-      "status": "binding",
-      "summary": "PROJECT_MEMORY.md operational layer + update_memory.py (stat summaries) + zero-noise compaction + verification contracts; harness remains authoritative.",
-      "refs": [
-        "PROJECT_MEMORY.md",
-        "update_memory.py"
-      ]
-    },
-    {
-      "id": "D-0017",
-      "type": "decision",
-      "label": "Full-tree harness audit",
-      "status": "binding",
-      "summary": "harness-audit CI = whole-tree integrity: every quoted 64-hex resolves to a tracked blob; chain lines recompute; replaces per-commit range audit.",
-      "refs": [
-        ".github/workflows/ci.yml"
-      ]
-    },
-    {
-      "id": "D-0018",
-      "type": "decision",
-      "label": "S1 item 0 shipped",
-      "status": "shipped",
-      "summary": "Windows entropy = RtlGenRandom via SystemFunction036 (LNK2019 lesson); data-dir HOLONET_DATA->HOME->USERPROFILE->hard-error (CWD fallback removed); ACL = per-user profile ACLs, no extra FFI.",
-      "refs": [
-        "engine/crates/holo-util/src/rand.rs",
-        "engine/crates/holonetd/src/main.rs"
-      ]
-    },
-    {
-      "id": "D-0027",
-      "type": "decision",
-      "label": "Memory as data graph",
-      "status": "binding",
-      "summary": "harness/memory/graph/ = queryable node/edge view of the binding memory (this file); memory_graph.py check runs in CI; harness markdown stays authoritative. Originally drafted as D-0019 before the parallel-session divergence; renumbered 2026-11-21 (pushed D-0019..D-0026 belong to the cross-validation run).",
-      "refs": [
-        "harness/memory/graph/graph.json",
-        "harness/memory/graph/memory_graph.py"
-      ]
-    },
-    {
-      "id": "S0",
-      "type": "stage",
-      "label": "Core + crypto + first data plane",
-      "status": "done",
-      "summary": "v0.3.0: SS AEAD (3 ciphers), SOCKS5 pooled relay, engine wiring, Material You; released 2026-11-08.",
-      "refs": [
-        "harness/memory/ROADMAP.md"
-      ]
-    },
-    {
-      "id": "S1",
-      "type": "stage",
-      "label": "Entropy + crypto extensions",
-      "status": "in_progress",
-      "summary": "Item 0 + server-path hardening + rand-split DONE (D-0018/D-0023/D-0024; ledger 87/86/86). Remaining: BLAKE2s (orphan KATs reusable per D-0020), X25519, AES-CFB, ExpandLabel, bignum/RSA, XChaCha standard switch (now unblocked).",
-      "refs": [
-        "harness/memory/ROADMAP.md"
-      ]
-    },
-    {
-      "id": "S2",
-      "type": "stage",
-      "label": "holo-tls (TLS 1.3 client)",
-      "status": "chartered",
-      "summary": "From-scratch RFC 8446; SPKI pinning on raw DER (no X.509 parser); SNI masking defined-or-cut; ONE TLS driver wired into session.connect.",
-      "refs": [
-        "harness/memory/ROADMAP.md"
-      ]
-    },
-    {
-      "id": "S3",
-      "type": "stage",
-      "label": "holo-quic (QUIC v1, client-relay profile)",
-      "status": "chartered",
-      "summary": "Rescoped: no 0-RTT/migration/qlog/v2; reuses holo-net CUBIC.",
-      "refs": [
-        "harness/memory/ROADMAP.md"
-      ]
-    },
-    {
-      "id": "S4",
-      "type": "stage",
-      "label": "Config importers",
-      "status": "chartered",
-      "summary": "Clash YAML, V2Ray/sing-box JSON, WG/AmneziaWG INI, base64 subscriptions (share-links already live).",
-      "refs": [
-        "harness/memory/ROADMAP.md"
-      ]
-    },
-    {
-      "id": "S5",
-      "type": "stage",
-      "label": "Providers (split S5a/S5b)",
-      "status": "chartered_blocked",
-      "summary": "S5a: VPN Gate + <=2 providers; S5b descope-eligible; blocked on owner credentials decision.",
-      "refs": [
-        "harness/memory/ROADMAP.md"
-      ]
-    },
-    {
-      "id": "S6",
-      "type": "stage",
-      "label": "System crates",
-      "status": "chartered_blocked",
-      "summary": "TUN/killswitch/etc; blocked on D-0002/D-0008 policy pre-decision (FFI scope, wintun.dll, Windows killswitch).",
-      "refs": [
-        "harness/memory/ROADMAP.md"
-      ]
-    },
-    {
-      "id": "S7",
-      "type": "stage",
-      "label": "Frontends + packaging",
-      "status": "chartered",
-      "summary": "Wire live status into Flutter/KMP/Qt; NSIS (not MSIX, Win7); flatpak proxy-mode-only; notarization/Play = owner cost decisions.",
-      "refs": [
-        "harness/memory/ROADMAP.md"
-      ]
-    },
-    {
-      "id": "GATE-0001",
-      "type": "gate_record",
-      "label": "Gate 0001 (S0->S1)",
-      "status": "passed",
-      "summary": "Round 1: A2 BLOCK; remediation 53ff229; round 2 unanimous non-BLOCK. Chain: genesis.",
-      "refs": [
-        "harness/adversarial/verdicts/0001-S1-gate.md"
-      ]
-    },
-    {
-      "id": "REVIEW-0002",
-      "type": "gate_record",
-      "label": "Progress review 0002",
-      "status": "passed",
-      "summary": "4x PROCEED_WITH_CONDITIONS, 0 BLOCK; NO transition authority; chain: 0001 blob.",
-      "refs": [
-        "harness/adversarial/verdicts/0002-progress-review.md"
-      ]
-    },
-    {
-      "id": "GATE-0003",
-      "type": "gate_record",
-      "label": "S1->S2 gate (pending)",
-      "status": "pending",
-      "summary": "Next record number; checks S1 acceptance incl. all carried conditions.",
-      "refs": [
-        "harness/memory/ROADMAP.md"
-      ]
-    },
-    {
-      "id": "A1-C1",
-      "type": "condition",
-      "label": "A1-C1 ubuntu CI diagnosed",
-      "status": "closed",
-      "summary": "Named failing test (memory_stays_bounded runner variance); fixed via D-0015; run 44234338593 green.",
-      "refs": [
-        "harness/adversarial/verdicts/0002-progress-review.md"
-      ]
-    },
-    {
-      "id": "A1-C2",
-      "type": "condition",
-      "label": "A1-C2 1.77.2 floor restored",
-      "status": "closed",
-      "summary": "Root cause Cargo.lock v3->v4 in 53ff229; restored v3; legacy job green.",
-      "refs": [
-        "engine/Cargo.lock"
-      ]
-    },
-    {
-      "id": "A1-C3",
-      "type": "condition",
-      "label": "A1-C3 README releases reality",
-      "status": "closed",
-      "summary": "Releases section rewritten to API-verified surface; D-0013 reconciliation recorded.",
-      "refs": [
-        "README.md"
-      ]
-    },
-    {
-      "id": "A1-C4",
-      "type": "condition",
-      "label": "A1-C4 OpenSSL claim honesty",
-      "status": "closed",
-      "summary": "README reworded (journals lost in recycle); re-running cross-checks as recorded evidence is an S1 charter item.",
-      "refs": [
-        "README.md"
-      ]
-    },
-    {
-      "id": "A1-C5",
-      "type": "condition",
-      "label": "A1-C5 STATE full CI disclosure",
-      "status": "closed",
-      "summary": "STATE discloses full CI state + per-host re-verify; prompts archived in end-of-run backup.",
-      "refs": [
-        "harness/memory/STATE.md"
-      ]
-    },
-    {
-      "id": "A2-C1",
-      "type": "condition",
-      "label": "A2-C1 salt-replay cache",
-      "status": "closed",
-      "summary": "CLOSED: SaltCache landed (D-0023, cap-1024 FIFO, opaque refusal, named test); THREAT-MODEL C amended.",
-      "refs": [
-        "docs/THREAT-MODEL.md",
-        "harness/memory/ROADMAP.md"
-      ]
-    },
-    {
-      "id": "A2-C2",
-      "type": "condition",
-      "label": "A2-C2 Windows secret-at-rest",
-      "status": "closed",
-      "summary": "Data-dir resolution hardened + test; ACL decision D-0018 in THREAT-MODEL G; landed with S1 item 0.",
-      "refs": [
-        "engine/crates/holonetd/src/main.rs"
-      ]
-    },
-    {
-      "id": "A2-C3",
-      "type": "condition",
-      "label": "A2-C3 D-0009 deadline",
-      "status": "closed",
-      "summary": "CLOSED: D-0025 (advisory + GHSA + v0.3.1 supersession) before the XChaCha wire change.",
-      "refs": [
-        "harness/memory/DECISIONS.md"
-      ]
-    },
-    {
-      "id": "A2-C4",
-      "type": "condition",
-      "label": "A2-C4 carried checks at gate 0003",
-      "status": "open_gate0003",
-      "summary": "Gate-0003(now 0004) checklist; most carried checks LANDED (rand-split D-0024, ProbeGuard decay + jittered slow-close D-0023, off-loopback A3-C4); residual: close-vs-hang uniformity, XChaCha standard switch.",
-      "refs": [
-        "harness/memory/ROADMAP.md"
-      ]
-    },
-    {
-      "id": "A3-C1",
-      "type": "condition",
-      "label": "A3-C1 numbering decoupled pre-push",
-      "status": "closed",
-      "summary": "WORKFLOW 2.6 + ROADMAP rewrites landed before record 0002 push.",
-      "refs": [
-        "harness/WORKFLOW.md"
-      ]
-    },
-    {
-      "id": "A3-C2",
-      "type": "condition",
-      "label": "A3-C2 descope named + tripwire + terminal gate",
-      "status": "closed_ownerconfirm",
-      "summary": "Landed as D-0014 (trojan default; owner may override); tripwire N=4; terminal gate chartered; S2 driver deliverable merged into charter.",
-      "refs": [
-        "harness/memory/ROADMAP.md"
-      ]
-    },
-    {
-      "id": "A3-C3",
-      "type": "condition",
-      "label": "A3-C3 S1 ordering + red window",
-      "status": "closed",
-      "summary": "Item 0 merged first; windows-latest full suite green REQUIRED; expected-red scaffolding removed at completion; 1.77.2 msvc check added.",
-      "refs": [
-        ".github/workflows/ci.yml"
-      ]
-    },
-    {
-      "id": "A3-C4",
-      "type": "condition",
-      "label": "A3-C4 off-loopback refusal in S1",
-      "status": "closed",
-      "summary": "CLOSED: loopback-only proxy_listen bind (D-0023) with HOLONET_PROXY_LISTEN_ANY override + named tests.",
-      "refs": [
-        "harness/memory/ROADMAP.md"
-      ]
-    },
-    {
-      "id": "A3-C5",
-      "type": "condition",
-      "label": "A3-C5 1M-vector execution mode",
-      "status": "closed",
-      "summary": "Charter annotation: release-mode-only or opt-in cfg; never default debug CI.",
-      "refs": [
-        "harness/memory/ROADMAP.md"
-      ]
-    },
-    {
-      "id": "A3-C6",
-      "type": "condition",
-      "label": "A3-C6 S1 charter annotations",
-      "status": "closed",
-      "summary": "BLAKE2b cut-or-justify; constant-time bar; S2 no-X.509; SNI masking defined-or-cut; OpenSSL cross-check grep of S1 journal.",
-      "refs": [
-        "harness/memory/ROADMAP.md"
-      ]
-    },
-    {
-      "id": "A3-C7",
-      "type": "condition",
-      "label": "A3-C7 owner decisions at session start",
-      "status": "closed",
-      "summary": "CLOSED: owner decisions made (D-0025 release resolution; D-0026 S5 credentials embedded-with-risk-acceptance).",
-      "refs": [
-        "harness/memory/ROADMAP.md"
-      ]
-    },
-    {
-      "id": "A3-C8",
-      "type": "condition",
-      "label": "A3-C8 S6 policy pre-decision",
-      "status": "open_future",
-      "summary": "Amend D-0002/D-0008 for TUN/killswitch FFI + wintun.dll policy at/before S5->S6 gate.",
-      "refs": [
-        "harness/memory/ROADMAP.md"
-      ]
-    },
-    {
-      "id": "A4-C1",
-      "type": "condition",
-      "label": "A4-C1 LF pinning + blob-hash rule",
-      "status": "closed",
-      "summary": ".gitattributes harness/** eol=lf; WORKFLOW 2.6; D-0011.",
-      "refs": [
-        ".gitattributes"
-      ]
-    },
-    {
-      "id": "A4-C2",
-      "type": "condition",
-      "label": "A4-C2 harness-audit strengthening",
-      "status": "closed",
-      "summary": "Full-tree integrity audit (hash equality + chain recompute), D-0017; CI-verified run 44494124628.",
-      "refs": [
-        ".github/workflows/ci.yml"
-      ]
-    },
-    {
-      "id": "A4-C3",
-      "type": "condition",
-      "label": "A4-C3 backup.sh hardening",
-      "status": "closed",
-      "summary": "Rebase/unmerged/cherry-pick refusal with recovery commands; WARN durability + error capture; negative-tested.",
-      "refs": [
-        "harness/scripts/backup.sh"
-      ]
-    },
-    {
-      "id": "A4-C4",
-      "type": "condition",
-      "label": "A4-C4 Windows restore runbook",
-      "status": "closed",
-      "summary": "SANDBOX-RESTORE Windows variant + 4W toolchain-less fallback + per-host STATE wording.",
-      "refs": [
-        "harness/memory/SANDBOX-RESTORE.md"
-      ]
-    },
-    {
-      "id": "A4-C5",
-      "type": "condition",
-      "label": "A4-C5 record 0002 scope statement",
-      "status": "closed",
-      "summary": "Record states progress review, no transition authority; DECISIONS entry (D-0011).",
-      "refs": [
-        "harness/adversarial/verdicts/0002-progress-review.md"
-      ]
-    },
-    {
-      "id": "A4-C6",
-      "type": "condition",
-      "label": "A4-C6 future-gate mechanics",
-      "status": "open_future",
-      "summary": "Gate records list remediation-touched files vs blocking scope; reviewers quote own prompt SHA-256 (adopted for gate 0003+).",
-      "refs": [
-        "harness/adversarial/verdicts/0002-progress-review.md"
-      ]
-    },
-    {
-      "id": "OD-v031",
-      "type": "owner_decision",
-      "label": "Advisory vs v0.3.1",
-      "status": "decided",
-      "summary": "DECIDED via D-0025: advisory + GHSA + v0.3.1 (4 per-OS tags, signed, checksummed); stale drafts deleted.",
-      "refs": [
-        "harness/memory/DECISIONS.md"
-      ]
-    },
-    {
-      "id": "OD-s5creds",
-      "type": "owner_decision",
-      "label": "S5 credentials model",
-      "status": "decided",
-      "summary": "DECIDED via D-0026: embedded with recorded risk-acceptance (operational only; fixtures synthetic).",
-      "refs": [
-        "harness/memory/ROADMAP.md"
-      ]
-    },
-    {
-      "id": "OD-d0014",
-      "type": "owner_decision",
-      "label": "Confirm trojan descope",
-      "status": "pending",
-      "summary": "Confirm or override D-0014 default (trojan over holo-tls as v1.0 second protocol).",
-      "refs": [
-        "harness/memory/DECISIONS.md"
-      ]
-    },
-    {
-      "id": "holo-util",
-      "type": "component",
-      "label": "holo-util",
-      "status": "live",
-      "summary": "hex/base64/JSON + rand (entropy split, sole unsafe).",
-      "refs": [
-        "engine/crates/holo-util"
-      ]
-    },
-    {
-      "id": "holo-crypto",
-      "type": "component",
-      "label": "holo-crypto",
-      "status": "live",
-      "summary": "ChaCha20/Poly1305/AEAD/XChaCha20/AES-256-GCM/SHA-2/HMAC/HKDF/EVP; 17 vector tests.",
-      "refs": [
-        "engine/crates/holo-crypto"
-      ]
-    },
-    {
-      "id": "holo-net",
-      "type": "component",
-      "label": "holo-net",
-      "status": "live",
-      "summary": "RTT/RTO, CUBIC+HyStart++, BBR-model, DRR, CoDel, pacing, padding, ProbeGuard, BufferPool.",
-      "refs": [
-        "engine/crates/holo-net"
-      ]
-    },
-    {
-      "id": "holo-ss",
-      "type": "component",
-      "label": "holo-ss",
-      "status": "live",
-      "summary": "SIP004 AEAD client+server, 3 ciphers, anti-probing; XChaCha wire is non-standard (gap).",
-      "refs": [
-        "engine/crates/holo-ss"
-      ]
-    },
-    {
-      "id": "holo-socks",
-      "type": "component",
-      "label": "holo-socks",
-      "status": "live",
-      "summary": "RFC 1928/1929 CONNECT-only pooled relay, DRR shaping.",
-      "refs": [
-        "engine/crates/holo-socks"
-      ]
-    },
-    {
-      "id": "holo-engine",
-      "type": "component",
-      "label": "holo-engine",
-      "status": "live",
-      "summary": "Session/dispatch (default-deny milestone errors), IPC token (ct_eq), theme service.",
-      "refs": [
-        "engine/crates/holo-engine"
-      ]
-    },
-    {
-      "id": "holo-config",
-      "type": "component",
-      "label": "holo-config",
-      "status": "live",
-      "summary": "Profiles store + 7-scheme share-link importer.",
-      "refs": [
-        "engine/crates/holo-config"
-      ]
-    },
-    {
-      "id": "holo-theme",
-      "type": "component",
-      "label": "holo-theme",
-      "status": "live",
-      "summary": "M3 color engine (33 roles, golden vectors).",
-      "refs": [
-        "engine/crates/holo-theme"
-      ]
-    },
-    {
-      "id": "holo-proto",
-      "type": "component",
-      "label": "holo-proto",
-      "status": "live",
-      "summary": "Driver SPI + params registry.",
-      "refs": [
-        "engine/crates/holo-proto"
-      ]
-    },
-    {
-      "id": "holonetd",
-      "type": "component",
-      "label": "holonetd",
-      "status": "live",
-      "summary": "Daemon: IPC + theme; hardened data-dir resolution.",
-      "refs": [
-        "engine/crates/holonetd"
-      ]
-    },
-    {
-      "id": "holonetctl",
-      "type": "component",
-      "label": "holonetctl",
-      "status": "live",
-      "summary": "CLI client; honest entropy error.",
-      "refs": [
-        "engine/crates/holonetctl"
-      ]
-    },
-    {
-      "id": "app-frontends",
-      "type": "component",
-      "label": "Flutter/KMP/Qt frontends",
-      "status": "live",
-      "summary": "Material You UIs speaking NDJSON JSON-RPC; live tunnel status wiring is S7.",
-      "refs": [
-        "app_flutter",
-        "app_kmp",
-        "app_qt"
-      ]
-    },
-    {
-      "id": "T-entropy-fail-closed",
-      "type": "test",
-      "label": "os_entropy_fails_closed_on_unreadable_source",
-      "status": "passing",
-      "summary": "Unix bad-path -> Err, never weak fallback.",
-      "refs": [
-        "engine/crates/holo-util/src/rand.rs"
-      ]
-    },
-    {
-      "id": "T-entropy-win-success",
-      "type": "test",
-      "label": "os_entropy_succeeds_and_is_nonzero_windows",
-      "status": "passing",
-      "summary": "RtlGenRandom contract: real entropy, not all-zero.",
-      "refs": [
-        "engine/crates/holo-util/src/rand.rs"
-      ]
-    },
-    {
-      "id": "T-entropy-win-fail-closed",
-      "type": "test",
-      "label": "os_entropy_fails_closed_on_ffi_failure_windows",
-      "status": "passing",
-      "summary": "Injected FFI failure -> Err, zero bytes produced.",
-      "refs": [
-        "engine/crates/holo-util/src/rand.rs"
-      ]
-    },
-    {
-      "id": "T-datadir-no-cwd",
-      "type": "test",
-      "label": "data_dir_resolution_order_and_no_cwd_fallback",
-      "status": "passing",
-      "summary": "HOLONET_DATA wins; no home -> hard Err; never CWD.",
-      "refs": [
-        "engine/crates/holonetd/src/main.rs"
-      ]
-    },
-    {
-      "id": "T-mem-bounded",
-      "type": "test",
-      "label": "memory_stays_bounded_under_sustained_relay",
-      "status": "passing",
-      "summary": "RSS growth < 8 MB over 64 MB relayed (D-0015); Linux-only.",
-      "refs": [
-        "engine/crates/holo-engine/tests/integration.rs"
-      ]
-    },
-    {
-      "id": "T-ss-probe-tests",
-      "type": "test",
-      "label": "oversized_length / tampered_salt tests",
-      "status": "passing",
-      "summary": "Probe resistance regressions for holo-ss.",
-      "refs": [
-        "engine/crates/holo-ss/src/lib.rs"
-      ]
-    },
-    {
-      "id": "T-salt-replay-planned",
-      "type": "test",
-      "label": "salt-replay rejection test (planned)",
-      "status": "planned",
-      "summary": "A2-C1 named test: replayed salt+first-chunk connection rejected opaquely.",
-      "refs": [
-        "harness/memory/ROADMAP.md"
-      ]
-    },
-    {
-      "id": "T-loopback-refusal-planned",
-      "type": "test",
-      "label": "off-loopback bind refusal test (planned)",
-      "status": "planned",
-      "summary": "A3-C4 named test: 0.0.0.0/:: bind refused without override.",
-      "refs": [
-        "harness/memory/ROADMAP.md"
-      ]
-    },
-    {
-      "id": "CI-ubuntu",
-      "type": "ci_job",
-      "label": "Test (ubuntu-latest)",
-      "status": "green",
-      "summary": "Full suite, required.",
-      "refs": [
-        ".github/workflows/ci.yml"
-      ]
-    },
-    {
-      "id": "CI-windows",
-      "type": "ci_job",
-      "label": "Test (windows-latest)",
-      "status": "green",
-      "summary": "Full suite, REQUIRED since S1 item 0 (2026-11-20).",
-      "refs": [
-        ".github/workflows/ci.yml"
-      ]
-    },
-    {
-      "id": "CI-macos",
-      "type": "ci_job",
-      "label": "Test (macos-latest)",
-      "status": "green",
-      "summary": "Full suite, required.",
-      "refs": [
-        ".github/workflows/ci.yml"
-      ]
-    },
-    {
-      "id": "CI-legacy",
-      "type": "ci_job",
-      "label": "Rust 1.77.2 compatibility",
-      "status": "green",
-      "summary": "Host check + x86_64-pc-windows-msvc check (no link).",
-      "refs": [
-        ".github/workflows/ci.yml"
-      ]
-    },
-    {
-      "id": "CI-cross",
-      "type": "ci_job",
-      "label": "Cross-compile check",
-      "status": "green",
-      "summary": "musl + Android targets.",
-      "refs": [
-        ".github/workflows/ci.yml"
-      ]
-    },
-    {
-      "id": "CI-audit",
-      "type": "ci_job",
-      "label": "Harness audit (full tree)",
-      "status": "green",
-      "summary": "Hash resolution + chain recompute (D-0017) + memory-graph check (D-0019).",
-      "refs": [
-        ".github/workflows/ci.yml"
-      ]
-    },
-    {
-      "id": "TH-A",
-      "type": "threat",
-      "label": "Local co-resident adversary",
-      "status": "in_scope_partial",
-      "summary": "IPC token fail-closed+ct_eq; 0600 unix; Windows = per-user ACLs (D-0018); root/ptrace out of scope.",
-      "refs": [
-        "docs/THREAT-MODEL.md"
-      ]
-    },
-    {
-      "id": "TH-B",
-      "type": "threat",
-      "label": "On-path DPI censor",
-      "status": "in_scope",
-      "summary": "Primary adversary; AEAD randomness + padding; TLS/QUIC staged.",
-      "refs": [
-        "docs/THREAT-MODEL.md"
-      ]
-    },
-    {
-      "id": "TH-C",
-      "type": "threat",
-      "label": "Active prober",
-      "status": "in_scope",
-      "summary": "Opaque errors, backoff, oversized-length rejection; replay NOT yet defended (gap).",
-      "refs": [
-        "docs/THREAT-MODEL.md"
-      ]
-    },
-    {
-      "id": "TH-D",
-      "type": "threat",
-      "label": "Upstream observer",
-      "status": "by_design",
-      "summary": "Exit sees destinations; trust decision.",
-      "refs": [
-        "docs/THREAT-MODEL.md"
-      ]
-    },
-    {
-      "id": "TH-E",
-      "type": "threat",
-      "label": "Supply chain",
-      "status": "in_scope_partial",
-      "summary": "Zero deps; SHA256SUMS on release jobs; signing = ops backlog (R-14).",
-      "refs": [
-        "docs/THREAT-MODEL.md"
-      ]
-    },
-    {
-      "id": "TH-F",
-      "type": "threat",
-      "label": "Implementation side channels",
-      "status": "out_of_scope",
-      "summary": "AES table-based timing accepted; ChaCha default recommended; ct_eq for MACs.",
-      "refs": [
-        "docs/THREAT-MODEL.md"
-      ]
-    },
-    {
-      "id": "TH-G",
-      "type": "threat",
-      "label": "Entropy (cross-cutting)",
-      "status": "in_scope",
-      "summary": "Fail-closed everywhere; Windows shipped via RtlGenRandom (D-0018); provenance documented.",
-      "refs": [
-        "docs/THREAT-MODEL.md"
-      ]
-    },
-    {
-      "id": "GAP-replay",
-      "type": "gap",
-      "label": "No salt-replay cache",
-      "status": "closed",
-      "summary": "CLOSED by D-0023 SaltCache (cap-1024 FIFO, opaque replay refusal, named test).",
-      "refs": [
-        "docs/THREAT-MODEL.md"
-      ]
-    },
-    {
-      "id": "GAP-xchacha",
-      "type": "gap",
-      "label": "XChaCha wire non-standard",
-      "status": "chartered_s1",
-      "summary": "hchacha20(key, zero_iv) mislabel; interop defect not confidentiality break; fix or honest de-scope + disclose on re-release.",
-      "refs": [
-        "engine/crates/holo-ss/src/lib.rs"
-      ]
-    },
-    {
-      "id": "GAP-probeguard",
-      "type": "gap",
-      "label": "ProbeGuard unbounded maps",
-      "status": "closed",
-      "summary": "CLOSED by D-0023 (decay, cap-1024).",
-      "refs": [
-        "engine/crates/holo-net/src/lib.rs"
-      ]
-    },
-    {
-      "id": "GAP-slowclose",
-      "type": "gap",
-      "label": "Deterministic slow-close + close-vs-hang",
-      "status": "open_residual",
-      "summary": "PARTIALLY closed by D-0023 (CSPRNG full-jitter + explicit 2s ceiling, read deadline 10s); close-vs-hang uniformity residual.",
-      "refs": [
-        "docs/THREAT-MODEL.md"
-      ]
-    },
-    {
-      "id": "L-lockfile-v4",
-      "type": "lesson",
-      "label": "Cargo silently rewrites lockfile v3->v4",
-      "status": "active",
-      "summary": "Breaks cargo 1.77.2; re-check engine/Cargo.lock after every cargo run.",
-      "refs": [
-        "harness/memory/LESSONS.md"
-      ]
-    },
-    {
-      "id": "L-runner-rss",
-      "type": "lesson",
-      "label": "Shared-runner RSS variance",
-      "status": "active",
-      "summary": "Memory-assert budgets need runner margin (D-0015: 8 MB over 64 MB).",
-      "refs": [
-        "harness/memory/LESSONS.md"
-      ]
-    },
-    {
-      "id": "L-systemfunction036",
-      "type": "lesson",
-      "label": "RtlGenRandom links as SystemFunction036",
-      "status": "active",
-      "summary": "Header macro; import-lib export name required; check-only cross-compile cannot catch it.",
-      "refs": [
-        "harness/memory/LESSONS.md"
-      ]
-    },
-    {
-      "id": "L-socks-log-redirect",
-      "type": "lesson",
-      "label": "Socks suite hidden in CI logs",
-      "status": "active",
-      "summary": "Redirected to socks-test.log; add 5 to naive log-summed test counts.",
-      "refs": [
-        "harness/memory/LESSONS.md"
-      ]
-    },
-    {
-      "id": "L-invalid-workflow",
-      "type": "lesson",
-      "label": "Invalid workflow YAML signature",
-      "status": "active",
-      "summary": "Run fails with 0 jobs, name = file path, no check-runs; validate YAML locally; keep GHA expressions conservative.",
-      "refs": [
-        "harness/memory/LESSONS.md"
-      ]
-    },
-    {
-      "id": "L-orchestration",
-      "type": "lesson",
-      "label": "Multi-agent orchestration limits",
-      "status": "active",
-      "summary": "Concurrency waves <=2-3; resume agents near completion instead of restarting; verify agent IDs against original prompts on resume.",
-      "refs": [
-        "harness/memory/LESSONS.md"
-      ]
-    },
-    {
-      "id": "L-claim-rot",
-      "type": "lesson",
-      "label": "Claim rot",
-      "status": "active",
-      "summary": "Re-count every quoted number from tree/CI at every gate; locally-green and CI-green are different claims.",
-      "refs": [
-        "harness/memory/LESSONS.md"
-      ]
-    },
-    {
-      "id": "L-phantom-backup",
-      "type": "lesson",
-      "label": "Phantom backups + FAILED markers",
-      "status": "active",
-      "summary": "Pre-push log lines prove nothing; FAILED/WARN markers are durable facts (backup.sh).",
-      "refs": [
-        "harness/memory/LESSONS.md"
-      ]
-    },
-    {
-      "id": "L-crlf-blobhash",
-      "type": "lesson",
-      "label": "CRLF breaks working-tree hashes",
-      "status": "active",
-      "summary": "Verify hash anchors at blob level; harness/** LF-pinned.",
-      "refs": [
-        "harness/memory/LESSONS.md"
-      ]
-    },
-    {
-      "id": "L-cred-logs",
-      "type": "lesson",
-      "label": "Authenticated CI log access",
-      "status": "active",
-      "summary": "Anonymous = 403 on logs; owner cached credential works (git credential fill, never echo); Copilot cloud sandbox for real execution.",
-      "refs": [
-        "harness/memory/LESSONS.md"
-      ]
-    },
-    {
-      "id": "SES-2026-11-13",
-      "type": "session",
-      "label": "Harness + gate 0001",
-      "status": "recorded",
-      "summary": "Harness installed; gate 0001 passed; hardening landed.",
-      "refs": [
-        "harness/memory/sessions/2026-11-13-harness-gate0001.md"
-      ]
-    },
-    {
-      "id": "SES-2026-11-17",
-      "type": "session",
-      "label": "Progress review 0002",
-      "status": "recorded",
-      "summary": "Adversarial panel + forensics + research; roadmap amended; D-0011..D-0014.",
-      "refs": [
-        "harness/memory/sessions/2026-11-17-progress-review.md"
-      ]
-    },
-    {
-      "id": "SES-2026-11-18",
-      "type": "session",
-      "label": "CI diagnosis",
-      "status": "recorded",
-      "summary": "A1-C1/C2 closed; D-0015; authenticated log access.",
-      "refs": [
-        "harness/memory/sessions/2026-11-18-ci-diagnosis.md"
-      ]
-    },
-    {
-      "id": "SES-2026-11-19",
-      "type": "session",
-      "label": "pstack protocol",
-      "status": "recorded",
-      "summary": "D-0016; PROJECT_MEMORY.md; update_memory.py.",
-      "refs": [
-        "harness/memory/sessions/2026-11-19-pstack-protocol.md"
-      ]
-    },
-    {
-      "id": "SES-2026-11-19b",
-      "type": "session",
-      "label": "Harness hardening",
-      "status": "recorded",
-      "summary": "A4-C2/C3 closed (D-0017); CI-verified.",
-      "refs": [
-        "harness/memory/sessions/2026-11-19b-harness-hardening.md"
-      ]
-    },
-    {
-      "id": "SES-2026-11-20",
-      "type": "session",
-      "label": "S1 item 0",
-      "status": "recorded",
-      "summary": "Windows FFI shipped; ledger 76/75/75; first all-required-green run.",
-      "refs": [
-        "harness/memory/sessions/2026-11-20-s1-item0.md"
-      ]
-    },
-    {
-      "id": "TOOL-backup",
-      "type": "tool",
-      "label": "harness/scripts/backup.sh",
-      "status": "live",
-      "summary": "Mandated final step of every run; event-driven; guards + durable markers.",
-      "refs": [
-        "harness/scripts/backup.sh"
-      ]
-    },
-    {
-      "id": "TOOL-update-memory",
-      "type": "tool",
-      "label": "update_memory.py",
-      "status": "live",
-      "summary": "Zero-noise git-activity section for PROJECT_MEMORY.md; HOLO_MEMORY_FULL_DIFF=1 for patches.",
-      "refs": [
-        "update_memory.py"
-      ]
-    },
-    {
-      "id": "TOOL-memory-graph",
-      "type": "tool",
-      "label": "memory_graph.py",
-      "status": "live",
-      "summary": "check/query/dot/stats over graph.json; check runs in CI harness-audit.",
-      "refs": [
-        "harness/memory/graph/memory_graph.py"
-      ]
-    },
-    {
-      "id": "TOOL-project-memory",
-      "type": "tool",
-      "label": "PROJECT_MEMORY.md",
-      "status": "live",
-      "summary": "Operational layer: invariants, playbook, verification contracts.",
-      "refs": [
-        "PROJECT_MEMORY.md"
-      ]
-    },
-    {
-      "id": "ROLE-A1",
-      "type": "role",
-      "label": "Reliability Skeptic",
-      "status": "standing",
-      "summary": "Claims vs evidence; test meaningfulness; milestone honesty.",
-      "refs": [
-        "harness/ADVERSARIAL.md"
-      ]
-    },
-    {
-      "id": "ROLE-A2",
-      "type": "role",
-      "label": "Security Red",
-      "status": "standing",
-      "summary": "Threat model; crypto; entropy; secrets; user safety.",
-      "refs": [
-        "harness/ADVERSARIAL.md"
-      ]
-    },
-    {
-      "id": "ROLE-A3",
-      "type": "role",
-      "label": "Strategy Adversary",
-      "status": "standing",
-      "summary": "Sequencing; scope realism; descope; measurability.",
-      "refs": [
-        "harness/ADVERSARIAL.md"
-      ]
-    },
-    {
-      "id": "ROLE-A4",
-      "type": "role",
-      "label": "Process Auditor",
-      "status": "standing",
-      "summary": "Harness itself; consensus failure modes; backup integrity; rubber-stamp risk.",
-      "refs": [
-        "harness/ADVERSARIAL.md"
-      ]
-    },
-    {
-      "id": "TOOL-memory-rag",
-      "type": "tool",
-      "label": "memory_rag.py",
-      "status": "live",
-      "summary": "RAG over the corpus + graph (D-0028): BM25 chunk retrieval (heading-chunked, id-preserving tokens) + graph-context expansion; ask/--json/smoke; index built per invocation (no staleness); smoke runs in CI.",
-      "refs": [
-        "harness/memory/graph/memory_rag.py",
-        "harness/memory/DECISIONS.md"
-      ]
-    },
-    {
-      "id": "D-0019",
-      "type": "decision",
-      "label": "Cross-validation review 0003 PASSED",
-      "status": "recorded",
-      "summary": "Second independent panel (different sandbox) reviewed the same baseline: 4/4 PROCEED_WITH_CONDITIONS, matching 0002. Mid-run remote divergence documented verbatim; residual conditions applied; WORKFLOW 4.4 (untracked-stray triage) added. S1->S2 gate will be record 0004 (D-0011 numbering).",
-      "refs": [
-        "harness/adversarial/verdicts/0003-cross-validation.md"
-      ]
-    },
-    {
-      "id": "D-0020",
-      "type": "decision",
-      "label": "Orphan blake2.rs disposition",
-      "status": "recorded",
-      "summary": "Untracked holo-crypto/src/blake2.rs was doubly broken (SIGMA E0425; 3/5 own KATs fail when m[2]!=m[8] -> mis-transcribed SIGMA row) and never compiled; moved OUT of every tree. Its 32 KAT expectations ARE authentic (OpenSSL-verified) and reusable in S1; the code is not.",
-      "refs": [
-        "harness/memory/DECISIONS.md"
-      ]
-    },
-    {
-      "id": "D-0021",
-      "type": "decision",
-      "label": "pstack re-affirmed + memory hooks",
-      "status": "binding",
-      "summary": "Owner re-affirmed the protocol; memory hooks with --check gate; PROJECT_MEMORY refreshed; Cargo.lock v4 regression on origin/main restored to v3.",
-      "refs": [
-        "harness/memory/DECISIONS.md"
-      ]
-    },
-    {
-      "id": "D-0022",
-      "type": "decision",
-      "label": "backup.sh retry mechanics",
-      "status": "binding",
-      "summary": "Push-retry path recorded after run-4/5 push failures (FAILED markers + retry landed).",
-      "refs": [
-        "harness/memory/DECISIONS.md"
-      ]
-    },
-    {
-      "id": "D-0023",
-      "type": "decision",
-      "label": "S1 server-path hardening",
-      "status": "shipped",
-      "summary": "A2-C1 SaltCache (cap-1024 FIFO, opaque replay refusal, named test), A3-C4 loopback-only proxy_listen bind (HOLONET_PROXY_LISTEN_ANY override, named tests), ProbeGuard decay cap-1024, CSPRNG full-jitter slow-close with explicit 2s ceiling, A2-F6 auth read deadline 10s.",
-      "refs": [
-        "engine/crates/holo-ss/src/lib.rs",
-        "engine/crates/holo-net/src/lib.rs"
-      ]
-    },
-    {
-      "id": "D-0024",
-      "type": "decision",
-      "label": "rand-split enforcement",
-      "status": "shipped",
-      "summary": "Weak PRNG behind rand::nosec (doc-hidden), re-exports closed, workspace audit test allowlist-enforced; negative demos live (audit FAIL with file:line + E0425). Closes the gate-0001 A2-C3 binding condition.",
-      "refs": [
-        "engine/crates/holo-util/src/rand.rs"
-      ]
-    },
-    {
-      "id": "D-0025",
-      "type": "decision",
-      "label": "RESOLVED: advisory + GHSA + v0.3.1",
-      "status": "shipped",
-      "summary": "Owner resolved D-0009/D-0013: security advisory + GHSA published, v0.3.1 cut from CI-verified tree as 4 per-OS tags + main release (advisory + checksum manifest + signature; ssh-keygen minisign-style, private key not in repo), stale drafts deleted. Pure security re-release - decided BEFORE the XChaCha wire change, which is now UNBLOCKED.",
-      "refs": [
-        "harness/memory/DECISIONS.md"
-      ]
-    },
-    {
-      "id": "D-0026",
-      "type": "decision",
-      "label": "S5 credentials model decided",
-      "status": "binding",
-      "summary": "Owner chose embedded-with-recorded-risk-acceptance; AMENDS D-0001 for S5 operational credentials only (session secrets stay env-var-only; S5 test fixtures stay synthetic; one documented config module with rotation/burn path in THREAT-MODEL E; VPN Gate first).",
-      "refs": [
-        "harness/memory/DECISIONS.md"
-      ]
-    },
-    {
-      "id": "REVIEW-0003",
-      "type": "gate_record",
-      "label": "Cross-validation review 0003",
-      "status": "passed",
-      "summary": "Independent panel, 4/4 PROCEED_WITH_CONDITIONS; no transition authority (S1->S2 = record 0004). Conditions archived in verdicts/0003-*.",
-      "refs": [
-        "harness/adversarial/verdicts/0003-cross-validation.md"
-      ]
-    },
-    {
-      "id": "SES-2026-11-20b",
-      "type": "session",
-      "label": "pstack re-affirm + hooks",
-      "status": "recorded",
-      "summary": "Memory hooks + --check gate; lockfile regression fixed on origin.",
-      "refs": [
-        "harness/memory/sessions/2026-11-20b-pstack-reaffirm.md"
-      ]
-    },
-    {
-      "id": "SES-2026-11-20c",
-      "type": "session",
-      "label": "S1 hardening run 4",
-      "status": "recorded",
-      "summary": "SaltCache + loopback-only bind; suite 76->83 local green.",
-      "refs": [
-        "harness/memory/sessions/2026-11-20c-s1-hardening.md"
-      ]
-    },
-    {
-      "id": "SES-2026-11-20d",
-      "type": "session",
-      "label": "S1 hardening run 5",
-      "status": "recorded",
-      "summary": "ProbeGuard decay, jittered slow-close + ceiling, read deadline; ledger 86/85/85.",
-      "refs": [
-        "harness/memory/sessions/2026-11-20d-s1-hardening2.md"
-      ]
-    },
-    {
-      "id": "SES-2026-11-20e",
-      "type": "session",
-      "label": "S1a rand-split",
-      "status": "recorded",
-      "summary": "rand::nosec + audit test; ledger 87/86/86 (run 44728988531 all-green).",
-      "refs": [
-        "harness/memory/sessions/2026-11-20e-rand-split.md"
-      ]
-    },
-    {
-      "id": "SES-2026-11-20f",
-      "type": "session",
-      "label": "Decisions + v0.3.1",
-      "status": "recorded",
-      "summary": "D-0025 advisory+GHSA+v0.3.1 cut; D-0026 S5 creds; signing keypair (private key not in repo).",
-      "refs": [
-        "harness/memory/sessions/2026-11-20f-decisions-and-v031.md"
-      ]
-    },
-    {
-      "id": "SES-2026-11-21",
-      "type": "session",
-      "label": "Memory graph + RAG",
-      "status": "recorded",
-      "summary": "D-0027/D-0028; graph.json + memory_graph.py + memory_rag.py; CI check+smoke.",
-      "refs": [
-        "harness/memory/sessions/2026-11-21-memory-graph-rag.md"
-      ]
-    },
-    {
-      "id": "D-0028",
-      "type": "decision",
-      "label": "RAG over the memory graph",
-      "status": "binding",
-      "summary": "memory_rag.py: BM25 chunk retrieval over the binding markdown corpus (heading-chunked; ids tokenize whole) + graph-context expansion (summary + 1-hop edges). ask [--json][-k]; smoke = retrieval regressions, runs in CI; per-invocation index (no staleness); lexical-not-semantic limitation stated. Read layer - markdown/graph stay authoritative.",
-      "refs": [
-        "harness/memory/graph/memory_rag.py",
-        "harness/memory/DECISIONS.md"
-      ]
-    }
+ "_meta": {
+  "schema": "holonet-memory-graph/1",
+  "purpose": "Agentic memory as a queryable data graph (D-0019). DERIVED, curated view over the binding markdown memory; on conflict the harness files are authoritative. Every node cites its sources.",
+  "node_types": [
+   "decision",
+   "stage",
+   "gate_record",
+   "condition",
+   "component",
+   "test",
+   "ci_job",
+   "threat",
+   "gap",
+   "lesson",
+   "session",
+   "owner_decision",
+   "tool",
+   "role"
   ],
-  "edges": [
-    {
-      "src": "D-0013",
-      "rel": "supersedes",
-      "dst": "D-0009",
-      "note": "re-escalation with API-verified facts + deadline"
-    },
-    {
-      "src": "D-0018",
-      "rel": "implements",
-      "dst": "D-0008",
-      "note": "S1 item 0: RtlGenRandom + data-dir"
-    },
-    {
-      "src": "D-0018",
-      "rel": "satisfies",
-      "dst": "A2-C2"
-    },
-    {
-      "src": "D-0015",
-      "rel": "satisfies",
-      "dst": "A1-C1"
-    },
-    {
-      "src": "D-0017",
-      "rel": "satisfies",
-      "dst": "A4-C2"
-    },
-    {
-      "src": "D-0027",
-      "rel": "amends",
-      "dst": "D-0016",
-      "note": "graph layer added to the operational stack"
-    },
-    {
-      "src": "D-0016",
-      "rel": "amends",
-      "dst": "D-0005",
-      "note": "operational layer over the binding workflow; backup.sh unchanged"
-    },
-    {
-      "src": "D-0010",
-      "rel": "cites",
-      "dst": "GATE-0001"
-    },
-    {
-      "src": "D-0012",
-      "rel": "cites",
-      "dst": "REVIEW-0002"
-    },
-    {
-      "src": "GATE-0001",
-      "rel": "gates",
-      "dst": "S1"
-    },
-    {
-      "src": "REVIEW-0002",
-      "rel": "amends",
-      "dst": "S1",
-      "note": "binding conditions copied into charter"
-    },
-    {
-      "src": "GATE-0003",
-      "rel": "gates",
-      "dst": "S2"
-    },
-    {
-      "src": "S0",
-      "rel": "ships",
-      "dst": "D-0003",
-      "note": "v0.2.0 Material You"
-    },
-    {
-      "src": "S1",
-      "rel": "implements",
-      "dst": "D-0008",
-      "note": "item 0 shipped; extensions pending"
-    },
-    {
-      "src": "S1",
-      "rel": "implements",
-      "dst": "D-0002",
-      "note": "crypto extensions stay std-only"
-    },
-    {
-      "src": "S2",
-      "rel": "implements",
-      "dst": "D-0014",
-      "note": "holo-tls is the descope-rule transport for trojan"
-    },
-    {
-      "src": "OD-v031",
-      "rel": "blocks",
-      "dst": "A2-C3"
-    },
-    {
-      "src": "OD-s5creds",
-      "rel": "blocks",
-      "dst": "S5"
-    },
-    {
-      "src": "A2-C1",
-      "rel": "closes",
-      "dst": "GAP-replay",
-      "note": "charter; test T-salt-replay-planned; when implemented+tested in S1"
-    },
-    {
-      "src": "A2-C4",
-      "rel": "amends",
-      "dst": "S1",
-      "note": "carried checks re-confirmed as gate-0003 checklist"
-    },
-    {
-      "src": "A3-C7",
-      "rel": "requires_decision",
-      "dst": "OD-v031"
-    },
-    {
-      "src": "A3-C7",
-      "rel": "requires_decision",
-      "dst": "OD-s5creds"
-    },
-    {
-      "src": "D-0014",
-      "rel": "requires_decision",
-      "dst": "OD-d0014"
-    },
-    {
-      "src": "T-salt-replay-planned",
-      "rel": "satisfies",
-      "dst": "A2-C1",
-      "note": "planned acceptance test"
-    },
-    {
-      "src": "T-loopback-refusal-planned",
-      "rel": "satisfies",
-      "dst": "A3-C4",
-      "note": "planned acceptance test"
-    },
-    {
-      "src": "T-ss-probe-tests",
-      "rel": "affects",
-      "dst": "TH-C"
-    },
-    {
-      "src": "TOOL-backup",
-      "rel": "part_of",
-      "dst": "D-0005"
-    },
-    {
-      "src": "TOOL-update-memory",
-      "rel": "part_of",
-      "dst": "D-0016"
-    },
-    {
-      "src": "TOOL-project-memory",
-      "rel": "part_of",
-      "dst": "D-0016"
-    },
-    {
-      "src": "TOOL-memory-graph",
-      "rel": "part_of",
-      "dst": "D-0027"
-    },
-    {
-      "src": "GAP-replay",
-      "rel": "affects",
-      "dst": "TH-C"
-    },
-    {
-      "src": "GAP-slowclose",
-      "rel": "affects",
-      "dst": "TH-C"
-    },
-    {
-      "src": "GAP-probeguard",
-      "rel": "affects",
-      "dst": "TH-C"
-    },
-    {
-      "src": "GAP-xchacha",
-      "rel": "affects",
-      "dst": "TH-B",
-      "note": "interop defect, not confidentiality"
-    },
-    {
-      "src": "L-lockfile-v4",
-      "rel": "affects",
-      "dst": "CI-legacy"
-    },
-    {
-      "src": "L-runner-rss",
-      "rel": "affects",
-      "dst": "T-mem-bounded"
-    },
-    {
-      "src": "L-systemfunction036",
-      "rel": "affects",
-      "dst": "D-0018"
-    },
-    {
-      "src": "L-socks-log-redirect",
-      "rel": "affects",
-      "dst": "CI-ubuntu"
-    },
-    {
-      "src": "L-invalid-workflow",
-      "rel": "affects",
-      "dst": "CI-audit"
-    },
-    {
-      "src": "L-crlf-blobhash",
-      "rel": "affects",
-      "dst": "D-0011"
-    },
-    {
-      "src": "L-cred-logs",
-      "rel": "affects",
-      "dst": "CI-windows",
-      "note": "log diagnosis path"
-    },
-    {
-      "src": "L-orchestration",
-      "rel": "learned_in",
-      "dst": "SES-2026-11-17"
-    },
-    {
-      "src": "L-systemfunction036",
-      "rel": "learned_in",
-      "dst": "SES-2026-11-20"
-    },
-    {
-      "src": "L-runner-rss",
-      "rel": "learned_in",
-      "dst": "SES-2026-11-18"
-    },
-    {
-      "src": "L-lockfile-v4",
-      "rel": "learned_in",
-      "dst": "SES-2026-11-18"
-    },
-    {
-      "src": "GATE-0001",
-      "rel": "reviewed_in",
-      "dst": "ROLE-A1",
-      "note": "panel roles reviewed; same for A2-A4"
-    },
-    {
-      "src": "REVIEW-0002",
-      "rel": "reviewed_in",
-      "dst": "ROLE-A2"
-    },
-    {
-      "src": "ROLE-A3",
-      "rel": "cites",
-      "dst": "D-0014",
-      "note": "conditions authored by A3"
-    },
-    {
-      "src": "ROLE-A4",
-      "rel": "cites",
-      "dst": "D-0017",
-      "note": "audit conditions authored by A4"
-    },
-    {
-      "src": "holo-util",
-      "rel": "part_of",
-      "dst": "D-0002"
-    },
-    {
-      "src": "holo-crypto",
-      "rel": "part_of",
-      "dst": "D-0002"
-    },
-    {
-      "src": "holo-ss",
-      "rel": "part_of",
-      "dst": "S0"
-    },
-    {
-      "src": "holo-socks",
-      "rel": "part_of",
-      "dst": "S0"
-    },
-    {
-      "src": "app-frontends",
-      "rel": "part_of",
-      "dst": "D-0003"
-    },
-    {
-      "src": "GAP-xchacha",
-      "rel": "part_of",
-      "dst": "holo-ss"
-    },
-    {
-      "src": "GAP-probeguard",
-      "rel": "part_of",
-      "dst": "holo-net"
-    },
-    {
-      "src": "TH-G",
-      "rel": "cites",
-      "dst": "D-0008"
-    },
-    {
-      "src": "TH-A",
-      "rel": "cites",
-      "dst": "D-0018"
-    },
-    {
-      "src": "SES-2026-11-20",
-      "rel": "implements",
-      "dst": "S1",
-      "note": "item 0 milestone"
-    },
-    {
-      "src": "SES-2026-11-17",
-      "rel": "authored",
-      "dst": "REVIEW-0002",
-      "note": "panel run that produced the record"
-    },
-    {
-      "src": "D-0018",
-      "rel": "verified_by",
-      "dst": "T-entropy-win-success"
-    },
-    {
-      "src": "D-0018",
-      "rel": "verified_by",
-      "dst": "T-entropy-win-fail-closed"
-    },
-    {
-      "src": "D-0018",
-      "rel": "verified_by",
-      "dst": "T-datadir-no-cwd"
-    },
-    {
-      "src": "D-0018",
-      "rel": "verified_by",
-      "dst": "CI-legacy",
-      "note": "FFI compiles on the 1.77.2 floor (msvc target)"
-    },
-    {
-      "src": "D-0018",
-      "rel": "verified_by",
-      "dst": "CI-windows",
-      "note": "full suite green, required (run 44668106188)"
-    },
-    {
-      "src": "D-0015",
-      "rel": "verified_by",
-      "dst": "T-mem-bounded"
-    },
-    {
-      "src": "D-0017",
-      "rel": "verified_by",
-      "dst": "CI-audit"
-    },
-    {
-      "src": "D-0002",
-      "rel": "verified_by",
-      "dst": "CI-ubuntu"
-    },
-    {
-      "src": "D-0002",
-      "rel": "verified_by",
-      "dst": "CI-windows"
-    },
-    {
-      "src": "D-0002",
-      "rel": "verified_by",
-      "dst": "CI-macos"
-    },
-    {
-      "src": "GATE-0001",
-      "rel": "cites",
-      "dst": "ROLE-A1",
-      "note": "panel roles (also A2-A4)"
-    },
-    {
-      "src": "REVIEW-0002",
-      "rel": "cites",
-      "dst": "ROLE-A2",
-      "note": "panel roles (also A1/A3/A4)"
-    },
-    {
-      "src": "TOOL-memory-rag",
-      "rel": "part_of",
-      "dst": "D-0027"
-    },
-    {
-      "src": "D-0025",
-      "rel": "supersedes",
-      "dst": "D-0009",
-      "note": "resolution: advisory + GHSA + v0.3.1"
-    },
-    {
-      "src": "D-0025",
-      "rel": "supersedes",
-      "dst": "D-0013",
-      "note": "resolved with reconciled facts + deadline met"
-    },
-    {
-      "src": "D-0025",
-      "rel": "satisfies",
-      "dst": "A2-C3"
-    },
-    {
-      "src": "D-0026",
-      "rel": "amends",
-      "dst": "D-0001",
-      "note": "S5 operational credentials only"
-    },
-    {
-      "src": "D-0023",
-      "rel": "satisfies",
-      "dst": "A2-C1"
-    },
-    {
-      "src": "D-0023",
-      "rel": "satisfies",
-      "dst": "A3-C4"
-    },
-    {
-      "src": "D-0023",
-      "rel": "closes",
-      "dst": "GAP-replay"
-    },
-    {
-      "src": "D-0023",
-      "rel": "closes",
-      "dst": "GAP-probeguard"
-    },
-    {
-      "src": "D-0023",
-      "rel": "closes",
-      "dst": "GAP-slowclose",
-      "note": "partial: uniformity residual"
-    },
-    {
-      "src": "D-0024",
-      "rel": "implements",
-      "dst": "D-0008",
-      "note": "rand-split mechanical enforcement (gate-0001 A2-C3)"
-    },
-    {
-      "src": "D-0025",
-      "rel": "ships",
-      "dst": "OD-v031",
-      "note": "v0.3.1 release tags"
-    },
-    {
-      "src": "D-0026",
-      "rel": "closes",
-      "dst": "OD-s5creds"
-    },
-    {
-      "src": "D-0019",
-      "rel": "cites",
-      "dst": "REVIEW-0003"
-    },
-    {
-      "src": "REVIEW-0003",
-      "rel": "gates",
-      "dst": "S1",
-      "note": "cross-validation of the S0->S1 authorization"
-    },
-    {
-      "src": "D-0028",
-      "rel": "amends",
-      "dst": "D-0027",
-      "note": "RAG read layer over the graph"
-    }
-  ]
+  "relations": {
+   "supersedes": "this decision replaces the target (target stays for history)",
+   "amends": "adds conditions/annotations to the target without replacing it",
+   "implements": "code/artifact realizing a decision or condition",
+   "satisfies": "evidence (commit/run/test) closing a condition",
+   "gates": "review that must pass before the target proceeds",
+   "ships": "stage/component delivered as a release",
+   "part_of": "structural containment",
+   "verified_by": "CI run/test/script proving the claim",
+   "blocks": "open item blocking the target",
+   "requires_decision": "owner decision needed before the target proceeds",
+   "affects": "risk/lesson bearing on the target",
+   "cites": "points at source material",
+   "reviewed_in": "was examined by this gate/panel",
+   "tested_by": "has this test as its regression",
+   "runs_on": "execution environment",
+   "learned_in": "session where the lesson originated",
+   "closes": "condition, when satisfied, resolves the target gap",
+   "authored": "session that produced the target record/artifact"
+  },
+  "authoritative_sources": [
+   "harness/memory/DECISIONS.md",
+   "harness/memory/ROADMAP.md",
+   "harness/memory/STATE.md",
+   "harness/memory/LESSONS.md",
+   "harness/memory/BACKUPS.md",
+   "harness/memory/sessions/",
+   "harness/adversarial/verdicts/",
+   "docs/THREAT-MODEL.md"
+  ],
+  "updated": "2026-11-21",
+  "updated_by": "run 2026-11-21a (XChaCha wire fix): +D-0029 +SES-2026-11-21a +3 test nodes; GAP-xchacha closed; component/stage/condition summaries refreshed; stale planned-test nodes flipped to shipped."
+ },
+ "nodes": [
+  {
+   "id": "D-0001",
+   "type": "decision",
+   "label": "Project charter",
+   "status": "binding",
+   "summary": "GPL-3.0 monorepo; Win7 SP1+/macOS 10.15+/Android 8+/Linux Mint 20+; portable builds; client-only — no servers, no embedded credentials.",
+   "refs": [
+    "harness/memory/DECISIONS.md"
+   ]
+  },
+  {
+   "id": "D-0002",
+   "type": "decision",
+   "label": "Zero third-party crates",
+   "status": "binding",
+   "summary": "Engine is pure-std Rust; clean-room crypto/TLS/QUIC accepted cost, mitigated by RFC/NIST vectors + OpenSSL cross-checks.",
+   "refs": [
+    "harness/memory/DECISIONS.md"
+   ]
+  },
+  {
+   "id": "D-0003",
+   "type": "decision",
+   "label": "Material You pipeline",
+   "status": "shipped",
+   "summary": "One verified Rust color engine ported to Dart/Kotlin/C++; byte-identical M3 palettes via golden vectors.",
+   "refs": [
+    "harness/memory/DECISIONS.md",
+    "docs/MATERIAL_YOU.md"
+   ]
+  },
+  {
+   "id": "D-0004",
+   "type": "decision",
+   "label": "Rebuild order after recycle",
+   "status": "executed",
+   "summary": "Compact core -> crypto foundation -> first live data plane (SS) -> breadth; pitfalls preserved in LESSONS/RESTORE.",
+   "refs": [
+    "docs/RESTORE.md"
+   ]
+  },
+  {
+   "id": "D-0005",
+   "type": "decision",
+   "label": "Harness installed",
+   "status": "binding",
+   "summary": "Binding execution workflow: every run ends with backup.sh push; stage gates need adversarial consensus.",
+   "refs": [
+    "harness/WORKFLOW.md"
+   ]
+  },
+  {
+   "id": "D-0006",
+   "type": "decision",
+   "label": "Git identity",
+   "status": "binding",
+   "summary": "Commits use the owner's identity (maniesh-NR), never the anonymous sandbox default.",
+   "refs": [
+    "harness/memory/DECISIONS.md"
+   ]
+  },
+  {
+   "id": "D-0007",
+   "type": "decision",
+   "label": "Consensus = role-separated blind review",
+   "status": "binding",
+   "summary": "Procedural separation only; correlated blind spots disclosed; reviewer prompts archived verbatim.",
+   "refs": [
+    "harness/ADVERSARIAL.md"
+   ]
+  },
+  {
+   "id": "D-0008",
+   "type": "decision",
+   "label": "Fail-closed entropy + contained FFI",
+   "status": "shipped",
+   "summary": "All security material from OS entropy, fail-closed; splitmix64 non-security only; Windows FFI scoped to holo-util/src/rand.rs ONLY (sole unsafe), re-reviewed at every gate.",
+   "refs": [
+    "harness/memory/DECISIONS.md",
+    "docs/THREAT-MODEL.md"
+   ]
+  },
+  {
+   "id": "D-0009",
+   "type": "decision",
+   "label": "Stale-binaries disclosure (v1)",
+   "status": "superseded",
+   "summary": "Escalated 2026-11-13: published v0.2.0/v0.3.0 Windows binaries predate entropy hardening; advisory-vs-v0.3.1 pending. RESOLVED by D-0025.",
+   "refs": [
+    "harness/memory/DECISIONS.md"
+   ]
+  },
+  {
+   "id": "D-0010",
+   "type": "decision",
+   "label": "Gate 0001 PASSED",
+   "status": "recorded",
+   "summary": "S0->S1 transition authorized on unanimous round-2 non-BLOCK verdicts.",
+   "refs": [
+    "harness/adversarial/verdicts/0001-S1-gate.md"
+   ]
+  },
+  {
+   "id": "D-0011",
+   "type": "decision",
+   "label": "Record numbering + blob hashes",
+   "status": "binding",
+   "summary": "Record numbers are sequence numbers; progress reviews have no transition authority; hashes are BLOB sha256; harness/** LF-pinned via .gitattributes.",
+   "refs": [
+    "harness/WORKFLOW.md",
+    ".gitattributes"
+   ]
+  },
+  {
+   "id": "D-0012",
+   "type": "decision",
+   "label": "Progress review 0002 consensus",
+   "status": "recorded",
+   "summary": "4x PROCEED_WITH_CONDITIONS; per-host re-verify wording; 21 binding conditions copied into ROADMAP.",
+   "refs": [
+    "harness/adversarial/verdicts/0002-progress-review.md"
+   ]
+  },
+  {
+   "id": "D-0013",
+   "type": "decision",
+   "label": "Stale-binaries disclosure (v2)",
+   "status": "open_owner",
+   "summary": "Re-escalated with API-verified facts: per-OS binaries not publicly downloadable; deadline = before S1 DONE; v0.3.1 (if chosen) must precede the XChaCha20 wire change.",
+   "refs": [
+    "harness/memory/DECISIONS.md"
+   ]
+  },
+  {
+   "id": "D-0014",
+   "type": "decision",
+   "label": "Descope rule NAMED",
+   "status": "default_recorded",
+   "summary": "v1.0 ships SS + trojan over holo-tls (owner may override); tripwire N=4 session journals; terminal gate chartered.",
+   "refs": [
+    "harness/memory/ROADMAP.md"
+   ]
+  },
+  {
+   "id": "D-0015",
+   "type": "decision",
+   "label": "Memory budget 2->8 MB",
+   "status": "binding",
+   "summary": "Memory regression ceiling raised for shared-runner variance (+2520 KB observed vs 2 MB assert; local +88-376 KB); catches per-chunk allocation regressions.",
+   "refs": [
+    "engine/crates/holo-engine/tests/integration.rs"
+   ]
+  },
+  {
+   "id": "D-0016",
+   "type": "decision",
+   "label": "pstack protocol",
+   "status": "binding",
+   "summary": "PROJECT_MEMORY.md operational layer + update_memory.py (stat summaries) + zero-noise compaction + verification contracts; harness remains authoritative.",
+   "refs": [
+    "PROJECT_MEMORY.md",
+    "update_memory.py"
+   ]
+  },
+  {
+   "id": "D-0017",
+   "type": "decision",
+   "label": "Full-tree harness audit",
+   "status": "binding",
+   "summary": "harness-audit CI = whole-tree integrity: every quoted 64-hex resolves to a tracked blob; chain lines recompute; replaces per-commit range audit.",
+   "refs": [
+    ".github/workflows/ci.yml"
+   ]
+  },
+  {
+   "id": "D-0018",
+   "type": "decision",
+   "label": "S1 item 0 shipped",
+   "status": "shipped",
+   "summary": "Windows entropy = RtlGenRandom via SystemFunction036 (LNK2019 lesson); data-dir HOLONET_DATA->HOME->USERPROFILE->hard-error (CWD fallback removed); ACL = per-user profile ACLs, no extra FFI.",
+   "refs": [
+    "engine/crates/holo-util/src/rand.rs",
+    "engine/crates/holonetd/src/main.rs"
+   ]
+  },
+  {
+   "id": "D-0027",
+   "type": "decision",
+   "label": "Memory as data graph",
+   "status": "binding",
+   "summary": "harness/memory/graph/ = queryable node/edge view of the binding memory (this file); memory_graph.py check runs in CI; harness markdown stays authoritative. Originally drafted as D-0019 before the parallel-session divergence; renumbered 2026-11-21 (pushed D-0019..D-0026 belong to the cross-validation run).",
+   "refs": [
+    "harness/memory/graph/graph.json",
+    "harness/memory/graph/memory_graph.py"
+   ]
+  },
+  {
+   "id": "S0",
+   "type": "stage",
+   "label": "Core + crypto + first data plane",
+   "status": "done",
+   "summary": "v0.3.0: SS AEAD (3 ciphers), SOCKS5 pooled relay, engine wiring, Material You; released 2026-11-08.",
+   "refs": [
+    "harness/memory/ROADMAP.md"
+   ]
+  },
+  {
+   "id": "S1",
+   "type": "stage",
+   "label": "Entropy + crypto extensions",
+   "status": "in_progress",
+   "summary": "Item 0 + server-path hardening + rand-split + XChaCha wire DONE (D-0018/D-0023/D-0024/D-0029; local 92, CI rides run-8 push). Remaining: BLAKE2s (orphan KATs reusable per D-0020), X25519, AES-CFB, ExpandLabel, bignum/RSA.",
+   "refs": [
+    "harness/memory/ROADMAP.md"
+   ]
+  },
+  {
+   "id": "S2",
+   "type": "stage",
+   "label": "holo-tls (TLS 1.3 client)",
+   "status": "chartered",
+   "summary": "From-scratch RFC 8446; SPKI pinning on raw DER (no X.509 parser); SNI masking defined-or-cut; ONE TLS driver wired into session.connect.",
+   "refs": [
+    "harness/memory/ROADMAP.md"
+   ]
+  },
+  {
+   "id": "S3",
+   "type": "stage",
+   "label": "holo-quic (QUIC v1, client-relay profile)",
+   "status": "chartered",
+   "summary": "Rescoped: no 0-RTT/migration/qlog/v2; reuses holo-net CUBIC.",
+   "refs": [
+    "harness/memory/ROADMAP.md"
+   ]
+  },
+  {
+   "id": "S4",
+   "type": "stage",
+   "label": "Config importers",
+   "status": "chartered",
+   "summary": "Clash YAML, V2Ray/sing-box JSON, WG/AmneziaWG INI, base64 subscriptions (share-links already live).",
+   "refs": [
+    "harness/memory/ROADMAP.md"
+   ]
+  },
+  {
+   "id": "S5",
+   "type": "stage",
+   "label": "Providers (split S5a/S5b)",
+   "status": "chartered_blocked",
+   "summary": "S5a: VPN Gate + <=2 providers; S5b descope-eligible; blocked on owner credentials decision.",
+   "refs": [
+    "harness/memory/ROADMAP.md"
+   ]
+  },
+  {
+   "id": "S6",
+   "type": "stage",
+   "label": "System crates",
+   "status": "chartered_blocked",
+   "summary": "TUN/killswitch/etc; blocked on D-0002/D-0008 policy pre-decision (FFI scope, wintun.dll, Windows killswitch).",
+   "refs": [
+    "harness/memory/ROADMAP.md"
+   ]
+  },
+  {
+   "id": "S7",
+   "type": "stage",
+   "label": "Frontends + packaging",
+   "status": "chartered",
+   "summary": "Wire live status into Flutter/KMP/Qt; NSIS (not MSIX, Win7); flatpak proxy-mode-only; notarization/Play = owner cost decisions.",
+   "refs": [
+    "harness/memory/ROADMAP.md"
+   ]
+  },
+  {
+   "id": "GATE-0001",
+   "type": "gate_record",
+   "label": "Gate 0001 (S0->S1)",
+   "status": "passed",
+   "summary": "Round 1: A2 BLOCK; remediation 53ff229; round 2 unanimous non-BLOCK. Chain: genesis.",
+   "refs": [
+    "harness/adversarial/verdicts/0001-S1-gate.md"
+   ]
+  },
+  {
+   "id": "REVIEW-0002",
+   "type": "gate_record",
+   "label": "Progress review 0002",
+   "status": "passed",
+   "summary": "4x PROCEED_WITH_CONDITIONS, 0 BLOCK; NO transition authority; chain: 0001 blob.",
+   "refs": [
+    "harness/adversarial/verdicts/0002-progress-review.md"
+   ]
+  },
+  {
+   "id": "GATE-0003",
+   "type": "gate_record",
+   "label": "S1->S2 gate (pending)",
+   "status": "pending",
+   "summary": "Next record number; checks S1 acceptance incl. all carried conditions.",
+   "refs": [
+    "harness/memory/ROADMAP.md"
+   ]
+  },
+  {
+   "id": "A1-C1",
+   "type": "condition",
+   "label": "A1-C1 ubuntu CI diagnosed",
+   "status": "closed",
+   "summary": "Named failing test (memory_stays_bounded runner variance); fixed via D-0015; run 44234338593 green.",
+   "refs": [
+    "harness/adversarial/verdicts/0002-progress-review.md"
+   ]
+  },
+  {
+   "id": "A1-C2",
+   "type": "condition",
+   "label": "A1-C2 1.77.2 floor restored",
+   "status": "closed",
+   "summary": "Root cause Cargo.lock v3->v4 in 53ff229; restored v3; legacy job green.",
+   "refs": [
+    "engine/Cargo.lock"
+   ]
+  },
+  {
+   "id": "A1-C3",
+   "type": "condition",
+   "label": "A1-C3 README releases reality",
+   "status": "closed",
+   "summary": "Releases section rewritten to API-verified surface; D-0013 reconciliation recorded.",
+   "refs": [
+    "README.md"
+   ]
+  },
+  {
+   "id": "A1-C4",
+   "type": "condition",
+   "label": "A1-C4 OpenSSL claim honesty",
+   "status": "closed",
+   "summary": "README reworded (journals lost in recycle); re-running cross-checks as recorded evidence is an S1 charter item.",
+   "refs": [
+    "README.md"
+   ]
+  },
+  {
+   "id": "A1-C5",
+   "type": "condition",
+   "label": "A1-C5 STATE full CI disclosure",
+   "status": "closed",
+   "summary": "STATE discloses full CI state + per-host re-verify; prompts archived in end-of-run backup.",
+   "refs": [
+    "harness/memory/STATE.md"
+   ]
+  },
+  {
+   "id": "A2-C1",
+   "type": "condition",
+   "label": "A2-C1 salt-replay cache",
+   "status": "closed",
+   "summary": "CLOSED: SaltCache landed (D-0023, cap-1024 FIFO, opaque refusal, named test); THREAT-MODEL C amended.",
+   "refs": [
+    "docs/THREAT-MODEL.md",
+    "harness/memory/ROADMAP.md"
+   ]
+  },
+  {
+   "id": "A2-C2",
+   "type": "condition",
+   "label": "A2-C2 Windows secret-at-rest",
+   "status": "closed",
+   "summary": "Data-dir resolution hardened + test; ACL decision D-0018 in THREAT-MODEL G; landed with S1 item 0.",
+   "refs": [
+    "engine/crates/holonetd/src/main.rs"
+   ]
+  },
+  {
+   "id": "A2-C3",
+   "type": "condition",
+   "label": "A2-C3 D-0009 deadline",
+   "status": "closed",
+   "summary": "CLOSED: D-0025 (advisory + GHSA + v0.3.1 supersession) before the XChaCha wire change.",
+   "refs": [
+    "harness/memory/DECISIONS.md"
+   ]
+  },
+  {
+   "id": "A2-C4",
+   "type": "condition",
+   "label": "A2-C4 carried checks at gate 0003",
+   "status": "open_gate0003",
+   "summary": "Gate-0003(now 0004) checklist; ALL carried checks LANDED (rand-split D-0024, ProbeGuard decay + jittered slow-close + read deadline D-0023, off-loopback A3-C4, XChaCha standard switch D-0029) — the checklist item itself stays open until gate record 0004 is written.",
+   "refs": [
+    "harness/memory/ROADMAP.md"
+   ]
+  },
+  {
+   "id": "A3-C1",
+   "type": "condition",
+   "label": "A3-C1 numbering decoupled pre-push",
+   "status": "closed",
+   "summary": "WORKFLOW 2.6 + ROADMAP rewrites landed before record 0002 push.",
+   "refs": [
+    "harness/WORKFLOW.md"
+   ]
+  },
+  {
+   "id": "A3-C2",
+   "type": "condition",
+   "label": "A3-C2 descope named + tripwire + terminal gate",
+   "status": "closed_ownerconfirm",
+   "summary": "Landed as D-0014 (trojan default; owner may override); tripwire N=4; terminal gate chartered; S2 driver deliverable merged into charter.",
+   "refs": [
+    "harness/memory/ROADMAP.md"
+   ]
+  },
+  {
+   "id": "A3-C3",
+   "type": "condition",
+   "label": "A3-C3 S1 ordering + red window",
+   "status": "closed",
+   "summary": "Item 0 merged first; windows-latest full suite green REQUIRED; expected-red scaffolding removed at completion; 1.77.2 msvc check added.",
+   "refs": [
+    ".github/workflows/ci.yml"
+   ]
+  },
+  {
+   "id": "A3-C4",
+   "type": "condition",
+   "label": "A3-C4 off-loopback refusal in S1",
+   "status": "closed",
+   "summary": "CLOSED: loopback-only proxy_listen bind (D-0023) with HOLONET_PROXY_LISTEN_ANY override + named tests.",
+   "refs": [
+    "harness/memory/ROADMAP.md"
+   ]
+  },
+  {
+   "id": "A3-C5",
+   "type": "condition",
+   "label": "A3-C5 1M-vector execution mode",
+   "status": "closed",
+   "summary": "Charter annotation: release-mode-only or opt-in cfg; never default debug CI.",
+   "refs": [
+    "harness/memory/ROADMAP.md"
+   ]
+  },
+  {
+   "id": "A3-C6",
+   "type": "condition",
+   "label": "A3-C6 S1 charter annotations",
+   "status": "closed",
+   "summary": "BLAKE2b cut-or-justify; constant-time bar; S2 no-X.509; SNI masking defined-or-cut; OpenSSL cross-check grep of S1 journal.",
+   "refs": [
+    "harness/memory/ROADMAP.md"
+   ]
+  },
+  {
+   "id": "A3-C7",
+   "type": "condition",
+   "label": "A3-C7 owner decisions at session start",
+   "status": "closed",
+   "summary": "CLOSED: owner decisions made (D-0025 release resolution; D-0026 S5 credentials embedded-with-risk-acceptance).",
+   "refs": [
+    "harness/memory/ROADMAP.md"
+   ]
+  },
+  {
+   "id": "A3-C8",
+   "type": "condition",
+   "label": "A3-C8 S6 policy pre-decision",
+   "status": "open_future",
+   "summary": "Amend D-0002/D-0008 for TUN/killswitch FFI + wintun.dll policy at/before S5->S6 gate.",
+   "refs": [
+    "harness/memory/ROADMAP.md"
+   ]
+  },
+  {
+   "id": "A4-C1",
+   "type": "condition",
+   "label": "A4-C1 LF pinning + blob-hash rule",
+   "status": "closed",
+   "summary": ".gitattributes harness/** eol=lf; WORKFLOW 2.6; D-0011.",
+   "refs": [
+    ".gitattributes"
+   ]
+  },
+  {
+   "id": "A4-C2",
+   "type": "condition",
+   "label": "A4-C2 harness-audit strengthening",
+   "status": "closed",
+   "summary": "Full-tree integrity audit (hash equality + chain recompute), D-0017; CI-verified run 44494124628.",
+   "refs": [
+    ".github/workflows/ci.yml"
+   ]
+  },
+  {
+   "id": "A4-C3",
+   "type": "condition",
+   "label": "A4-C3 backup.sh hardening",
+   "status": "closed",
+   "summary": "Rebase/unmerged/cherry-pick refusal with recovery commands; WARN durability + error capture; negative-tested.",
+   "refs": [
+    "harness/scripts/backup.sh"
+   ]
+  },
+  {
+   "id": "A4-C4",
+   "type": "condition",
+   "label": "A4-C4 Windows restore runbook",
+   "status": "closed",
+   "summary": "SANDBOX-RESTORE Windows variant + 4W toolchain-less fallback + per-host STATE wording.",
+   "refs": [
+    "harness/memory/SANDBOX-RESTORE.md"
+   ]
+  },
+  {
+   "id": "A4-C5",
+   "type": "condition",
+   "label": "A4-C5 record 0002 scope statement",
+   "status": "closed",
+   "summary": "Record states progress review, no transition authority; DECISIONS entry (D-0011).",
+   "refs": [
+    "harness/adversarial/verdicts/0002-progress-review.md"
+   ]
+  },
+  {
+   "id": "A4-C6",
+   "type": "condition",
+   "label": "A4-C6 future-gate mechanics",
+   "status": "open_future",
+   "summary": "Gate records list remediation-touched files vs blocking scope; reviewers quote own prompt SHA-256 (adopted for gate 0003+).",
+   "refs": [
+    "harness/adversarial/verdicts/0002-progress-review.md"
+   ]
+  },
+  {
+   "id": "OD-v031",
+   "type": "owner_decision",
+   "label": "Advisory vs v0.3.1",
+   "status": "decided",
+   "summary": "DECIDED via D-0025: advisory + GHSA + v0.3.1 (4 per-OS tags, signed, checksummed); stale drafts deleted.",
+   "refs": [
+    "harness/memory/DECISIONS.md"
+   ]
+  },
+  {
+   "id": "OD-s5creds",
+   "type": "owner_decision",
+   "label": "S5 credentials model",
+   "status": "decided",
+   "summary": "DECIDED via D-0026: embedded with recorded risk-acceptance (operational only; fixtures synthetic).",
+   "refs": [
+    "harness/memory/ROADMAP.md"
+   ]
+  },
+  {
+   "id": "OD-d0014",
+   "type": "owner_decision",
+   "label": "Confirm trojan descope",
+   "status": "pending",
+   "summary": "Confirm or override D-0014 default (trojan over holo-tls as v1.0 second protocol).",
+   "refs": [
+    "harness/memory/DECISIONS.md"
+   ]
+  },
+  {
+   "id": "holo-util",
+   "type": "component",
+   "label": "holo-util",
+   "status": "live",
+   "summary": "hex/base64/JSON + rand (entropy split, sole unsafe).",
+   "refs": [
+    "engine/crates/holo-util"
+   ]
+  },
+  {
+   "id": "holo-crypto",
+   "type": "component",
+   "label": "holo-crypto",
+   "status": "live",
+   "summary": "ChaCha20/Poly1305/AEAD/XChaCha20/AES-256-GCM/SHA-2/HMAC/HKDF/EVP; 20 vector tests incl. draft-irtf-cfrg-xchacha-03 2.2.1/A.2.1/A.1.",
+   "refs": [
+    "engine/crates/holo-crypto"
+   ]
+  },
+  {
+   "id": "holo-net",
+   "type": "component",
+   "label": "holo-net",
+   "status": "live",
+   "summary": "RTT/RTO, CUBIC+HyStart++, BBR-model, DRR, CoDel, pacing, padding, ProbeGuard, BufferPool.",
+   "refs": [
+    "engine/crates/holo-net"
+   ]
+  },
+  {
+   "id": "holo-ss",
+   "type": "component",
+   "label": "holo-ss",
+   "status": "live",
+   "summary": "SIP004 AEAD client+server, 3 ciphers, anti-probing; xchacha wire STANDARD XChaCha20-Poly1305-IETF since run 8 (D-0029, 24-byte LE counter).",
+   "refs": [
+    "engine/crates/holo-ss"
+   ]
+  },
+  {
+   "id": "holo-socks",
+   "type": "component",
+   "label": "holo-socks",
+   "status": "live",
+   "summary": "RFC 1928/1929 CONNECT-only pooled relay, DRR shaping.",
+   "refs": [
+    "engine/crates/holo-socks"
+   ]
+  },
+  {
+   "id": "holo-engine",
+   "type": "component",
+   "label": "holo-engine",
+   "status": "live",
+   "summary": "Session/dispatch (default-deny milestone errors), IPC token (ct_eq), theme service.",
+   "refs": [
+    "engine/crates/holo-engine"
+   ]
+  },
+  {
+   "id": "holo-config",
+   "type": "component",
+   "label": "holo-config",
+   "status": "live",
+   "summary": "Profiles store + 7-scheme share-link importer.",
+   "refs": [
+    "engine/crates/holo-config"
+   ]
+  },
+  {
+   "id": "holo-theme",
+   "type": "component",
+   "label": "holo-theme",
+   "status": "live",
+   "summary": "M3 color engine (33 roles, golden vectors).",
+   "refs": [
+    "engine/crates/holo-theme"
+   ]
+  },
+  {
+   "id": "holo-proto",
+   "type": "component",
+   "label": "holo-proto",
+   "status": "live",
+   "summary": "Driver SPI + params registry.",
+   "refs": [
+    "engine/crates/holo-proto"
+   ]
+  },
+  {
+   "id": "holonetd",
+   "type": "component",
+   "label": "holonetd",
+   "status": "live",
+   "summary": "Daemon: IPC + theme; hardened data-dir resolution.",
+   "refs": [
+    "engine/crates/holonetd"
+   ]
+  },
+  {
+   "id": "holonetctl",
+   "type": "component",
+   "label": "holonetctl",
+   "status": "live",
+   "summary": "CLI client; honest entropy error.",
+   "refs": [
+    "engine/crates/holonetctl"
+   ]
+  },
+  {
+   "id": "app-frontends",
+   "type": "component",
+   "label": "Flutter/KMP/Qt frontends",
+   "status": "live",
+   "summary": "Material You UIs speaking NDJSON JSON-RPC; live tunnel status wiring is S7.",
+   "refs": [
+    "app_flutter",
+    "app_kmp",
+    "app_qt"
+   ]
+  },
+  {
+   "id": "T-entropy-fail-closed",
+   "type": "test",
+   "label": "os_entropy_fails_closed_on_unreadable_source",
+   "status": "passing",
+   "summary": "Unix bad-path -> Err, never weak fallback.",
+   "refs": [
+    "engine/crates/holo-util/src/rand.rs"
+   ]
+  },
+  {
+   "id": "T-entropy-win-success",
+   "type": "test",
+   "label": "os_entropy_succeeds_and_is_nonzero_windows",
+   "status": "passing",
+   "summary": "RtlGenRandom contract: real entropy, not all-zero.",
+   "refs": [
+    "engine/crates/holo-util/src/rand.rs"
+   ]
+  },
+  {
+   "id": "T-entropy-win-fail-closed",
+   "type": "test",
+   "label": "os_entropy_fails_closed_on_ffi_failure_windows",
+   "status": "passing",
+   "summary": "Injected FFI failure -> Err, zero bytes produced.",
+   "refs": [
+    "engine/crates/holo-util/src/rand.rs"
+   ]
+  },
+  {
+   "id": "T-datadir-no-cwd",
+   "type": "test",
+   "label": "data_dir_resolution_order_and_no_cwd_fallback",
+   "status": "passing",
+   "summary": "HOLONET_DATA wins; no home -> hard Err; never CWD.",
+   "refs": [
+    "engine/crates/holonetd/src/main.rs"
+   ]
+  },
+  {
+   "id": "T-mem-bounded",
+   "type": "test",
+   "label": "memory_stays_bounded_under_sustained_relay",
+   "status": "passing",
+   "summary": "RSS growth < 8 MB over 64 MB relayed (D-0015); Linux-only.",
+   "refs": [
+    "engine/crates/holo-engine/tests/integration.rs"
+   ]
+  },
+  {
+   "id": "T-ss-probe-tests",
+   "type": "test",
+   "label": "oversized_length / tampered_salt tests",
+   "status": "passing",
+   "summary": "Probe resistance regressions for holo-ss.",
+   "refs": [
+    "engine/crates/holo-ss/src/lib.rs"
+   ]
+  },
+  {
+   "id": "T-salt-replay",
+   "type": "test",
+   "label": "salt_cache_rejects_replayed_prefix",
+   "status": "passing",
+   "summary": "A2-C1 named test SHIPPED run 4: replayed salt+first-chunk connection rejected opaquely (SaltCache cap-1024 FIFO).",
+   "refs": [
+    "harness/memory/ROADMAP.md"
+   ]
+  },
+  {
+   "id": "T-loopback-refusal",
+   "type": "test",
+   "label": "non_loopback_bind_refused_ipv4_any",
+   "status": "passing",
+   "summary": "A3-C4 named test SHIPPED run 4: 0.0.0.0/:: bind refused without HOLONET_PROXY_LISTEN_ANY override.",
+   "refs": [
+    "harness/memory/ROADMAP.md"
+   ]
+  },
+  {
+   "id": "CI-ubuntu",
+   "type": "ci_job",
+   "label": "Test (ubuntu-latest)",
+   "status": "green",
+   "summary": "Full suite, required.",
+   "refs": [
+    ".github/workflows/ci.yml"
+   ]
+  },
+  {
+   "id": "CI-windows",
+   "type": "ci_job",
+   "label": "Test (windows-latest)",
+   "status": "green",
+   "summary": "Full suite, REQUIRED since S1 item 0 (2026-11-20).",
+   "refs": [
+    ".github/workflows/ci.yml"
+   ]
+  },
+  {
+   "id": "CI-macos",
+   "type": "ci_job",
+   "label": "Test (macos-latest)",
+   "status": "green",
+   "summary": "Full suite, required.",
+   "refs": [
+    ".github/workflows/ci.yml"
+   ]
+  },
+  {
+   "id": "CI-legacy",
+   "type": "ci_job",
+   "label": "Rust 1.77.2 compatibility",
+   "status": "green",
+   "summary": "Host check + x86_64-pc-windows-msvc check (no link).",
+   "refs": [
+    ".github/workflows/ci.yml"
+   ]
+  },
+  {
+   "id": "CI-cross",
+   "type": "ci_job",
+   "label": "Cross-compile check",
+   "status": "green",
+   "summary": "musl + Android targets.",
+   "refs": [
+    ".github/workflows/ci.yml"
+   ]
+  },
+  {
+   "id": "CI-audit",
+   "type": "ci_job",
+   "label": "Harness audit (full tree)",
+   "status": "green",
+   "summary": "Hash resolution + chain recompute (D-0017) + memory-graph check (D-0019).",
+   "refs": [
+    ".github/workflows/ci.yml"
+   ]
+  },
+  {
+   "id": "TH-A",
+   "type": "threat",
+   "label": "Local co-resident adversary",
+   "status": "in_scope_partial",
+   "summary": "IPC token fail-closed+ct_eq; 0600 unix; Windows = per-user ACLs (D-0018); root/ptrace out of scope.",
+   "refs": [
+    "docs/THREAT-MODEL.md"
+   ]
+  },
+  {
+   "id": "TH-B",
+   "type": "threat",
+   "label": "On-path DPI censor",
+   "status": "in_scope",
+   "summary": "Primary adversary; AEAD randomness + padding; TLS/QUIC staged.",
+   "refs": [
+    "docs/THREAT-MODEL.md"
+   ]
+  },
+  {
+   "id": "TH-C",
+   "type": "threat",
+   "label": "Active prober",
+   "status": "in_scope",
+   "summary": "Opaque errors, backoff, oversized-length rejection; replay NOT yet defended (gap).",
+   "refs": [
+    "docs/THREAT-MODEL.md"
+   ]
+  },
+  {
+   "id": "TH-D",
+   "type": "threat",
+   "label": "Upstream observer",
+   "status": "by_design",
+   "summary": "Exit sees destinations; trust decision.",
+   "refs": [
+    "docs/THREAT-MODEL.md"
+   ]
+  },
+  {
+   "id": "TH-E",
+   "type": "threat",
+   "label": "Supply chain",
+   "status": "in_scope_partial",
+   "summary": "Zero deps; SHA256SUMS on release jobs; signing = ops backlog (R-14).",
+   "refs": [
+    "docs/THREAT-MODEL.md"
+   ]
+  },
+  {
+   "id": "TH-F",
+   "type": "threat",
+   "label": "Implementation side channels",
+   "status": "out_of_scope",
+   "summary": "AES table-based timing accepted; ChaCha default recommended; ct_eq for MACs.",
+   "refs": [
+    "docs/THREAT-MODEL.md"
+   ]
+  },
+  {
+   "id": "TH-G",
+   "type": "threat",
+   "label": "Entropy (cross-cutting)",
+   "status": "in_scope",
+   "summary": "Fail-closed everywhere; Windows shipped via RtlGenRandom (D-0018); provenance documented.",
+   "refs": [
+    "docs/THREAT-MODEL.md"
+   ]
+  },
+  {
+   "id": "GAP-replay",
+   "type": "gap",
+   "label": "No salt-replay cache",
+   "status": "closed",
+   "summary": "CLOSED by D-0023 SaltCache (cap-1024 FIFO, opaque replay refusal, named test).",
+   "refs": [
+    "docs/THREAT-MODEL.md"
+   ]
+  },
+  {
+   "id": "GAP-xchacha",
+   "type": "gap",
+   "label": "XChaCha wire non-standard",
+   "status": "closed",
+   "summary": "hchacha20(key, zero_iv) mislabel; interop defect not confidentiality break. FIXED run 8 (D-0029): standard XChaCha20-Poly1305-IETF wire; disclosed in THREAT-MODEL G; v0.3.1 keeps the retired construction (D-0025 sequenced the re-release BEFORE the wire change).",
+   "refs": [
+    "engine/crates/holo-ss/src/lib.rs"
+   ]
+  },
+  {
+   "id": "GAP-probeguard",
+   "type": "gap",
+   "label": "ProbeGuard unbounded maps",
+   "status": "closed",
+   "summary": "CLOSED by D-0023 (decay, cap-1024).",
+   "refs": [
+    "engine/crates/holo-net/src/lib.rs"
+   ]
+  },
+  {
+   "id": "GAP-slowclose",
+   "type": "gap",
+   "label": "Deterministic slow-close + close-vs-hang",
+   "status": "open_residual",
+   "summary": "PARTIALLY closed by D-0023 (CSPRNG full-jitter + explicit 2s ceiling, read deadline 10s); close-vs-hang uniformity residual.",
+   "refs": [
+    "docs/THREAT-MODEL.md"
+   ]
+  },
+  {
+   "id": "L-lockfile-v4",
+   "type": "lesson",
+   "label": "Cargo silently rewrites lockfile v3->v4",
+   "status": "active",
+   "summary": "Breaks cargo 1.77.2; re-check engine/Cargo.lock after every cargo run.",
+   "refs": [
+    "harness/memory/LESSONS.md"
+   ]
+  },
+  {
+   "id": "L-runner-rss",
+   "type": "lesson",
+   "label": "Shared-runner RSS variance",
+   "status": "active",
+   "summary": "Memory-assert budgets need runner margin (D-0015: 8 MB over 64 MB).",
+   "refs": [
+    "harness/memory/LESSONS.md"
+   ]
+  },
+  {
+   "id": "L-systemfunction036",
+   "type": "lesson",
+   "label": "RtlGenRandom links as SystemFunction036",
+   "status": "active",
+   "summary": "Header macro; import-lib export name required; check-only cross-compile cannot catch it.",
+   "refs": [
+    "harness/memory/LESSONS.md"
+   ]
+  },
+  {
+   "id": "L-socks-log-redirect",
+   "type": "lesson",
+   "label": "Socks suite hidden in CI logs",
+   "status": "active",
+   "summary": "Redirected to socks-test.log; add 5 to naive log-summed test counts.",
+   "refs": [
+    "harness/memory/LESSONS.md"
+   ]
+  },
+  {
+   "id": "L-invalid-workflow",
+   "type": "lesson",
+   "label": "Invalid workflow YAML signature",
+   "status": "active",
+   "summary": "Run fails with 0 jobs, name = file path, no check-runs; validate YAML locally; keep GHA expressions conservative.",
+   "refs": [
+    "harness/memory/LESSONS.md"
+   ]
+  },
+  {
+   "id": "L-orchestration",
+   "type": "lesson",
+   "label": "Multi-agent orchestration limits",
+   "status": "active",
+   "summary": "Concurrency waves <=2-3; resume agents near completion instead of restarting; verify agent IDs against original prompts on resume.",
+   "refs": [
+    "harness/memory/LESSONS.md"
+   ]
+  },
+  {
+   "id": "L-claim-rot",
+   "type": "lesson",
+   "label": "Claim rot",
+   "status": "active",
+   "summary": "Re-count every quoted number from tree/CI at every gate; locally-green and CI-green are different claims.",
+   "refs": [
+    "harness/memory/LESSONS.md"
+   ]
+  },
+  {
+   "id": "L-phantom-backup",
+   "type": "lesson",
+   "label": "Phantom backups + FAILED markers",
+   "status": "active",
+   "summary": "Pre-push log lines prove nothing; FAILED/WARN markers are durable facts (backup.sh).",
+   "refs": [
+    "harness/memory/LESSONS.md"
+   ]
+  },
+  {
+   "id": "L-crlf-blobhash",
+   "type": "lesson",
+   "label": "CRLF breaks working-tree hashes",
+   "status": "active",
+   "summary": "Verify hash anchors at blob level; harness/** LF-pinned.",
+   "refs": [
+    "harness/memory/LESSONS.md"
+   ]
+  },
+  {
+   "id": "L-cred-logs",
+   "type": "lesson",
+   "label": "Authenticated CI log access",
+   "status": "active",
+   "summary": "Anonymous = 403 on logs; owner cached credential works (git credential fill, never echo); Copilot cloud sandbox for real execution.",
+   "refs": [
+    "harness/memory/LESSONS.md"
+   ]
+  },
+  {
+   "id": "SES-2026-11-13",
+   "type": "session",
+   "label": "Harness + gate 0001",
+   "status": "recorded",
+   "summary": "Harness installed; gate 0001 passed; hardening landed.",
+   "refs": [
+    "harness/memory/sessions/2026-11-13-harness-gate0001.md"
+   ]
+  },
+  {
+   "id": "SES-2026-11-17",
+   "type": "session",
+   "label": "Progress review 0002",
+   "status": "recorded",
+   "summary": "Adversarial panel + forensics + research; roadmap amended; D-0011..D-0014.",
+   "refs": [
+    "harness/memory/sessions/2026-11-17-progress-review.md"
+   ]
+  },
+  {
+   "id": "SES-2026-11-18",
+   "type": "session",
+   "label": "CI diagnosis",
+   "status": "recorded",
+   "summary": "A1-C1/C2 closed; D-0015; authenticated log access.",
+   "refs": [
+    "harness/memory/sessions/2026-11-18-ci-diagnosis.md"
+   ]
+  },
+  {
+   "id": "SES-2026-11-19",
+   "type": "session",
+   "label": "pstack protocol",
+   "status": "recorded",
+   "summary": "D-0016; PROJECT_MEMORY.md; update_memory.py.",
+   "refs": [
+    "harness/memory/sessions/2026-11-19-pstack-protocol.md"
+   ]
+  },
+  {
+   "id": "SES-2026-11-19b",
+   "type": "session",
+   "label": "Harness hardening",
+   "status": "recorded",
+   "summary": "A4-C2/C3 closed (D-0017); CI-verified.",
+   "refs": [
+    "harness/memory/sessions/2026-11-19b-harness-hardening.md"
+   ]
+  },
+  {
+   "id": "SES-2026-11-20",
+   "type": "session",
+   "label": "S1 item 0",
+   "status": "recorded",
+   "summary": "Windows FFI shipped; ledger 76/75/75; first all-required-green run.",
+   "refs": [
+    "harness/memory/sessions/2026-11-20-s1-item0.md"
+   ]
+  },
+  {
+   "id": "TOOL-backup",
+   "type": "tool",
+   "label": "harness/scripts/backup.sh",
+   "status": "live",
+   "summary": "Mandated final step of every run; event-driven; guards + durable markers.",
+   "refs": [
+    "harness/scripts/backup.sh"
+   ]
+  },
+  {
+   "id": "TOOL-update-memory",
+   "type": "tool",
+   "label": "update_memory.py",
+   "status": "live",
+   "summary": "Zero-noise git-activity section for PROJECT_MEMORY.md; HOLO_MEMORY_FULL_DIFF=1 for patches.",
+   "refs": [
+    "update_memory.py"
+   ]
+  },
+  {
+   "id": "TOOL-memory-graph",
+   "type": "tool",
+   "label": "memory_graph.py",
+   "status": "live",
+   "summary": "check/query/dot/stats over graph.json; check runs in CI harness-audit.",
+   "refs": [
+    "harness/memory/graph/memory_graph.py"
+   ]
+  },
+  {
+   "id": "TOOL-project-memory",
+   "type": "tool",
+   "label": "PROJECT_MEMORY.md",
+   "status": "live",
+   "summary": "Operational layer: invariants, playbook, verification contracts.",
+   "refs": [
+    "PROJECT_MEMORY.md"
+   ]
+  },
+  {
+   "id": "ROLE-A1",
+   "type": "role",
+   "label": "Reliability Skeptic",
+   "status": "standing",
+   "summary": "Claims vs evidence; test meaningfulness; milestone honesty.",
+   "refs": [
+    "harness/ADVERSARIAL.md"
+   ]
+  },
+  {
+   "id": "ROLE-A2",
+   "type": "role",
+   "label": "Security Red",
+   "status": "standing",
+   "summary": "Threat model; crypto; entropy; secrets; user safety.",
+   "refs": [
+    "harness/ADVERSARIAL.md"
+   ]
+  },
+  {
+   "id": "ROLE-A3",
+   "type": "role",
+   "label": "Strategy Adversary",
+   "status": "standing",
+   "summary": "Sequencing; scope realism; descope; measurability.",
+   "refs": [
+    "harness/ADVERSARIAL.md"
+   ]
+  },
+  {
+   "id": "ROLE-A4",
+   "type": "role",
+   "label": "Process Auditor",
+   "status": "standing",
+   "summary": "Harness itself; consensus failure modes; backup integrity; rubber-stamp risk.",
+   "refs": [
+    "harness/ADVERSARIAL.md"
+   ]
+  },
+  {
+   "id": "TOOL-memory-rag",
+   "type": "tool",
+   "label": "memory_rag.py",
+   "status": "live",
+   "summary": "RAG over the corpus + graph (D-0028): BM25 chunk retrieval (heading-chunked, id-preserving tokens) + graph-context expansion; ask/--json/smoke; index built per invocation (no staleness); smoke runs in CI.",
+   "refs": [
+    "harness/memory/graph/memory_rag.py",
+    "harness/memory/DECISIONS.md"
+   ]
+  },
+  {
+   "id": "D-0019",
+   "type": "decision",
+   "label": "Cross-validation review 0003 PASSED",
+   "status": "recorded",
+   "summary": "Second independent panel (different sandbox) reviewed the same baseline: 4/4 PROCEED_WITH_CONDITIONS, matching 0002. Mid-run remote divergence documented verbatim; residual conditions applied; WORKFLOW 4.4 (untracked-stray triage) added. S1->S2 gate will be record 0004 (D-0011 numbering).",
+   "refs": [
+    "harness/adversarial/verdicts/0003-cross-validation.md"
+   ]
+  },
+  {
+   "id": "D-0020",
+   "type": "decision",
+   "label": "Orphan blake2.rs disposition",
+   "status": "recorded",
+   "summary": "Untracked holo-crypto/src/blake2.rs was doubly broken (SIGMA E0425; 3/5 own KATs fail when m[2]!=m[8] -> mis-transcribed SIGMA row) and never compiled; moved OUT of every tree. Its 32 KAT expectations ARE authentic (OpenSSL-verified) and reusable in S1; the code is not.",
+   "refs": [
+    "harness/memory/DECISIONS.md"
+   ]
+  },
+  {
+   "id": "D-0021",
+   "type": "decision",
+   "label": "pstack re-affirmed + memory hooks",
+   "status": "binding",
+   "summary": "Owner re-affirmed the protocol; memory hooks with --check gate; PROJECT_MEMORY refreshed; Cargo.lock v4 regression on origin/main restored to v3.",
+   "refs": [
+    "harness/memory/DECISIONS.md"
+   ]
+  },
+  {
+   "id": "D-0022",
+   "type": "decision",
+   "label": "backup.sh retry mechanics",
+   "status": "binding",
+   "summary": "Push-retry path recorded after run-4/5 push failures (FAILED markers + retry landed).",
+   "refs": [
+    "harness/memory/DECISIONS.md"
+   ]
+  },
+  {
+   "id": "D-0023",
+   "type": "decision",
+   "label": "S1 server-path hardening",
+   "status": "shipped",
+   "summary": "A2-C1 SaltCache (cap-1024 FIFO, opaque replay refusal, named test), A3-C4 loopback-only proxy_listen bind (HOLONET_PROXY_LISTEN_ANY override, named tests), ProbeGuard decay cap-1024, CSPRNG full-jitter slow-close with explicit 2s ceiling, A2-F6 auth read deadline 10s.",
+   "refs": [
+    "engine/crates/holo-ss/src/lib.rs",
+    "engine/crates/holo-net/src/lib.rs"
+   ]
+  },
+  {
+   "id": "D-0024",
+   "type": "decision",
+   "label": "rand-split enforcement",
+   "status": "shipped",
+   "summary": "Weak PRNG behind rand::nosec (doc-hidden), re-exports closed, workspace audit test allowlist-enforced; negative demos live (audit FAIL with file:line + E0425). Closes the gate-0001 A2-C3 binding condition.",
+   "refs": [
+    "engine/crates/holo-util/src/rand.rs"
+   ]
+  },
+  {
+   "id": "D-0025",
+   "type": "decision",
+   "label": "RESOLVED: advisory + GHSA + v0.3.1",
+   "status": "shipped",
+   "summary": "Owner resolved D-0009/D-0013: security advisory + GHSA published, v0.3.1 cut from CI-verified tree as 4 per-OS tags + main release (advisory + checksum manifest + signature; ssh-keygen minisign-style, private key not in repo), stale drafts deleted. Pure security re-release - decided BEFORE the XChaCha wire change, which is now UNBLOCKED.",
+   "refs": [
+    "harness/memory/DECISIONS.md"
+   ]
+  },
+  {
+   "id": "D-0026",
+   "type": "decision",
+   "label": "S5 credentials model decided",
+   "status": "binding",
+   "summary": "Owner chose embedded-with-recorded-risk-acceptance; AMENDS D-0001 for S5 operational credentials only (session secrets stay env-var-only; S5 test fixtures stay synthetic; one documented config module with rotation/burn path in THREAT-MODEL E; VPN Gate first).",
+   "refs": [
+    "harness/memory/DECISIONS.md"
+   ]
+  },
+  {
+   "id": "REVIEW-0003",
+   "type": "gate_record",
+   "label": "Cross-validation review 0003",
+   "status": "passed",
+   "summary": "Independent panel, 4/4 PROCEED_WITH_CONDITIONS; no transition authority (S1->S2 = record 0004). Conditions archived in verdicts/0003-*.",
+   "refs": [
+    "harness/adversarial/verdicts/0003-cross-validation.md"
+   ]
+  },
+  {
+   "id": "SES-2026-11-20b",
+   "type": "session",
+   "label": "pstack re-affirm + hooks",
+   "status": "recorded",
+   "summary": "Memory hooks + --check gate; lockfile regression fixed on origin.",
+   "refs": [
+    "harness/memory/sessions/2026-11-20b-pstack-reaffirm.md"
+   ]
+  },
+  {
+   "id": "SES-2026-11-20c",
+   "type": "session",
+   "label": "S1 hardening run 4",
+   "status": "recorded",
+   "summary": "SaltCache + loopback-only bind; suite 76->83 local green.",
+   "refs": [
+    "harness/memory/sessions/2026-11-20c-s1-hardening.md"
+   ]
+  },
+  {
+   "id": "SES-2026-11-20d",
+   "type": "session",
+   "label": "S1 hardening run 5",
+   "status": "recorded",
+   "summary": "ProbeGuard decay, jittered slow-close + ceiling, read deadline; ledger 86/85/85.",
+   "refs": [
+    "harness/memory/sessions/2026-11-20d-s1-hardening2.md"
+   ]
+  },
+  {
+   "id": "SES-2026-11-20e",
+   "type": "session",
+   "label": "S1a rand-split",
+   "status": "recorded",
+   "summary": "rand::nosec + audit test; ledger 87/86/86 (run 44728988531 all-green).",
+   "refs": [
+    "harness/memory/sessions/2026-11-20e-rand-split.md"
+   ]
+  },
+  {
+   "id": "SES-2026-11-20f",
+   "type": "session",
+   "label": "Decisions + v0.3.1",
+   "status": "recorded",
+   "summary": "D-0025 advisory+GHSA+v0.3.1 cut; D-0026 S5 creds; signing keypair (private key not in repo).",
+   "refs": [
+    "harness/memory/sessions/2026-11-20f-decisions-and-v031.md"
+   ]
+  },
+  {
+   "id": "SES-2026-11-21",
+   "type": "session",
+   "label": "Memory graph + RAG",
+   "status": "recorded",
+   "summary": "D-0027/D-0028; graph.json + memory_graph.py + memory_rag.py; CI check+smoke.",
+   "refs": [
+    "harness/memory/sessions/2026-11-21-memory-graph-rag.md"
+   ]
+  },
+  {
+   "id": "D-0028",
+   "type": "decision",
+   "label": "RAG over the memory graph",
+   "status": "binding",
+   "summary": "memory_rag.py: BM25 chunk retrieval over the binding markdown corpus (heading-chunked; ids tokenize whole) + graph-context expansion (summary + 1-hop edges). ask [--json][-k]; smoke = retrieval regressions, runs in CI; per-invocation index (no staleness); lexical-not-semantic limitation stated. Read layer - markdown/graph stay authoritative.",
+   "refs": [
+    "harness/memory/graph/memory_rag.py",
+    "harness/memory/DECISIONS.md"
+   ]
+  },
+  {
+   "id": "D-0029",
+   "type": "decision",
+   "label": "XChaCha20 wire standardization executed",
+   "status": "shipped",
+   "summary": "xchacha20-ietf-poly1305 wire = standard XChaCha20-Poly1305-IETF: method-sized SIP004 nonce (N12/N24), 24-byte LE counter fed to aead_xchacha20poly1305_* (HChaCha20 inside the AEAD); zero-IV mislabel + dead n24 RETIRED, no compat mode (never interopped with standard peers; chunk-0 coincidence documented). draft-irtf-cfrg-xchacha-03 vectors 2.2.1/A.2.1/A.1 landed in holo-crypto (no vector, no merge satisfied). Closes binding condition 8 / GAP-xchacha.",
+   "refs": [
+    "engine/crates/holo-ss/src/lib.rs",
+    "engine/crates/holo-crypto/src/lib.rs",
+    "harness/memory/DECISIONS.md"
+   ]
+  },
+  {
+   "id": "SES-2026-11-21a",
+   "type": "session",
+   "label": "XChaCha wire fix + run-7 reconciliation",
+   "status": "recorded",
+   "summary": "D-0029 XChaCha wire fix (+5 tests, local 92-green, static 94); run-7 push reconciled LANDED at 17e5b8d (CI 44759108489 success; FAILED tail was the in-script attempt); mid-run divergence rebased onto the parallel graph/RAG session (their D-0027/D-0028 stand; this run's decision renumbered D-0029).",
+   "refs": [
+    "harness/memory/sessions/2026-11-21a-xchacha-wire.md"
+   ]
+  },
+  {
+   "id": "T-xchacha-interop",
+   "type": "test",
+   "label": "xchacha_wire_is_standard_aead_24byte_le_counter",
+   "status": "passing",
+   "summary": "Binding-condition-8 interop lock: chunk k == standard XChaCha20-Poly1305-IETF at nonce k (byte-exact), k=0,1,2.",
+   "refs": [
+    "engine/crates/holo-ss/src/lib.rs"
+   ]
+  },
+  {
+   "id": "T-xchacha-divergence",
+   "type": "test",
+   "label": "xchacha_wire_differs_from_the_retired_zeroiv_construction",
+   "status": "passing",
+   "summary": "Regression lock: new wire must differ from the retired zero-IV re-key at chunk 1 (chunk 0 coincidentally matches).",
+   "refs": [
+    "engine/crates/holo-ss/src/lib.rs"
+   ]
+  },
+  {
+   "id": "T-xchacha-vectors",
+   "type": "test",
+   "label": "hchacha20_draft_xchacha_2_2_1 / xchacha20_draft_a_2_1_keystream / aead_xchacha20poly1305_draft_a_1",
+   "status": "passing",
+   "summary": "Official draft-irtf-cfrg-xchacha-03 vectors (HChaCha20 subkey; XChaCha20 keystream; AEAD ct+tag+published Poly1305 key) fetched verbatim from the IETF archive.",
+   "refs": [
+    "engine/crates/holo-crypto/src/lib.rs"
+   ]
+  }
+ ],
+ "edges": [
+  {
+   "src": "D-0013",
+   "rel": "supersedes",
+   "dst": "D-0009",
+   "note": "re-escalation with API-verified facts + deadline"
+  },
+  {
+   "src": "D-0018",
+   "rel": "implements",
+   "dst": "D-0008",
+   "note": "S1 item 0: RtlGenRandom + data-dir"
+  },
+  {
+   "src": "D-0018",
+   "rel": "satisfies",
+   "dst": "A2-C2"
+  },
+  {
+   "src": "D-0015",
+   "rel": "satisfies",
+   "dst": "A1-C1"
+  },
+  {
+   "src": "D-0017",
+   "rel": "satisfies",
+   "dst": "A4-C2"
+  },
+  {
+   "src": "D-0027",
+   "rel": "amends",
+   "dst": "D-0016",
+   "note": "graph layer added to the operational stack"
+  },
+  {
+   "src": "D-0016",
+   "rel": "amends",
+   "dst": "D-0005",
+   "note": "operational layer over the binding workflow; backup.sh unchanged"
+  },
+  {
+   "src": "D-0010",
+   "rel": "cites",
+   "dst": "GATE-0001"
+  },
+  {
+   "src": "D-0012",
+   "rel": "cites",
+   "dst": "REVIEW-0002"
+  },
+  {
+   "src": "GATE-0001",
+   "rel": "gates",
+   "dst": "S1"
+  },
+  {
+   "src": "REVIEW-0002",
+   "rel": "amends",
+   "dst": "S1",
+   "note": "binding conditions copied into charter"
+  },
+  {
+   "src": "GATE-0003",
+   "rel": "gates",
+   "dst": "S2"
+  },
+  {
+   "src": "S0",
+   "rel": "ships",
+   "dst": "D-0003",
+   "note": "v0.2.0 Material You"
+  },
+  {
+   "src": "S1",
+   "rel": "implements",
+   "dst": "D-0008",
+   "note": "item 0 shipped; extensions pending"
+  },
+  {
+   "src": "S1",
+   "rel": "implements",
+   "dst": "D-0002",
+   "note": "crypto extensions stay std-only"
+  },
+  {
+   "src": "S2",
+   "rel": "implements",
+   "dst": "D-0014",
+   "note": "holo-tls is the descope-rule transport for trojan"
+  },
+  {
+   "src": "OD-v031",
+   "rel": "blocks",
+   "dst": "A2-C3"
+  },
+  {
+   "src": "OD-s5creds",
+   "rel": "blocks",
+   "dst": "S5"
+  },
+  {
+   "src": "A2-C1",
+   "rel": "closes",
+   "dst": "GAP-replay",
+   "note": "charter; test T-salt-replay-planned; when implemented+tested in S1"
+  },
+  {
+   "src": "A2-C4",
+   "rel": "amends",
+   "dst": "S1",
+   "note": "carried checks re-confirmed as gate-0003 checklist"
+  },
+  {
+   "src": "A3-C7",
+   "rel": "requires_decision",
+   "dst": "OD-v031"
+  },
+  {
+   "src": "A3-C7",
+   "rel": "requires_decision",
+   "dst": "OD-s5creds"
+  },
+  {
+   "src": "D-0014",
+   "rel": "requires_decision",
+   "dst": "OD-d0014"
+  },
+  {
+   "src": "T-salt-replay",
+   "rel": "satisfies",
+   "dst": "A2-C1",
+   "note": "planned acceptance test"
+  },
+  {
+   "src": "T-loopback-refusal",
+   "rel": "satisfies",
+   "dst": "A3-C4",
+   "note": "planned acceptance test"
+  },
+  {
+   "src": "T-ss-probe-tests",
+   "rel": "affects",
+   "dst": "TH-C"
+  },
+  {
+   "src": "TOOL-backup",
+   "rel": "part_of",
+   "dst": "D-0005"
+  },
+  {
+   "src": "TOOL-update-memory",
+   "rel": "part_of",
+   "dst": "D-0016"
+  },
+  {
+   "src": "TOOL-project-memory",
+   "rel": "part_of",
+   "dst": "D-0016"
+  },
+  {
+   "src": "TOOL-memory-graph",
+   "rel": "part_of",
+   "dst": "D-0027"
+  },
+  {
+   "src": "GAP-replay",
+   "rel": "affects",
+   "dst": "TH-C"
+  },
+  {
+   "src": "GAP-slowclose",
+   "rel": "affects",
+   "dst": "TH-C"
+  },
+  {
+   "src": "GAP-probeguard",
+   "rel": "affects",
+   "dst": "TH-C"
+  },
+  {
+   "src": "GAP-xchacha",
+   "rel": "affects",
+   "dst": "TH-B",
+   "note": "interop defect, not confidentiality"
+  },
+  {
+   "src": "L-lockfile-v4",
+   "rel": "affects",
+   "dst": "CI-legacy"
+  },
+  {
+   "src": "L-runner-rss",
+   "rel": "affects",
+   "dst": "T-mem-bounded"
+  },
+  {
+   "src": "L-systemfunction036",
+   "rel": "affects",
+   "dst": "D-0018"
+  },
+  {
+   "src": "L-socks-log-redirect",
+   "rel": "affects",
+   "dst": "CI-ubuntu"
+  },
+  {
+   "src": "L-invalid-workflow",
+   "rel": "affects",
+   "dst": "CI-audit"
+  },
+  {
+   "src": "L-crlf-blobhash",
+   "rel": "affects",
+   "dst": "D-0011"
+  },
+  {
+   "src": "L-cred-logs",
+   "rel": "affects",
+   "dst": "CI-windows",
+   "note": "log diagnosis path"
+  },
+  {
+   "src": "L-orchestration",
+   "rel": "learned_in",
+   "dst": "SES-2026-11-17"
+  },
+  {
+   "src": "L-systemfunction036",
+   "rel": "learned_in",
+   "dst": "SES-2026-11-20"
+  },
+  {
+   "src": "L-runner-rss",
+   "rel": "learned_in",
+   "dst": "SES-2026-11-18"
+  },
+  {
+   "src": "L-lockfile-v4",
+   "rel": "learned_in",
+   "dst": "SES-2026-11-18"
+  },
+  {
+   "src": "GATE-0001",
+   "rel": "reviewed_in",
+   "dst": "ROLE-A1",
+   "note": "panel roles reviewed; same for A2-A4"
+  },
+  {
+   "src": "REVIEW-0002",
+   "rel": "reviewed_in",
+   "dst": "ROLE-A2"
+  },
+  {
+   "src": "ROLE-A3",
+   "rel": "cites",
+   "dst": "D-0014",
+   "note": "conditions authored by A3"
+  },
+  {
+   "src": "ROLE-A4",
+   "rel": "cites",
+   "dst": "D-0017",
+   "note": "audit conditions authored by A4"
+  },
+  {
+   "src": "holo-util",
+   "rel": "part_of",
+   "dst": "D-0002"
+  },
+  {
+   "src": "holo-crypto",
+   "rel": "part_of",
+   "dst": "D-0002"
+  },
+  {
+   "src": "holo-ss",
+   "rel": "part_of",
+   "dst": "S0"
+  },
+  {
+   "src": "holo-socks",
+   "rel": "part_of",
+   "dst": "S0"
+  },
+  {
+   "src": "app-frontends",
+   "rel": "part_of",
+   "dst": "D-0003"
+  },
+  {
+   "src": "GAP-xchacha",
+   "rel": "part_of",
+   "dst": "holo-ss"
+  },
+  {
+   "src": "GAP-probeguard",
+   "rel": "part_of",
+   "dst": "holo-net"
+  },
+  {
+   "src": "TH-G",
+   "rel": "cites",
+   "dst": "D-0008"
+  },
+  {
+   "src": "TH-A",
+   "rel": "cites",
+   "dst": "D-0018"
+  },
+  {
+   "src": "SES-2026-11-20",
+   "rel": "implements",
+   "dst": "S1",
+   "note": "item 0 milestone"
+  },
+  {
+   "src": "SES-2026-11-17",
+   "rel": "authored",
+   "dst": "REVIEW-0002",
+   "note": "panel run that produced the record"
+  },
+  {
+   "src": "D-0018",
+   "rel": "verified_by",
+   "dst": "T-entropy-win-success"
+  },
+  {
+   "src": "D-0018",
+   "rel": "verified_by",
+   "dst": "T-entropy-win-fail-closed"
+  },
+  {
+   "src": "D-0018",
+   "rel": "verified_by",
+   "dst": "T-datadir-no-cwd"
+  },
+  {
+   "src": "D-0018",
+   "rel": "verified_by",
+   "dst": "CI-legacy",
+   "note": "FFI compiles on the 1.77.2 floor (msvc target)"
+  },
+  {
+   "src": "D-0018",
+   "rel": "verified_by",
+   "dst": "CI-windows",
+   "note": "full suite green, required (run 44668106188)"
+  },
+  {
+   "src": "D-0015",
+   "rel": "verified_by",
+   "dst": "T-mem-bounded"
+  },
+  {
+   "src": "D-0017",
+   "rel": "verified_by",
+   "dst": "CI-audit"
+  },
+  {
+   "src": "D-0002",
+   "rel": "verified_by",
+   "dst": "CI-ubuntu"
+  },
+  {
+   "src": "D-0002",
+   "rel": "verified_by",
+   "dst": "CI-windows"
+  },
+  {
+   "src": "D-0002",
+   "rel": "verified_by",
+   "dst": "CI-macos"
+  },
+  {
+   "src": "GATE-0001",
+   "rel": "cites",
+   "dst": "ROLE-A1",
+   "note": "panel roles (also A2-A4)"
+  },
+  {
+   "src": "REVIEW-0002",
+   "rel": "cites",
+   "dst": "ROLE-A2",
+   "note": "panel roles (also A1/A3/A4)"
+  },
+  {
+   "src": "TOOL-memory-rag",
+   "rel": "part_of",
+   "dst": "D-0027"
+  },
+  {
+   "src": "D-0025",
+   "rel": "supersedes",
+   "dst": "D-0009",
+   "note": "resolution: advisory + GHSA + v0.3.1"
+  },
+  {
+   "src": "D-0025",
+   "rel": "supersedes",
+   "dst": "D-0013",
+   "note": "resolved with reconciled facts + deadline met"
+  },
+  {
+   "src": "D-0025",
+   "rel": "satisfies",
+   "dst": "A2-C3"
+  },
+  {
+   "src": "D-0026",
+   "rel": "amends",
+   "dst": "D-0001",
+   "note": "S5 operational credentials only"
+  },
+  {
+   "src": "D-0023",
+   "rel": "satisfies",
+   "dst": "A2-C1"
+  },
+  {
+   "src": "D-0023",
+   "rel": "satisfies",
+   "dst": "A3-C4"
+  },
+  {
+   "src": "D-0023",
+   "rel": "closes",
+   "dst": "GAP-replay"
+  },
+  {
+   "src": "D-0023",
+   "rel": "closes",
+   "dst": "GAP-probeguard"
+  },
+  {
+   "src": "D-0023",
+   "rel": "closes",
+   "dst": "GAP-slowclose",
+   "note": "partial: uniformity residual"
+  },
+  {
+   "src": "D-0024",
+   "rel": "implements",
+   "dst": "D-0008",
+   "note": "rand-split mechanical enforcement (gate-0001 A2-C3)"
+  },
+  {
+   "src": "D-0025",
+   "rel": "ships",
+   "dst": "OD-v031",
+   "note": "v0.3.1 release tags"
+  },
+  {
+   "src": "D-0026",
+   "rel": "closes",
+   "dst": "OD-s5creds"
+  },
+  {
+   "src": "D-0019",
+   "rel": "cites",
+   "dst": "REVIEW-0003"
+  },
+  {
+   "src": "REVIEW-0003",
+   "rel": "gates",
+   "dst": "S1",
+   "note": "cross-validation of the S0->S1 authorization"
+  },
+  {
+   "src": "D-0028",
+   "rel": "amends",
+   "dst": "D-0027",
+   "note": "RAG read layer over the graph"
+  },
+  {
+   "src": "D-0029",
+   "rel": "closes",
+   "dst": "GAP-xchacha",
+   "note": "binding condition 8 (record-0003 A3-C3) satisfied"
+  },
+  {
+   "src": "SES-2026-11-21a",
+   "rel": "authored",
+   "dst": "D-0029"
+  },
+  {
+   "src": "SES-2026-11-21a",
+   "rel": "implements",
+   "dst": "S1",
+   "note": "binding condition 8 / XChaCha wire fix"
+  },
+  {
+   "src": "holo-ss",
+   "rel": "tested_by",
+   "dst": "T-xchacha-interop"
+  },
+  {
+   "src": "holo-ss",
+   "rel": "tested_by",
+   "dst": "T-xchacha-divergence"
+  },
+  {
+   "src": "holo-crypto",
+   "rel": "tested_by",
+   "dst": "T-xchacha-vectors"
+  },
+  {
+   "src": "D-0029",
+   "rel": "verified_by",
+   "dst": "T-xchacha-interop",
+   "note": "local 92-green; CI ledger rides the run-8 push"
+  }
+ ]
 }

@@ -1240,6 +1240,94 @@ mod tests {
     }
 
     #[test]
+    fn hchacha20_draft_xchacha_2_2_1() {
+        // draft-irtf-cfrg-xchacha-03 §2.2.1 (verbatim from the IETF
+        // archive): key = 00..1f, nonce = 00000009 0000004a 00000000
+        // 31415927 → subkey = words 0..3 and 12..15 of the final state,
+        // each serialized little-endian.
+        let key: [u8; 32] = from_hex(
+            "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+        )
+        .try_into()
+        .unwrap();
+        let nonce: [u8; 16] = from_hex("000000090000004a0000000031415927")
+            .try_into()
+            .unwrap();
+        let sub = hchacha20(&key, &nonce);
+        assert_eq!(
+            to_hex(&sub),
+            "82413b4227b27bfed30e42508a877d73a0f9e4d58a74a853c12ec41326d3ecdc"
+        );
+    }
+
+    #[test]
+    fn xchacha20_draft_a_2_1_keystream() {
+        // draft-irtf-cfrg-xchacha-03 A.2.1 (block counter = 0): composed
+        // exactly as the draft's §2.3.1 pseudocode — subkey = HChaCha20 over
+        // IV[0..16], inner nonce = 4 NUL bytes || IV[16..24], keystream from
+        // counter 0. NOTE: this vector's IV ends ...54 55 56 58 (0x58, not
+        // 0x57) — transcribed verbatim, not from memory.
+        let key: [u8; 32] = from_hex(
+            "808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f",
+        )
+        .try_into()
+        .unwrap();
+        let iv24: [u8; 24] =
+            from_hex("404142434445464748494a4b4c4d4e4f5051525354555658")
+                .try_into()
+                .unwrap();
+        let sub = hchacha20(&key, iv24[0..16].try_into().unwrap());
+        let mut n12 = [0u8; 12];
+        n12[4..12].copy_from_slice(&iv24[16..24]);
+        // 256 bytes = the draft's first four keystream rows (000–0ff)
+        let want = from_hex(
+            "1131ce9a2a20ae0d67c8935c7789fa1025c9e5bb720fb96f11354fb97af0bd9a\
+             adec0863ba60cac8582c48f86cdfc48edd46a48642c5de62ccf11c7b21bf337d\
+             29624b4b1b140ace53740e405b2168540fd7d630c1f536fecd722fc3cddba7f4\
+             cca98cf9e47e5e64d115450f9b125b54449ff76141ca620a1f9cfcab2a1a8a25",
+        );
+        for (i, want_block) in want.chunks(64).enumerate() {
+            let ks = chacha20::block(&sub, i as u32, &n12);
+            assert_eq!(&ks[..], want_block, "keystream block {}", i);
+        }
+    }
+
+    #[test]
+    fn aead_xchacha20poly1305_draft_a_1() {
+        // draft-irtf-cfrg-xchacha-03 A.1: the RFC 8439 §2.8.2 example lifted
+        // to a 24-byte IV. Asserts ciphertext AND tag AND the published
+        // intermediate Poly1305 key (= block 0 of subkey/inner-nonce), which
+        // pins every layer of the construction at once.
+        let key: [u8; 32] = from_hex(
+            "808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f",
+        )
+        .try_into()
+        .unwrap();
+        let iv: [u8; 24] =
+            from_hex("404142434445464748494a4b4c4d4e4f5051525354555657")
+                .try_into()
+                .unwrap();
+        let aad = from_hex("50515253c0c1c2c3c4c5c6c7");
+        let pt: &[u8] = b"Ladies and Gentlemen of the class of '99: If I could offer you only one tip for the future, sunscreen would be it.";
+        let sub = hchacha20(&key, iv[0..16].try_into().unwrap());
+        let mut n12 = [0u8; 12];
+        n12[4..12].copy_from_slice(&iv[16..24]);
+        assert_eq!(
+            to_hex(&poly_key(&sub, &n12)),
+            "7b191f80f361f099094f6f4b8fb97df847cc6873a8f2b190dd73807183f907d5"
+        );
+        let out = aead_xchacha20poly1305_encrypt(&key, &iv, &aad, pt);
+        let (ct, tag) = out.split_at(out.len() - 16);
+        assert_eq!(
+            to_hex(ct),
+            "bd6d179d3e83d43b9576579493c0e939572a1700252bfaccbed2902c21396cbb731c7f1b0b4aa6440bf3a82f4eda7e39ae64c6708c54c216cb96b72e1213b4522f8c9ba40db5d945b11b69b982c1bb9e3f3fac2bc369488f76b2383565d3fff921f9664c97637da9768812f615c68b13b52e"
+        );
+        assert_eq!(to_hex(tag), "c0875924c1c7987947deafd8780acf49");
+        let back = aead_xchacha20poly1305_decrypt(&key, &iv, &aad, &out).unwrap();
+        assert_eq!(back.as_slice(), pt);
+    }
+
+    #[test]
     fn aes128_fips197_c1() {
         let key = from_hex("000102030405060708090a0b0c0d0e0f");
         let aes = aes::Aes::new(&key);

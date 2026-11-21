@@ -190,9 +190,13 @@ evidence survives (corrected at record 0003, A1-F3).
 
 - ChaCha20, Poly1305, ChaCha20-Poly1305 AEAD, HChaCha20/XChaCha20 —
   Y.-A. Nir, A. Langley, "ChaCha20 and Poly1305 for IETF Protocols",
-  RFC 8439. NOTE: the RFC 7539-era printed ciphertext for the §2.4.2
-  example is superseded — RFC 8439's value (and OpenSSL's output) is
-  authoritative; our test vector comments document this.
+  RFC 8439; HChaCha20/XChaCha20/AEAD_XChaCha20_Poly1305 per
+  draft-irtf-cfrg-xchacha-03 (§2.2.1 subkey, A.1 AEAD, A.2.1 keystream
+  vectors in the holo-crypto tests — fetched verbatim from the IETF
+  archive 2026-11-21, run 8). NOTE: the RFC 7539-era printed ciphertext
+  for the §2.4.2 example is superseded — RFC 8439's value (and
+  OpenSSL's output) is authoritative; our test vector comments document
+  this.
 - SHA-256/SHA-1 — FIPS 180-4; MD5 — RFC 1321 (only for the legacy
   Shadowsocks password KDF); HMAC — RFC 2104/4231; HKDF — RFC 5869
   (HKDF-SHA1 for the SS session subkey, info "ss-subkey").

@@ -248,3 +248,21 @@
   Also: `git push` needs the inline credential helper on EVERY
   invocation (one was missed on the delete pushes — auth error read
   as "could not read Username", easy to misread as a dead token).
+- Hand-transcribing expected vector hex is itself error-prone: run 8
+  dropped/permuted digits TWICE while typing the draft A.1 ciphertext
+  (a "d4b3"→"d43b" transposition, then a lost 'f' at a multiline
+  string-continuation junction — 226 chars instead of 228). The catch
+  was comparing the IMPLEMENTATION's output against the fetched draft
+  row by row. Long expected values go in ONE unbroken string, and any
+  "vector mismatch" must be resolved by re-reading the source text
+  before concluding the code is wrong — here the code was right and
+  the test constant was wrong, twice.
+- Direction state machines are one-way: holo-ss `Direction` increments
+  its nonce after EVERY seal/open, so a test that seals chunk k and
+  opens it with the SAME Direction gets a tag mismatch (nonce now k+1)
+  — model the two roles as two Directions with independent counters,
+  exactly like the tunnel does. Related trap when writing an
+  "old vs new construction differ" test: the retired zero-IV xchacha
+  and the standard wire COINCIDE at chunk 0 (both nonces all-zero);
+  equivalence must be asserted per-chunk-k and divergence tested at
+  k>=1, or the test proves nothing.

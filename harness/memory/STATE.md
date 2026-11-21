@@ -1,7 +1,38 @@
 # HoloNet State Snapshot
 
-Last updated: 2026-11-20 (UTC, seventh run of the day — OWNER
-DECISIONS EXECUTED: D-0025 advisory+v0.3.1, D-0026 S5 creds). Run 7
+Last updated: 2026-11-21 (UTC, run 8 — XChaCha20 WIRE FIX, binding
+condition 8 / D-0029; S1a now FULLY CLOSED). Restore ritual: warm path
+(runbook 0/0b) — remote reconciliation MATCH at 17e5b8d == origin/main
+(the run-7 push DID land; the BACKUPS.md FAILED tail was an in-script
+attempt only, reconciled + LANDED line appended this run; CI of the
+17e5b8d tree = run 44759108489 SUCCESS). fileMode guard re-applied,
+hooks present, memory gate PASSED. Toolchain REINSTALLED via rustup a
+third time (rustc 1.100.0 — the recycle wipes ~/.cargo reliably;
+runbook step 2 is the proven path); baseline re-verified **87/87
+green BEFORE changes** (static 89), matching the CI-verified run-6/7
+ledger. **XCHACHA20 WIRE FIX SHIPPED (record-0003 A2-F8/A3-C3, gate
+condition 8; D-0029):** holo-ss `Direction` now carries a method-sized
+`Nonce` (N12/N24) — xchacha20-ietf-poly1305 seals/opens via
+`aead_xchacha20poly1305_*` with the 24-byte LE SIP004 counter
+(HChaCha20 subkey derivation inside the AEAD); the mislabeled
+zero-IV re-key + dead `n24` store REMOVED (retired, no compat mode —
+it never interopped with any standard peer; chunk 0 coincidentally
+matches, divergence from the 2nd AEAD op). holo-crypto gained the
+OFFICIAL draft-irtf-cfrg-xchacha-03 vectors fetched verbatim from the
+IETF archive (§2.2.1 HChaCha20 subkey; A.2.1 XChaCha20 keystream, 4
+blocks; A.1 AEAD ct+tag+the published intermediate Poly1305 key) —
+primitives were already draft-correct, now PROVEN. Named holo-ss tests
+`xchacha_wire_is_standard_aead_24byte_le_counter` (byte-exact
+equivalence at nonce k=0,1,2) + `xchacha_wire_differs_from_the_
+retired_zeroiv_construction` (divergence at chunk 1). Local suite
+**92 green** (87 + 3 crypto vectors + 2 wire tests), static 94,
+Cargo.lock v3 HELD. CVE status re-checked: GHSA-8h6m-w5qj-cq9g
+published, cve_id still None (pending — backfill when assigned).
+Remaining S1: BLAKE2s (S1b; SIGMA re-derivation warning applies,
+D-0020), X25519, AES-CFB, ExpandLabel, bignum/RSA (S1b/S1c).
+
+Previous-run state, preserved below (run 7 — OWNER DECISIONS EXECUTED:
+D-0025 advisory+v0.3.1, D-0026 S5 creds). Run 7
 highlights: HoloNet-SA-0001 drafted AND published as GHSA-8h6m-w5qj-
 cq9g (CVE requested); v0.3.1 cut from CI-verified 6314da0 — 4 per-OS
 release builds all-green (windows 44758027482, macos 44758056729,

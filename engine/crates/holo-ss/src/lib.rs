@@ -5,16 +5,20 @@
 //! `[32-byte salt]` then chunks: `[len(2 BE) | tag16][payload | tag16]`
 //! - session subkey = HKDF-SHA1(master_key, salt, "ss-subkey", 32)
 //! - master key = EVP_BytesToKey(MD5, password, 32)
-//! - nonce = 12-byte LE counter starting at zero, incremented after every
-//!   AEAD operation (separate counters per direction)
+//! - nonce = LE counter starting at zero, incremented after every
+//!   AEAD operation (separate counters per direction): 12-byte for
+//!   chacha20-ietf-poly1305 and aes-256-gcm, 24-byte for
+//!   xchacha20-ietf-poly1305 — the standard SIP004 XChaCha wire
+//!   (XChaCha20-Poly1305-IETF per draft-irtf-cfrg-xchacha, fixed 2026-
+//!   11-21 run 8 after the mislabel found by record-0003 A2-F8)
 //! - first chunk payload = SOCKS5 target address (+ optional user payload)
 //!
 //! Anti-probing: any AEAD tag failure closes the connection after a
 //! delayed slow-close with per-peer exponential backoff
 //! (holo_net::ProbeGuard). The error VALUE never leaks whether the failure
-//! was salt, length, or payload. The close delay is deterministic today;
-//! CSPRNG-jittered randomization lands with the S1 entropy work
-//! (docs/THREAT-MODEL.md records the accepted interim exposure).
+//! was salt, length, or payload. The close delay is CSPRNG-jittered since
+//! run 5 (D-0023, ceiling 2 s — the deterministic-timing fingerprint is
+//! closed).
 //!
 //! Supported ciphers: chacha20-ietf-poly1305, xchacha20-ietf-poly1305,
 //! aes-256-gcm — all 32-byte keys, 16-byte tags.
@@ -67,7 +71,39 @@ impl Method {
 struct Direction {
     method: Method,
     subkey: [u8; 32],
-    nonce: [u8; 12],
+    nonce: Nonce,
+}
+
+/// SIP004 nonce: a little-endian counter starting at zero, incremented
+/// after every AEAD operation. Its length is the cipher's AEAD nonce
+/// length — 12 bytes (chacha20-ietf-poly1305, aes-256-gcm) or 24 bytes
+/// (xchacha20-ietf-poly1305 = XChaCha20-Poly1305-IETF).
+enum Nonce {
+    N12([u8; 12]),
+    N24([u8; 24]),
+}
+
+impl Nonce {
+    fn zero_for(method: Method) -> Nonce {
+        match method {
+            Method::XChaCha20IetfPoly1305 => Nonce::N24([0u8; 24]),
+            _ => Nonce::N12([0u8; 12]),
+        }
+    }
+
+    /// little-endian increment over the full counter
+    fn increment(&mut self) {
+        let bytes: &mut [u8] = match self {
+            Nonce::N12(n) => &mut n[..],
+            Nonce::N24(n) => &mut n[..],
+        };
+        for b in bytes.iter_mut() {
+            *b = b.wrapping_add(1);
+            if *b != 0 {
+                break;
+            }
+        }
+    }
 }
 
 impl Direction {
@@ -78,51 +114,46 @@ impl Direction {
         Direction {
             method,
             subkey,
-            nonce: [0u8; 12], // SIP004: nonce starts at zero, LE +1 per op
-        }
-    }
-
-    fn increment(&mut self) {
-        // little-endian increment over all 12 bytes
-        for b in self.nonce.iter_mut() {
-            *b = b.wrapping_add(1);
-            if *b != 0 {
-                break;
-            }
+            nonce: Nonce::zero_for(method), // SIP004: counter starts at zero
         }
     }
 
     fn seal(&mut self, aad: &[u8], pt: &[u8]) -> Vec<u8> {
-        let out = match self.method {
-            Method::ChaCha20IetfPoly1305 => {
-                holo_crypto::aead_chacha20poly1305_encrypt(&self.subkey, &self.nonce, aad, pt)
+        let out = match (&self.method, &self.nonce) {
+            (Method::ChaCha20IetfPoly1305, Nonce::N12(n)) => {
+                holo_crypto::aead_chacha20poly1305_encrypt(&self.subkey, n, aad, pt)
             }
-            Method::XChaCha20IetfPoly1305 => {
-                let mut n24 = [0u8; 24];
-                n24[12..].copy_from_slice(&self.nonce);
-                let zero_iv = [0u8; 16];
-                let sub = holo_crypto::hchacha20(&self.subkey, &zero_iv);
-                holo_crypto::aead_chacha20poly1305_encrypt(&sub, &self.nonce, aad, pt)
+            (Method::XChaCha20IetfPoly1305, Nonce::N24(n)) => {
+                // Standard XChaCha20-Poly1305-IETF (draft-irtf-cfrg-xchacha,
+                // holo-crypto draft-vector-proven): the 24-byte LE counter
+                // IS the AEAD nonce; HChaCha20 subkey derivation happens
+                // inside aead_xchacha20poly1305_*. Interops with mainstream
+                // shadowsocks xchacha20-ietf-poly1305 peers.
+                holo_crypto::aead_xchacha20poly1305_encrypt(&self.subkey, n, aad, pt)
             }
-            Method::Aes256Gcm => holo_crypto::gcm::encrypt(&self.subkey, &self.nonce, aad, pt),
+            (Method::Aes256Gcm, Nonce::N12(n)) => {
+                holo_crypto::gcm::encrypt(&self.subkey, n, aad, pt)
+            }
+            _ => unreachable!("method/nonce length mismatch"),
         };
-        self.increment();
+        self.nonce.increment();
         out
     }
 
     fn open(&mut self, aad: &[u8], ct_tag: &[u8]) -> Result<Vec<u8>, &'static str> {
-        let out = match self.method {
-            Method::ChaCha20IetfPoly1305 => {
-                holo_crypto::aead_chacha20poly1305_decrypt(&self.subkey, &self.nonce, aad, ct_tag)
+        let out = match (&self.method, &self.nonce) {
+            (Method::ChaCha20IetfPoly1305, Nonce::N12(n)) => {
+                holo_crypto::aead_chacha20poly1305_decrypt(&self.subkey, n, aad, ct_tag)
             }
-            Method::XChaCha20IetfPoly1305 => {
-                let zero_iv = [0u8; 16];
-                let sub = holo_crypto::hchacha20(&self.subkey, &zero_iv);
-                holo_crypto::aead_chacha20poly1305_decrypt(&sub, &self.nonce, aad, ct_tag)
+            (Method::XChaCha20IetfPoly1305, Nonce::N24(n)) => {
+                holo_crypto::aead_xchacha20poly1305_decrypt(&self.subkey, n, aad, ct_tag)
             }
-            Method::Aes256Gcm => holo_crypto::gcm::decrypt(&self.subkey, &self.nonce, aad, ct_tag),
+            (Method::Aes256Gcm, Nonce::N12(n)) => {
+                holo_crypto::gcm::decrypt(&self.subkey, n, aad, ct_tag)
+            }
+            _ => unreachable!("method/nonce length mismatch"),
         };
-        self.increment();
+        self.nonce.increment();
         out
     }
 }
@@ -1335,6 +1366,73 @@ mod tests {
         }
         assert_eq!(Method::parse("rc4"), None);
         assert_eq!(Method::parse(""), None);
+    }
+
+    #[test]
+    fn xchacha_wire_is_standard_aead_24byte_le_counter() {
+        // Binding condition 8 (record-0003 A3-C3), the interop lock: the
+        // xchacha20-ietf-poly1305 wire IS XChaCha20-Poly1305-IETF — chunk
+        // k's ciphertext must equal the standard AEAD (draft-vector-proven
+        // in holo-crypto) evaluated at the 24-byte LE nonce = k, byte for
+        // byte. This is exactly what mainstream shadowsocks peers do.
+        let master = master_key("pw-xchacha-interop");
+        let salt = [7u8; 32];
+        let mut subkey = [0u8; 32];
+        subkey.copy_from_slice(&hkdf_sha1(&salt, &master, b"ss-subkey", 32));
+        let mut d = Direction::new(Method::XChaCha20IetfPoly1305, &master, &salt);
+        // SIP004 directions are one-way: seal and open live on separate
+        // Directions with independent counters, exactly like the tunnel.
+        let mut d_rd = Direction::new(Method::XChaCha20IetfPoly1305, &master, &salt);
+        let aad: &[u8] = b"";
+        let chunks: [&[u8]; 3] = [b"first", b"second chunk", &[9u8; 64]];
+        for (k, pt) in chunks.iter().enumerate() {
+            let mut n24 = [0u8; 24];
+            n24[0] = k as u8; // LE counter = k
+            let expect = holo_crypto::aead_xchacha20poly1305_encrypt(&subkey, &n24, aad, pt);
+            let got = d.seal(aad, pt);
+            assert_eq!(got, expect, "chunk {} must match the standard AEAD", k);
+            let back = d_rd.open(aad, &got).unwrap();
+            assert_eq!(back.as_slice(), *pt, "chunk {} roundtrip", k);
+        }
+        // and a tampered chunk fails closed (fresh direction ⇒ nonce 0 =
+        // the chunk's own nonce, so the failure is the tag, not the counter)
+        let mut d2 = Direction::new(Method::XChaCha20IetfPoly1305, &master, &salt);
+        let mut bad = d2.seal(b"", b"t");
+        let last = bad.len() - 1;
+        bad[last] ^= 1;
+        let mut d3 = Direction::new(Method::XChaCha20IetfPoly1305, &master, &salt);
+        assert!(d3.open(b"", &bad).is_err());
+    }
+
+    #[test]
+    fn xchacha_wire_differs_from_the_retired_zeroiv_construction() {
+        // The OLD (pre-run-8) mislabeled wire: HChaCha20(subkey, 0^16) as a
+        // fixed re-key, then plain ChaCha20-Poly1305 with a 12-byte counter.
+        // The two constructions COINCIDE at chunk 0 (both nonces all-zero —
+        // first-session-chunk bytes are unchanged); they diverge from the
+        // second AEAD operation, where the 12-byte counter puts the 1 in
+        // nonce byte 0 while the 24-byte counter puts it in byte 16 of the
+        // XChaCha nonce. Asserting divergence at chunk 1 locks the fix in
+        // place — a regression back to the old path would re-produce these
+        // bytes and fail this test.
+        let master = master_key("pw-xchacha-interop");
+        let salt = [7u8; 32];
+        let mut subkey = [0u8; 32];
+        subkey.copy_from_slice(&hkdf_sha1(&salt, &master, b"ss-subkey", 32));
+        let mut d = Direction::new(Method::XChaCha20IetfPoly1305, &master, &salt);
+        let _chunk0 = d.seal(b"", b"first");
+        let new_wire = d.seal(b"", b"second"); // nonce = LE(1) over 24 bytes
+        let retired = holo_crypto::aead_chacha20poly1305_encrypt(
+            &holo_crypto::hchacha20(&subkey, &[0u8; 16]),
+            &[1u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], // 12-byte counter = 1
+            b"",
+            b"second",
+        );
+        assert_ne!(
+            new_wire,
+            retired,
+            "wire must be the standard XChaCha, not the retired zero-IV re-key"
+        );
     }
 
     #[test]

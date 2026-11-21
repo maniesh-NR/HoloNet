@@ -229,9 +229,28 @@ ONLY from `holo_util::rand::os_fill` — **fail-closed**:
   manifest. Owner decision: option (a) — advisory + re-release —
   chosen BEFORE the S1 XChaCha20 wire change lands, so the re-release
   carries no wire-format change.
+- **XChaCha20 wire standardization — RESOLVED 2026-11-21 (run 8,
+  D-0029):** under the name `xchacha20-ietf-poly1305`, holo-ss
+  shipped HChaCha20(subkey, 0^16)-re-keyed ChaCha20-Poly1305 with a
+  12-byte counter — never XChaCha (record-0003 A2-F8's "re-keyed
+  ChaCha20-Poly1305"). The wire is NOW standard
+  XChaCha20-Poly1305-IETF with a 24-byte LE SIP004 counter
+  (draft-irtf-cfrg-xchacha-03 §2.2.1/A.1/A.2.1 vectors in holo-crypto
+  tests; byte-exact equivalence locked by the holo-ss named test).
+  Honest compat consequence: v0.3.1-and-earlier xchacha sessions
+  cannot interop with post-run-8 builds — but they never interopped
+  with ANY standard shadowsocks peer under that name, which is the
+  mislabel being fixed; chunk 0 of a session coincidentally matches
+  (both constructions use the all-zero first nonce), divergence
+  begins at the second AEAD operation. Cryptographically the retired
+  construction was still ChaCha20-Poly1305 (confidentiality/auth
+  intact) — the defect was interop/mislabeling, not key weakness.
 
 ## Revision history
 
+- 2026-11-21 — run 8: §G disclosure bullet extended with the XChaCha20
+  wire standardization resolution (D-0029 — record-0003 A2-F8 closed;
+  binding condition 8 DONE).
 - 2026-11-13 — created at gate 0001 (A2-C2), including the D-0008
   entropy decision recorded in `harness/memory/DECISIONS.md`.
 - 2026-11-17 — progress review 0002 amendments: §A local-SOCKS-hop

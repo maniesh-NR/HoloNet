@@ -245,7 +245,8 @@ Acceptance criteria (all measurable):
   elevation above) **DONE 2026-11-20 run 5 — `AUTH_READ_DEADLINE` 10 s
   over the whole unauthenticated phase, cleared post-auth, named test
   `silent_after_valid_length_times_out`; the remaining S1 crypto items
-  (XChaCha wire fix, rand-split enforcement, BLAKE2s, X25519, AES-CFB,
+  (XChaCha wire fix **DONE 2026-11-21 run 8**, rand-split enforcement
+  **DONE 2026-11-20 run 6**, BLAKE2s, X25519, AES-CFB,
   ExpandLabel, bignum/RSA) are the next runs' work**.
 - OpenSSL cross-checks during development, recorded in the session
   journal WITH the exact command lines and ≥16 hex characters of each
@@ -471,6 +472,24 @@ verdicts of A1/A2/A3/A4, archived verbatim in
    with draft-irtf-cfrg-xchacha vectors, or de-scope the cipher with an
    honest non-interop note; remove the dead `n24` store
    (holo-ss/src/lib.rs:97-98).
+   **DONE 2026-11-21 run 8 (fix chosen, not de-scope; D-0029): holo-ss
+   `Direction` now holds a method-sized `Nonce` (N12/N24); the
+   xchacha20-ietf-poly1305 wire IS XChaCha20-Poly1305-IETF — 24-byte LE
+   SIP004 counter fed to `aead_xchacha20poly1305_*` (HChaCha20 subkey
+   derivation lives inside the AEAD); the mislabeled zero-IV re-key and
+   the dead `n24` store are removed. holo-crypto now carries the official
+   draft-irtf-cfrg-xchacha-03 vectors (fetched verbatim from the IETF
+   archive): §2.2.1 HChaCha20 subkey, A.2.1 XChaCha20 keystream (4
+   blocks, counter 0), A.1 AEAD ct+tag+the published intermediate
+   Poly1305 key — the primitives were already draft-correct; now
+   proven. holo-ss named tests:
+   `xchacha_wire_is_standard_aead_24byte_le_counter` (byte-exact
+   equivalence with the standard AEAD at nonce=k, k=0,1,2) +
+   `xchacha_wire_differs_from_the_retired_zeroiv_construction`
+   (divergence at chunk 1; chunk 0 coincidentally matches — both
+   nonces all-zero). Local suite 92-green (+3 crypto vectors, +2 wire
+   tests); static 94; Cargo.lock v3 held; CI verification rides the
+   run-8 push.**
 9. **Bookkeeping refresh at every gate (A3-C4)**: STATE.md and
    ARCHITECTURE.md "Current workspace" re-checked against the tree
    (partially done this run).

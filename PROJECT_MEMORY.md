@@ -55,9 +55,8 @@ run 44703200189 @ f433de4 all-green (6/6 jobs; 86 Linux / 85 macOS /
 
 S1 in progress: items 0, salt-cache, loopback-bind, ProbeGuard decay,
 jittered slow-close, read-deadline AND rand-split enforcement (run 6,
-D-0024 — rand::nosec doc-hidden module, ALL re-export paths closed,
-named workspace audit test) all DONE. S1a is CLOSED except the XChaCha
-wire fix, which is NOW UNBLOCKED: both owner decisions landed run 7.
+D-0024) all DONE. **S1a is FULLY CLOSED as of 2026-11-21 (run 8):
+the XChaCha wire fix — the last S1a item — landed (D-0029).**
 
 RUN 7 (2026-11-20, owner decisions executed): **D-0025 = (a) advisory +
 v0.3.1** and **D-0026 = S5 creds embedded-with-risk-acceptance**.
@@ -75,6 +74,23 @@ private in sandbox /home/z/my-project/keys/ (NOT in repo), pubkey
 committed docs/release-signing.pub.pem; owner re-key at S7. Next dev:
 XChaCha wire fix (unblocked) + BLAKE2s onward (S1b/S1c).
 
+RUN 8 (2026-11-21, XChaCha wire fix — D-0029, binding condition 8,
+record-0003 A3-C3): the xchacha20-ietf-poly1305 wire is NOW standard
+XChaCha20-Poly1305-IETF (24-byte LE SIP004 counter → holo-crypto's
+`aead_xchacha20poly1305_*`; `Direction` holds a method-sized N12/N24
+nonce; the mislabeled zero-IV re-key + dead n24 store RETIRED, no
+compat mode — it never interopped with any standard peer; chunk 0
+coincidentally matches, divergence from the 2nd AEAD op). holo-crypto
+now carries the official draft-irtf-cfrg-xchacha-03 vectors (§2.2.1 /
+A.2.1 keystream / A.1 AEAD incl. the published intermediate Poly1305
+key — fetched verbatim from the IETF archive); primitives were already
+draft-correct, now PROVEN. Local 92-green (+5), static 94, lock v3
+held; CI verification rides the run-8 push. Run-8 session-start
+reconciliation: the run-7 push HAD landed at 17e5b8d (CI run
+44759108489 SUCCESS) despite the BACKUPS.md FAILED tail — LANDED
+reconciliation line appended; CVE still unassigned (cve_id None).
+Next dev: BLAKE2s (S1b), X25519, AES-CFB, ExpandLabel, bignum/RSA.
+
 ## Verification contracts (how "done" is proven)
 
 - Full matrix green on push: ubuntu/macos/1.77.2/cross-check/
@@ -87,10 +103,13 @@ XChaCha wire fix (unblocked) + BLAKE2s onward (S1b/S1c).
   integration test, cfg-gated util/config deltas).
 - Memory regression budget: RSS growth < 8 MB over 64 MB relayed
   (D-0015; local reference +88–376 KB; runner variance absorbed).
-- 89 `#[test]` countable: `grep -rn "#\[test\]" engine/crates
-  --include="*.rs" | wc -l` → 89 (87 runnable on Linux after run 6's
-  +1 audit test — no cfg gates, so +1 on macOS/Windows too; the 87/86/86
-  ledger above is CI-verified @ 937554f, run 44728988531).
+- 89→94 `#[test]` countable: `grep -rn "#\[test\]" engine/crates
+  --include="*.rs" | wc -l` → 94 (92 runnable on Linux after run 8's
+  +3 holo-crypto draft vectors + 2 holo-ss wire tests — no cfg gates,
+  so +5 on macOS/Windows too; run 6's +1 audit test included in the
+  base). Local 92-green; the CI-verified per-OS ledger rides the run-8
+  push (expect 92/91/91; previously 87/86/86 @ 937554f, run
+  44728988531).
 - Every run ends: `bash harness/scripts/backup.sh "<summary>"`
   (WORKFLOW §1.2; push = completion). Gate records quote SHA-256 in
   the BACKUPS.md line; next record number = 0004 (S1→S2 gate,
@@ -114,7 +133,9 @@ XChaCha wire fix (unblocked) + BLAKE2s onward (S1b/S1c).
    close-vs-hang uniformity~~ DONE 2026-11-20 run 5 (D-0023: cap 1024
    stalest-eviction + full-jitter ceiling 2 s + auth read deadline 10 s;
    +3 named tests, local 86-green; lock-across-sleep defect fixed);
-   remaining: XChaCha standard switch (waits on D-0009/D-0013),
+   remaining: ~~XChaCha standard switch (waits on D-0009/D-0013)~~
+   DONE 2026-11-21 run 8 (D-0029 — standard 24-byte-counter wire +
+   draft vectors; the zero-IV mislabel retired),
    BLAKE2s (BLAKE2b cut unless justified), X25519 (1M-vector execution
    mode decided first), AES-CFB, ExpandLabel, bignum/RSA. Rand-split
    enforcement DONE 2026-11-20 run 6 (D-0024).
@@ -171,7 +192,7 @@ XChaCha wire fix (unblocked) + BLAKE2s onward (S1b/S1c).
 ## Recent Progress & Git Activity
 
 ```text
+### Commit: 17e5b8d - docs: fix split-line pubkey filename in STATE (release-signing.pub) (maniesh-NR, 2026-11-20)
 ### Commit: 6ae86fa - backup: FAILED 2026-11-20T15:01:11Z (push did not land) (maniesh-NR, 2026-11-20)
 ### Commit: 19e0791 - backup: run 7: D-0025 advisory+GHSA+v0.3.1 cut+drafts deleted; D-0026 S5 creds decided --allow-untracked (maniesh-NR, 2026-11-20)
-### Commit: 6314da0 - backup: FAILED 2026-11-20T11:39:41Z (push did not land) (maniesh-NR, 2026-11-20)
 ```
