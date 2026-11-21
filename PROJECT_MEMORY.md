@@ -200,7 +200,7 @@ Next dev: BLAKE2s (S1b), X25519, AES-CFB, ExpandLabel, bignum/RSA.
 ## Recent Progress & Git Activity
 
 ```text
+### Commit: 6f977ad - backup: run 8 closure: CI-VERIFIED 44872078593 @ 676a58c all-green 6/6, per-OS ledger 92 Linux/91 macOS/91 Windows (visible 82/81/81 + socks 10 reconciled); README badge + Status block and ARCHITECTURE data-p (maniesh-NR, 2026-11-21)
 ### Commit: 676a58c - backup: FAILED 2026-11-21T05:41:44Z (push did not land) (maniesh-NR, 2026-11-21)
 ### Commit: 84dbf83 - backup: run 8: XChaCha wire fix D-0029 (standard XChaCha20-Poly1305-IETF, 24-byte LE SIP004 counter; draft-irtf-cfrg-xchacha-03 vectors 2.2.1/A.2.1/A.1; +5 tests, rebased-tree 92-green, static 94); mid-run di (maniesh-NR, 2026-11-21)
-### Commit: e2e3a83 - run 8: XChaCha20 wire fix — standard XChaCha20-Poly1305-IETF (24-byte LE SIP004 counter) + draft-irtf-cfrg-xchacha vectors; +5 tests, local 92-green (maniesh-NR, 2026-11-21)
 ```
