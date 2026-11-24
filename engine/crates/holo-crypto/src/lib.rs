@@ -9,6 +9,11 @@
 //! - ChaCha20 (RFC 8439 §2), Poly1305 (RFC 8439 §2.5),
 //!   ChaCha20-Poly1305 AEAD (RFC 8439 §2.8), XChaCha20 (draft-irtf-cfrg-xchacha)
 //! - AES-128/192/256 encryption (FIPS-197) + GCM (NIST SP 800-38D)
+//! - AES-CFB128 stream mode (NIST SP 800-38A §6.3) — PRIVATE primitive,
+//!   mechanically enforced by the `cfb_usage_audit` test (record-0003 A2-C4)
+//! - RSA signature VERIFICATION — RSASSA-PKCS1-v1_5 + RSASSA-PSS, SHA-256
+//!   (RFC 8017 §8.1.2/§8.2.2/§9.1/§9.2) — over the hand-written `bignum`
+//!   module (little-endian u64 limbs, CIOS Montgomery multiplication)
 //! - OpenSSL `EVP_BytesToKey` (the classic Shadowsocks password KDF)
 //!
 //! Design notes for future sessions (the pitfalls that cost time before):
@@ -305,6 +310,18 @@ pub fn hkdf_sha256(salt: &[u8], ikm: &[u8], info: &[u8], out_len: usize) -> Vec<
     expand(&|k, d| hmac_sha256(k, d).to_vec(), 32, &prk, info, out_len)
 }
 
+/// Bare HKDF-SHA256 **expand phase** (RFC 5869 §2.3): a caller-supplied PRK
+/// is stretched into `out_len` bytes of OKM with `info`. The TLS 1.3 key
+/// schedule (see the `tls13` module below) works in exactly this shape —
+/// HKDF-Extract is applied separately with per-stage salts and the `info`
+/// blob is an encoded HkdfLabel — so it needs the expand half of
+/// [`hkdf_sha256`] on its own. Implemented by the crate's one private
+/// `expand` helper shared with `hkdf_sha256`/`hkdf_sha1` (no duplicated
+/// HKDF logic).
+pub fn hkdf_sha256_expand(prk: &[u8], info: &[u8], out_len: usize) -> Vec<u8> {
+    expand(&|k, d| hmac_sha256(k, d).to_vec(), 32, prk, info, out_len)
+}
+
 /// HKDF-SHA1 — the Shadowsocks AEAD session-subkey KDF (info = "ss-subkey").
 pub fn hkdf_sha1(salt: &[u8], ikm: &[u8], info: &[u8], out_len: usize) -> Vec<u8> {
     let prk = hmac_sha1(salt, ikm);
@@ -329,6 +346,104 @@ where
     }
     okm.truncate(out_len);
     okm
+}
+
+// ---------------------------------------------------------------------------
+// TLS 1.3 key schedule (RFC 8446 §7.1)
+// ---------------------------------------------------------------------------
+
+/// TLS 1.3 key-schedule helpers (RFC 8446 §7.1), SHA-256 only (Hash.length
+/// = 32). RFC 8446 §7.1 defines, verbatim:
+///
+/// ```text
+///    HKDF-Expand-Label(Secret, Label, Context, Length) =
+///         HKDF-Expand(Secret, HkdfLabel, Length)
+///
+///    Where HkdfLabel is specified as:
+///
+///    struct {
+///        uint16 length = Length;
+///        opaque label<7..255> = "tls13 " + Label;
+///        opaque context<0..255> = Context;
+///    } HkdfLabel;
+///
+///    Derive-Secret(Secret, Label, Messages) =
+///         HKDF-Expand-Label(Secret, Label,
+///                           Transcript-Hash(Messages), Hash.length)
+/// ```
+///
+/// ("0" in the schedule diagram is a string of Hash.length zero bytes;
+/// HKDF-Extract takes Salt from the current secret state and IKM from the
+/// new secret — RFC 8446 §7.1.) Every function here is validated against
+/// the official RFC 8448 §3 "Simple 1-RTT Handshake" trace in the tests.
+pub mod tls13 {
+    use super::hkdf_sha256_expand;
+
+    /// The `"tls13 "` prefix RFC 8446 §7.1 prepends to every label. The
+    /// RFC's labels are all ASCII and carry no trailing NUL byte (§7.1).
+    pub const LABEL_PREFIX: &[u8] = b"tls13 ";
+
+    /// Encode the `HkdfLabel` struct of RFC 8446 §7.1 exactly as it goes on
+    /// the wire (it *is* the HKDF-Expand `info` argument):
+    ///
+    /// ```text
+    ///    struct {
+    ///        uint16 length = Length;
+    ///        opaque label<7..255> = "tls13 " + Label;
+    ///        opaque context<0..255> = Context;
+    ///    } HkdfLabel;
+    /// ```
+    ///
+    /// Layout: u16be(out_len) || u8(6 + label.len()) || "tls13 " || label
+    /// || u8(context.len()) || context. The label field must satisfy its
+    /// <7..255> bound (i.e. `label` is non-empty) and `context` its
+    /// <0..255> bound.
+    pub fn encode_hkdf_label(label: &[u8], context: &[u8], out_len: usize) -> Vec<u8> {
+        assert!(
+            out_len <= u16::MAX as usize,
+            "tls13: HkdfLabel.length does not fit in uint16"
+        );
+        let full_label_len = LABEL_PREFIX.len() + label.len();
+        assert!(
+            (7..=255).contains(&full_label_len),
+            "tls13: label field must be 7..255 bytes (\"tls13 \" + Label)"
+        );
+        assert!(context.len() <= 255, "tls13: context too long for HkdfLabel");
+        let mut out = Vec::with_capacity(4 + full_label_len + context.len());
+        out.extend_from_slice(&(out_len as u16).to_be_bytes());
+        out.push(full_label_len as u8);
+        out.extend_from_slice(LABEL_PREFIX);
+        out.extend_from_slice(label);
+        out.push(context.len() as u8);
+        out.extend_from_slice(context);
+        out
+    }
+
+    /// HKDF-Expand-Label (RFC 8446 §7.1): HKDF-Expand(Secret, HkdfLabel,
+    /// Length) with the HkdfLabel wire encoding from [`encode_hkdf_label`].
+    pub fn hkdf_expand_label(
+        secret: &[u8],
+        label: &[u8],
+        context: &[u8],
+        out_len: usize,
+    ) -> Vec<u8> {
+        let info = encode_hkdf_label(label, context, out_len);
+        hkdf_sha256_expand(secret, &info, out_len)
+    }
+
+    /// Derive-Secret (RFC 8446 §7.1): HKDF-Expand-Label(Secret, Label,
+    /// Transcript-Hash(Messages), Hash.length) — so the output is always
+    /// Hash.length = 32 bytes of SHA-256 output.
+    ///
+    /// NOTE: `transcript_hash` is the ALREADY-HASHED transcript. The caller
+    /// computes it with [`crate::sha256::digest`] over the concatenation of
+    /// the indicated handshake messages (type + length fields included,
+    /// record layer headers excluded — RFC 8446 §7.1 Transcript-Hash). The
+    /// tests pin this end-to-end against the RFC 8448 §3 trace, which
+    /// publishes both the raw messages and the resulting hashes.
+    pub fn derive_secret(secret: &[u8], label: &[u8], transcript_hash: &[u8]) -> Vec<u8> {
+        hkdf_expand_label(secret, label, transcript_hash, 32)
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1189,6 +1304,75 @@ pub mod gcm {
 }
 
 // ---------------------------------------------------------------------------
+// AES-CFB128 (NIST SP 800-38A §6.3, Appendix F.3) — PRIVATE stream primitive
+// ---------------------------------------------------------------------------
+//
+// Record-0003 A2-C4 (mechanical usage enforcement): raw CFB encrypt/decrypt
+// types are NOT `pub` outside the authenticated wrapper module. CFB128 is
+// unauthenticated and byte-malleable by design, so until a pub authenticated
+// wrapper exists nothing outside this single-file crate may even name the
+// primitive. Enforcement has two halves, verifiable independently:
+// - compile failure: `cfb128` and its functions are `pub(crate)` — invisible
+//   to every other crate in the workspace, so any external use cannot link;
+// - CI audit: the `cfb_usage_audit` test at the bottom of this file fails if
+//   ANY other workspace .rs file references `cfb` at all.
+// A future consumer gets access ONLY through a pub wrapper API that itself
+// authenticates; enabling one means extending that audit's allowlist with a
+// justification comment + a DECISIONS.md record — the visible, journaled
+// path (same discipline as holo-util's rand_split_audit).
+pub(crate) mod cfb128 {
+    use super::aes::Aes;
+
+    fn enc_block(aes: &Aes, b: &[u8; 16]) -> [u8; 16] {
+        let mut blk = *b;
+        aes.encrypt_block(&mut blk);
+        blk
+    }
+
+    // S1 scope = primitive + enforcement; the consumer (the authenticated
+    // wrapper) arrives later, so a non-test build legitimately sees these
+    // two functions as dead code. It is the cfb_usage_audit test — not
+    // reachability — that keeps usage honest.
+    #[cfg_attr(not(test), allow(dead_code))]
+    /// CFB128 encryption in place (SP 800-38A §6.3): O = E_K(C_prev);
+    /// C_i = P_i XOR leftmost_bytes(O). Stream mode — arbitrary lengths;
+    /// a partial final block consumes only its own bytes of the keystream
+    /// block. AES *encryption* is used in both directions; `iv` seeds the
+    /// 16-byte feedback register.
+    pub(crate) fn encrypt(aes: &Aes, iv: &[u8; 16], data: &mut [u8]) {
+        let mut prev = *iv;
+        for chunk in data.chunks_mut(16) {
+            let out = enc_block(aes, &prev);
+            for (i, b) in chunk.iter_mut().enumerate() {
+                *b ^= out[i];
+            }
+            // chunk now holds C_i — feed it back (full blocks only; a
+            // partial final chunk ends the loop).
+            if chunk.len() == 16 {
+                prev.copy_from_slice(chunk);
+            }
+        }
+    }
+
+    #[cfg_attr(not(test), allow(dead_code))]
+    /// CFB128 decryption in place: P_i = C_i XOR E_K(C_{i-1}). The feedback
+    /// is the *received* ciphertext, so it must be captured BEFORE the
+    /// in-place XOR overwrites the block with plaintext.
+    pub(crate) fn decrypt(aes: &Aes, iv: &[u8; 16], data: &mut [u8]) {
+        let mut prev = *iv;
+        for chunk in data.chunks_mut(16) {
+            let out = enc_block(aes, &prev);
+            if chunk.len() == 16 {
+                prev.copy_from_slice(chunk); // still C_i here — snapshot first
+            }
+            for (i, b) in chunk.iter_mut().enumerate() {
+                *b ^= out[i];
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // EVP_BytesToKey (OpenSSL) — the Shadowsocks password KDF (MD5, count=1)
 // ---------------------------------------------------------------------------
 
@@ -1235,9 +1419,532 @@ pub fn from_hex(s: &str) -> Vec<u8> {
 // tests — official vectors
 // ---------------------------------------------------------------------------
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+// ---------------------------------------------------------------------------
+// Minimal big-integer arithmetic (support layer for RSA, below)
+// ---------------------------------------------------------------------------
+
+/// Minimal big-unsigned-integer arithmetic over little-endian `Vec<u64>`
+/// limbs, with Montgomery multiplication (CIOS) and modular exponentiation.
+/// Octet-string conversion follows RFC 8017 §4.1/§4.2 (`os2ip`/`i2osp`,
+/// big-endian). Limb vectors are kept trimmed — the integer zero is the
+/// EMPTY vector.
+///
+/// CONSTANT-TIME STATUS — RECORDED DECISION (A3-C6/F13 bar): every operation
+/// in this module processes PUBLIC data only — signatures, public keys, the
+/// exponent e, message hashes and salts are all attacker-visible in the
+/// verification path — so variable-time behaviour (bit-branching `mont_pow`,
+/// the data-dependent final subtraction, the operand-shape-dependent `rem`)
+/// is an ACCEPTED RISK for this stage, not an oversight. No secret-operand
+/// operation is in scope here. A future consumer that routes SECRET operands
+/// through this module (e.g. S2 client-side operations holding RSA private
+/// keys) MUST treat constant-time execution as its own requirement; this
+/// code does not provide it.
+pub mod bignum {
+    use std::cmp::Ordering;
+
+    /// Drop leading (most significant) zero limbs.
+    fn trim(mut v: Vec<u64>) -> Vec<u64> {
+        while v.last() == Some(&0) {
+            v.pop();
+        }
+        v
+    }
+
+    /// RFC 8017 §4.2 OS2IP: big-endian octet string → integer (limbs LE).
+    pub fn os2ip(bytes: &[u8]) -> Vec<u64> {
+        let mut out = vec![0u64; (bytes.len() + 7) / 8];
+        for (i, b) in bytes.iter().rev().enumerate() {
+            out[i / 8] |= (*b as u64) << (8 * (i % 8));
+        }
+        out
+    }
+
+    /// RFC 8017 §4.1 I2OSP: integer → big-endian octet string of exactly
+    /// `len` octets; `Err` ("integer too large") when the value does not fit.
+    pub fn i2osp(x: &[u64], len: usize) -> Result<Vec<u8>, &'static str> {
+        if bit_len(x).div_ceil(8) > len {
+            return Err("i2osp: integer too large");
+        }
+        let mut out = vec![0u8; len];
+        for (i, b) in out.iter_mut().rev().enumerate() {
+            *b = if i / 8 < x.len() {
+                (x[i / 8] >> (8 * (i % 8))) as u8
+            } else {
+                0
+            };
+        }
+        Ok(out)
+    }
+
+    /// Number of significant bits (0 for the zero integer).
+    pub fn bit_len(x: &[u64]) -> usize {
+        match x.iter().rposition(|&l| l != 0) {
+            None => 0,
+            Some(top) => 64 * top + (64 - x[top].leading_zeros() as usize),
+        }
+    }
+
+    /// Three-way compare (operands are trimmed first, so leading zero limbs
+    /// and the empty-vector zero compare correctly).
+    pub fn cmp(a: &[u64], b: &[u64]) -> Ordering {
+        let (a, b) = (trim(a.to_vec()), trim(b.to_vec()));
+        if a.len() != b.len() {
+            return a.len().cmp(&b.len());
+        }
+        for i in (0..a.len()).rev() {
+            if a[i] != b[i] {
+                return a[i].cmp(&b[i]);
+            }
+        }
+        Ordering::Equal
+    }
+
+    /// a + b.
+    pub fn add(a: &[u64], b: &[u64]) -> Vec<u64> {
+        let n = a.len().max(b.len()) + 1;
+        let mut out = Vec::with_capacity(n);
+        let mut carry = 0u64;
+        for i in 0..n {
+            let x = *a.get(i).unwrap_or(&0) as u128;
+            let y = *b.get(i).unwrap_or(&0) as u128;
+            let s = x + y + carry as u128;
+            out.push(s as u64);
+            carry = (s >> 64) as u64;
+        }
+        trim(out)
+    }
+
+    /// a − b. Returns `None` on underflow (a < b) — the documented choice:
+    /// callers that cannot underflow (`rem`, the Montgomery final subtract)
+    /// use guarded/`expect` calls, verification code maps it to errors.
+    pub fn sub(a: &[u64], b: &[u64]) -> Option<Vec<u64>> {
+        if cmp(a, b) == Ordering::Less {
+            return None;
+        }
+        let n = a.len().max(b.len());
+        let mut out = Vec::with_capacity(n);
+        let mut borrow = 0u64;
+        for i in 0..n {
+            let x = *a.get(i).unwrap_or(&0);
+            let y = *b.get(i).unwrap_or(&0);
+            let (d1, br1) = x.overflowing_sub(y);
+            let (d2, br2) = d1.overflowing_sub(borrow);
+            out.push(d2);
+            borrow = (br1 as u64) | (br2 as u64);
+        }
+        debug_assert_eq!(borrow, 0, "sub: inputs checked, borrow must cancel");
+        Some(trim(out))
+    }
+
+    /// Schoolbook multiplication with u128 products. No u128 overflow is
+    /// possible: the accumulate step is bounded by (2^64−1)² + 2·(2^64−1)
+    /// = 2^128 − 1 (same argument as Poly1305 above).
+    pub fn mul(a: &[u64], b: &[u64]) -> Vec<u64> {
+        if a.is_empty() || b.is_empty() {
+            return Vec::new();
+        }
+        let mut out = vec![0u64; a.len() + b.len()];
+        for (i, &ai) in a.iter().enumerate() {
+            let mut carry: u128 = 0;
+            for (j, &bj) in b.iter().enumerate() {
+                let cur = (out[i + j] as u128) + (ai as u128) * (bj as u128) + carry;
+                out[i + j] = cur as u64;
+                carry = cur >> 64;
+            }
+            let mut idx = i + b.len();
+            while carry > 0 {
+                let cur = (out[idx] as u128) + carry;
+                out[idx] = cur as u64;
+                carry = cur >> 64;
+                idx += 1;
+            }
+        }
+        trim(out)
+    }
+
+    /// a mod m via MSB-first binary long division, O(bits(a)·limbs(m)).
+    /// Used once per `modpow` call for base reduction — not on hot loops.
+    /// `m` must be nonzero.
+    pub fn rem(a: &[u64], m: &[u64]) -> Vec<u64> {
+        let m = trim(m.to_vec());
+        debug_assert!(!m.is_empty(), "rem: zero modulus");
+        let a = trim(a.to_vec());
+        if cmp(&a, &m) == Ordering::Less {
+            return a;
+        }
+        let mut r: Vec<u64> = Vec::new();
+        for i in (0..bit_len(&a)).rev() {
+            let bit = (a[i / 64] >> (i % 64)) & 1;
+            // r = 2·r + bit (MSB-first shift-add)
+            let mut carry = bit;
+            for limb in r.iter_mut() {
+                let next = (*limb << 1) | carry;
+                carry = *limb >> 63;
+                *limb = next;
+            }
+            if carry != 0 {
+                r.push(carry);
+            }
+            r = trim(r);
+            if cmp(&r, &m) != Ordering::Less {
+                r = sub(&r, &m).expect("rem: r < 2m ⇒ single subtract cannot underflow");
+            }
+        }
+        r
+    }
+
+    /// Montgomery context number n0′ = −n⁻¹ mod 2^64 for an odd modulus
+    /// (read from n[0] once per modulus). Newton iteration on the low bits:
+    /// if x ≡ n0⁻¹ (mod 2^m) then x·(2 − n0·x) ≡ n0⁻¹ (mod 2^2m); seed
+    /// x = 1 (correct mod 2 because n0 is odd) and double the precision six
+    /// times to reach mod 2^64, then negate.
+    pub fn montgomery_context(n: &[u64]) -> u64 {
+        let n0 = *n.first().expect("montgomery_context: empty modulus");
+        debug_assert!(n0 & 1 == 1, "Montgomery requires an odd modulus");
+        let mut x: u64 = 1;
+        for _ in 0..6 {
+            x = x.wrapping_mul(2u64.wrapping_sub(n0.wrapping_mul(x)));
+        }
+        x.wrapping_neg()
+    }
+
+    /// Coarse Integrated Operand Scanning (CIOS) Montgomery multiplication
+    /// (Koç/Acar/Kaliski): returns a·b·R⁻¹ mod n for a, b < n, with
+    /// R = 2^(64·k) and k = limbs of the (odd, normalized) modulus n.
+    /// Every per-limb accumulation runs in u128 with the carry split by
+    /// shift/mask, so nothing overflows (max intermediate
+    /// (2^64−1)² + 2·(2^64−1) = 2^128 − 1).
+    ///
+    /// FINAL-CARRY-LIMB PITFALL (documented): after the last outer
+    /// iteration the accumulator T — kept as k+1 limbs, with t[k+1] as the
+    /// extra carry slot a naive k-limb layout loses — satisfies T < 2n and
+    /// may still be ≥ n. Exactly ONE conditional subtraction of n brings it
+    /// below n; T < 2n is what makes a single subtract sufficient.
+    pub fn mont_mul(a: &[u64], b: &[u64], n: &[u64], n0p: u64) -> Vec<u64> {
+        let k = n.len();
+        debug_assert!(k > 0, "mont_mul: empty modulus");
+        debug_assert!(n[k - 1] != 0, "mont_mul: modulus must be normalized");
+        debug_assert!(n[0] & 1 == 1, "mont_mul: modulus must be odd");
+        let ap = trim(a.to_vec());
+        let bp = trim(b.to_vec());
+        debug_assert!(cmp(&ap, n) == Ordering::Less, "a >= n");
+        debug_assert!(cmp(&bp, n) == Ordering::Less, "b >= n");
+        let at = |i: usize| *ap.get(i).unwrap_or(&0);
+        let bt = |i: usize| *bp.get(i).unwrap_or(&0);
+
+        let mut t = vec![0u64; k + 2];
+        for i in 0..k {
+            // product-and-accumulate: t += a·b[i]
+            let mut c: u64 = 0;
+            let bi = bt(i);
+            for j in 0..k {
+                let v = (at(j) as u128) * (bi as u128) + (t[j] as u128) + (c as u128);
+                t[j] = v as u64;
+                c = (v >> 64) as u64;
+            }
+            let v = (t[k] as u128) + (c as u128);
+            t[k] = v as u64;
+            t[k + 1] = (v >> 64) as u64;
+
+            // reduction: t += m·n, then shift one whole limb down
+            let m = t[0].wrapping_mul(n0p);
+            let v = (t[0] as u128) + (m as u128) * (n[0] as u128);
+            t[0] = v as u64;
+            let mut c2 = (v >> 64) as u64;
+            for j in 1..k {
+                let v = (t[j] as u128) + (m as u128) * (n[j] as u128) + (c2 as u128);
+                t[j - 1] = v as u64;
+                c2 = (v >> 64) as u64;
+            }
+            let v = (t[k] as u128) + (c2 as u128);
+            t[k - 1] = v as u64;
+            c2 = (v >> 64) as u64;
+            t[k] = t[k + 1] + c2; // both ≤ 1 ⇒ no overflow
+            t[k + 1] = 0;
+        }
+
+        // T = t[0..=k] is < 2n: subtract n once if T ≥ n. (T == 0 compares
+        // Less because n[k−1] ≠ 0, so the zero case never "subtracts".)
+        let mut ge = Ordering::Equal;
+        for i in (0..=k).rev() {
+            let ti = t[i];
+            let ni = if i < k { n[i] } else { 0 };
+            if ti != ni {
+                ge = ti.cmp(&ni);
+                break;
+            }
+        }
+        if ge != Ordering::Less {
+            let mut borrow = 0u64;
+            for i in 0..=k {
+                let ni = if i < k { n[i] } else { 0 };
+                let (d1, b1) = t[i].overflowing_sub(ni);
+                let (d2, b2) = d1.overflowing_sub(borrow);
+                t[i] = d2;
+                borrow = (b1 as u64) | (b2 as u64);
+            }
+            debug_assert_eq!(borrow, 0, "T < 2n ⇒ single subtract must cancel");
+        }
+        trim(t[..k].to_vec())
+    }
+
+    /// x + x mod n for x < n (helper for building R mod n / R² mod n:
+    /// x < n ⇒ 2x < 2n, one conditional subtraction suffices).
+    fn double_mod(x: &[u64], n: &[u64]) -> Vec<u64> {
+        let s = add(x, x);
+        if cmp(&s, n) == Ordering::Less {
+            s
+        } else {
+            sub(&s, n).expect("double_mod: s < 2n ⇒ single subtract cannot underflow")
+        }
+    }
+
+    /// Modular exponentiation base^exp mod modulus, MSB-first square-and-
+    /// multiply over Montgomery form (the task-spec API name). `ctx` is the
+    /// Montgomery context number `montgomery_context(n)` — computed once per
+    /// modulus by the caller (see `modpow` for the one-call convenience
+    /// wrapper). `base` may be any size (reduced first); `exp` is walked
+    /// bit-by-bit with a plain branch — see the module-level constant-time
+    /// note (public-operand operation, ACCEPTED RISK). Requirements: modulus
+    /// odd and > 1 (any RSA modulus n = p·q of odd primes qualifies).
+    pub fn mont_pow(x: &[u64], e: &[u64], n: &[u64], ctx: u64) -> Vec<u64> {
+        let n = trim(n.to_vec());
+        debug_assert!(!n.is_empty(), "mont_pow: zero modulus");
+        debug_assert!(n[0] & 1 == 1, "mont_pow: odd modulus required (Montgomery)");
+        if n == vec![1u64] {
+            return Vec::new(); // x mod 1 == 0
+        }
+        let e = trim(e.to_vec());
+        if e.is_empty() {
+            return vec![1u64]; // anything^0 == 1 mod n, n > 1
+        }
+        let x_r = rem(x, &n);
+        let k = n.len();
+        let n0p = ctx;
+        // R mod n and R² mod n, by 64·k doublings each.
+        let mut r_mod_n = vec![1u64];
+        for _ in 0..64 * k {
+            r_mod_n = double_mod(&r_mod_n, &n);
+        }
+        let mut r2_mod_n = r_mod_n.clone();
+        for _ in 0..64 * k {
+            r2_mod_n = double_mod(&r2_mod_n, &n);
+        }
+        let x_mont = mont_mul(&x_r, &r2_mod_n, &n, n0p);
+        let mut acc = mont_mul(&[1u64], &r2_mod_n, &n, n0p); // 1 in Montgomery form
+        for i in (0..bit_len(&e)).rev() {
+            acc = mont_mul(&acc, &acc, &n, n0p);
+            if (e[i / 64] >> (i % 64)) & 1 == 1 {
+                acc = mont_mul(&acc, &x_mont, &n, n0p);
+            }
+        }
+        // Leave Montgomery form: acc·1·R⁻¹ mod n.
+        let mut one = vec![0u64; k];
+        one[0] = 1;
+        mont_mul(&acc, &one, &n, n0p)
+    }
+
+    /// Convenience wrapper: `modpow(base, exp, modulus)` computes the
+    /// Montgomery context itself and delegates to `mont_pow`. Kept because
+    /// the RSA verify path (§8.1.2/§8.2.2 step 2b, RSAVP1) uses it.
+    pub fn modpow(base: &[u64], exp: &[u64], modulus: &[u64]) -> Vec<u64> {
+        let n = trim(modulus.to_vec());
+        debug_assert!(!n.is_empty(), "modpow: zero modulus");
+        mont_pow(base, exp, &n, montgomery_context(&n))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RSA signature verification — RSASSA-PKCS1-v1_5 + RSASSA-PSS, SHA-256 only
+// (RFC 8017 §8.1.2, §8.2.2, §9.1, §9.2). Verify-only by design: the HoloNet
+// engine never signs, so no CRT / private-key code exists here.
+// ---------------------------------------------------------------------------
+
+pub mod rsa {
+    use super::bignum;
+    use super::sha256;
+    use crate::ct_eq;
+    use std::cmp::Ordering;
+
+    /// hLen for SHA-256.
+    const H_LEN: usize = 32;
+    /// EMSA-PSS trailer field octet (RFC 8017 §9.1 note 1, step 12 / step 4).
+    const PSS_TRAILER: u8 = 0xbc;
+
+    /// DER encoding T of the SHA-256 DigestInfo WITHOUT the hash octets —
+    /// RFC 8017 §9.2 note 1: "SHA-256: (0x)30 31 30 0d 06 09 60 86 48 01 65
+    /// 03 04 02 01 05 00 04 20 || H". Copied verbatim from the fetched RFC
+    /// text and cross-checked byte-for-byte against a hand-assembled
+    /// SEQUENCE{SEQUENCE{OID 2.16.840.1.101.3.4.2.1, NULL}, OCTET STRING(32)}
+    /// in the Python cross-check (bignum_report.md).
+    pub const DIGEST_INFO_SHA256: [u8; 19] = [
+        0x30, 0x31, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02,
+        0x01, 0x05, 0x00, 0x04, 0x20,
+    ];
+
+    /// tLen = len(T): 19 prefix bytes + 32 hash bytes.
+    const T_LEN: usize = DIGEST_INFO_SHA256.len() + H_LEN;
+
+    /// Common §8.1.2/§8.2.2 step 1 length checking + RSAVP1 (§5.2.2) range
+    /// check: non-empty odd modulus, signature exactly k octets,
+    /// representative s < n. Returns (n, s, k).
+    fn public_key_checks(
+        n: &[u8],
+        sig: &[u8],
+    ) -> Result<(Vec<u64>, Vec<u64>, usize), &'static str> {
+        if n.is_empty() {
+            return Err("rsa: empty modulus");
+        }
+        if n[n.len() - 1] & 1 == 0 {
+            return Err("rsa: modulus must be odd");
+        }
+        if sig.len() != n.len() {
+            return Err("rsa: signature length != modulus length");
+        }
+        let n_big = bignum::os2ip(n);
+        let s = bignum::os2ip(sig);
+        if bignum::cmp(&s, &n_big) != Ordering::Less {
+            return Err("rsa: signature representative out of range");
+        }
+        Ok((n_big, s, n.len()))
+    }
+
+    /// RSASSA-PKCS1-v1_5-VERIFY (RFC 8017 §8.2.2) for SHA-256. `n`/`e` are
+    /// the big-endian modulus/exponent, `message_hash` is H = Hash(M) (32
+    /// bytes; the caller hashes, §9.2 step 1 embeds it in DigestInfo), and
+    /// `sig` is S. Distinct error string per failure stage.
+    pub fn verify_pkcs1_v1_5_sha256(
+        n: &[u8],
+        e: &[u8],
+        message_hash: &[u8],
+        sig: &[u8],
+    ) -> Result<(), &'static str> {
+        let (n_big, s, k) = public_key_checks(n, sig)?;
+        if message_hash.len() != H_LEN {
+            return Err("rsa: expected a 32-byte SHA-256 message hash");
+        }
+        // §8.2.2 step 2b: RSAVP1 — m = s^e mod n.
+        let m = bignum::modpow(&s, &bignum::os2ip(e), &n_big);
+        // §8.2.2 step 2c: EM = I2OSP(m, k).
+        let em = bignum::i2osp(&m, k).map_err(|_| "rsa: integer too large")?;
+        // §8.2.2 step 3: EM' = EMSA-PKCS1-V1_5-ENCODE(M, k) (§9.2):
+        //   EM = 0x00 || 0x01 || PS (0xff × (k − tLen − 3), ≥ 8) || 0x00 || T
+        if k < T_LEN + 11 {
+            return Err("rsa: modulus too short for PKCS#1 v1.5");
+        }
+        let mut em_prime = Vec::with_capacity(k);
+        em_prime.push(0x00);
+        em_prime.push(0x01);
+        em_prime.extend(std::iter::repeat(0xff).take(k - T_LEN - 3));
+        em_prime.push(0x00);
+        em_prime.extend_from_slice(&DIGEST_INFO_SHA256);
+        em_prime.extend_from_slice(message_hash);
+        debug_assert_eq!(em_prime.len(), k);
+        // §8.2.2 step 4: compare EM and EM' (constant-time byte compare).
+        if ct_eq(&em, &em_prime) {
+            Ok(())
+        } else {
+            Err("rsa: PKCS#1 v1.5 encoded message mismatch")
+        }
+    }
+
+    /// RSASSA-PSS-VERIFY (RFC 8017 §8.1.2) with EMSA-PSS-VERIFY (§9.1.2) and
+    /// MGF1-SHA256, for SHA-256. `salt_len` is the sLen parameter — the
+    /// verifier must be configured with the signer's salt length (typical:
+    /// hLen = 32 or 0). `message_hash` is H = Hash(M) (32 bytes). Distinct
+    /// error string per failure stage.
+    pub fn verify_pss_sha256(
+        n: &[u8],
+        e: &[u8],
+        salt_len: usize,
+        message_hash: &[u8],
+        sig: &[u8],
+    ) -> Result<(), &'static str> {
+        let (n_big, s, _k) = public_key_checks(n, sig)?;
+        if message_hash.len() != H_LEN {
+            return Err("rsa: expected a 32-byte SHA-256 message hash");
+        }
+        // §8.1.2 step 2b: RSAVP1 — m = s^e mod n.
+        let m = bignum::modpow(&s, &bignum::os2ip(e), &n_big);
+        // §8.1.2 step 2c: EM = I2OSP(m, emLen), emLen = ⌈(modBits − 1)/8⌉ —
+        // emLen is k − 1 when modBits − 1 is divisible by 8, k otherwise.
+        let mod_bits = bignum::bit_len(&n_big);
+        let em_bits = mod_bits - 1;
+        let em_len = em_bits.div_ceil(8);
+        let em = bignum::i2osp(&m, em_len).map_err(|_| "rsa: integer too large")?;
+
+        // EMSA-PSS-VERIFY (§9.1.2), hLen = 32:
+        // step 3: emLen ≥ hLen + sLen + 2.
+        if em_len < H_LEN + salt_len + 2 {
+            return Err("rsa/pss: encoded message too short for salt length");
+        }
+        // step 4: rightmost octet is the 0xbc trailer.
+        if em[em_len - 1] != PSS_TRAILER {
+            return Err("rsa/pss: bad trailer byte (not 0xbc)");
+        }
+        // step 5: maskedDB = leftmost emLen − hLen − 1 octets, H the next 32.
+        let db_len = em_len - H_LEN - 1;
+        let h = &em[db_len..db_len + H_LEN];
+        // step 6: the leftmost 8·emLen − emBits bits of maskedDB must be zero.
+        let top_bits = 8 * em_len - em_bits;
+        debug_assert!(top_bits < 8);
+        if top_bits > 0 && em[0] >> (8 - top_bits) != 0 {
+            return Err("rsa/pss: leftmost bits of maskedDB not zero");
+        }
+        // steps 7–8: DB = maskedDB xor MGF1(H, emLen − hLen − 1).
+        let db_mask = mgf1_sha256(h, db_len);
+        let mut db: Vec<u8> = em[..db_len]
+            .iter()
+            .zip(db_mask)
+            .map(|(x, y)| x ^ y)
+            .collect();
+        // step 9: set the same leftmost bits of DB to zero.
+        if top_bits > 0 {
+            db[0] &= 0xff >> top_bits;
+        }
+        // step 10: the emLen − hLen − sLen − 2 leftmost octets are zero and
+        // the octet at position emLen − hLen − sLen − 1 (leftmost = 1) is 0x01.
+        let ps_len = em_len - H_LEN - salt_len - 2;
+        if db[..ps_len].iter().any(|&b| b != 0) {
+            return Err("rsa/pss: DB padding zeros corrupted");
+        }
+        if db[ps_len] != 0x01 {
+            return Err("rsa/pss: DB separator byte (0x01) missing");
+        }
+        // step 11: salt = last sLen octets of DB.
+        let salt = &db[db_len - salt_len..];
+        // steps 12–13: H' = Hash(0x00…00 (8 octets) || mHash || salt).
+        let mut m_prime = Vec::with_capacity(8 + H_LEN + salt_len);
+        m_prime.extend_from_slice(&[0u8; 8]);
+        m_prime.extend_from_slice(message_hash);
+        m_prime.extend_from_slice(salt);
+        let h_prime = sha256::digest(&m_prime);
+        // step 14: H = H' ?
+        if ct_eq(&h_prime, h) {
+            Ok(())
+        } else {
+            Err("rsa/pss: recomputed H' does not match H")
+        }
+    }
+
+    /// MGF1 with SHA-256 (RFC 8017 B.2.1): plain SHA-256 over
+    /// `seed || counter` (32-bit big-endian counter), concatenated and
+    /// truncated — NOT HMAC.
+    fn mgf1_sha256(seed: &[u8], mask_len: usize) -> Vec<u8> {
+        let mut out = Vec::with_capacity(mask_len + H_LEN);
+        let mut counter: u32 = 0;
+        while out.len() < mask_len {
+            let mut input = Vec::with_capacity(seed.len() + 4);
+            input.extend_from_slice(seed);
+            input.extend_from_slice(&counter.to_be_bytes());
+            out.extend_from_slice(&sha256::digest(&input));
+            counter = counter.wrapping_add(1);
+        }
+        out.truncate(mask_len);
+        out
+    }
+}
+
 
     #[test]
     fn sha256_vectors() {
@@ -1558,6 +2265,137 @@ mod tests {
         assert!(gcm::decrypt(&key, &iv, b"other aad", &ct).is_err());
     }
 
+    // -----------------------------------------------------------------------
+    // CFB128 (NIST SP 800-38A Appendix F.3) — vector source: pdftotext of
+    // nistspecialpublication800-38a.pdf, transcribed verbatim from
+    // sections F.3.13–F.3.17; every tuple independently re-verified in
+    // BOTH directions with OpenSSL 3.5.7 (`openssl enc -aes-{n}-cfb`,
+    // per-segment checks via prefix-stream technique — command transcript
+    // in the run report).
+    // -----------------------------------------------------------------------
+
+    /// The four SP 800-38A Appendix F plaintext blocks shared by all
+    /// CFB128 examples (F.3.13 through F.3.18).
+    #[cfg(test)]
+    const SP800_38A_PT4: [&str; 4] = [
+        "6bc1bee22e409f96e93d7e117393172a",
+        "ae2d8a571e03ac9c9eb76fac45af8e51",
+        "30c81c46a35ce411e5fbc1191a0a52ef",
+        "f69f2445df4f9b17ad2b417be66c3710",
+    ];
+
+    /// Shared F.3 runner: each of the 4 segments is encrypted AND decrypted
+    /// in its own call, feeding the previous ciphertext back as the IV
+    /// (exactly the chaining the NIST example models); finally the whole
+    /// 4-block message in one call must match the concatenation of the
+    /// four expected ciphertexts (multi-block chunking path).
+    #[cfg(test)]
+    fn cfb128_kat(key: &[u8], iv: &[u8; 16], cts: &[&str; 4]) {
+        let aes = aes::Aes::new(key);
+        let mut prev = *iv;
+        let mut want = String::new();
+        for (i, pt) in SP800_38A_PT4.iter().enumerate() {
+            let mut buf = from_hex(pt);
+            cfb128::encrypt(&aes, &prev, &mut buf);
+            assert_eq!(to_hex(&buf), cts[i], "F.3 encrypt segment #{}", i + 1);
+            cfb128::decrypt(&aes, &prev, &mut buf);
+            assert_eq!(to_hex(&buf), *pt, "F.3 decrypt segment #{}", i + 1);
+            prev = from_hex(cts[i]).try_into().unwrap();
+            want.push_str(cts[i]);
+        }
+        let mut whole = Vec::new();
+        for pt in SP800_38A_PT4.iter() {
+            whole.extend_from_slice(&from_hex(pt));
+        }
+        cfb128::encrypt(&aes, iv, &mut whole);
+        assert_eq!(to_hex(&whole), want, "F.3 four-block single-stream");
+    }
+
+    /// F.3.13 CFB128-AES128.Encrypt / F.3.14 CFB128-AES128.Decrypt
+    #[test]
+    fn cfb128_sp800_38a_aes128() {
+        cfb128_kat(
+            &from_hex("2b7e151628aed2a6abf7158809cf4f3c"),
+            &from_hex("000102030405060708090a0b0c0d0e0f")
+                .try_into()
+                .unwrap(),
+            &[
+                "3b3fd92eb72dad20333449f8e83cfb4a",
+                "c8a64537a0b3a93fcde3cdad9f1ce58b",
+                "26751f67a3cbb140b1808cf187a4f4df",
+                "c04b05357c5d1c0eeac4c66f9ff7f2e6",
+            ],
+        );
+    }
+
+    /// F.3.15 CFB128-AES192.Encrypt / F.3.16 CFB128-AES192.Decrypt
+    #[test]
+    fn cfb128_sp800_38a_aes192() {
+        cfb128_kat(
+            &from_hex("8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b"),
+            &from_hex("000102030405060708090a0b0c0d0e0f")
+                .try_into()
+                .unwrap(),
+            &[
+                "cdc80d6fddf18cab34c25909c99a4174",
+                "67ce7f7f81173621961a2b70171d3d7a",
+                "2e1e8a1dd59b88b1c8e60fed1efac4c9",
+                "c05f9f9ca9834fa042ae8fba584b09ff",
+            ],
+        );
+    }
+
+    /// F.3.17 CFB128-AES256.Encrypt / F.3.18 CFB128-AES256.Decrypt
+    #[test]
+    fn cfb128_sp800_38a_aes256() {
+        cfb128_kat(
+            &from_hex("603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4"),
+            &from_hex("000102030405060708090a0b0c0d0e0f")
+                .try_into()
+                .unwrap(),
+            &[
+                "dc7e84bfda79164b7ecd8486985d3860",
+                "39ffed143b28b1c832113c6331e5407b",
+                "df10132415e54b92a13ed0a8267ae2f9",
+                "75a385741ab9cef82031623d55b1e471",
+            ],
+        );
+    }
+
+    /// Stream-mode roundtrips at awkward lengths (1, 15, 17, 31, 33 —
+    /// partial final blocks of 1..15 bytes), plus an OpenSSL 3.5.7
+    /// cross-check constant for one odd length: the 17-byte input is
+    /// F.3.13's block #1 plus the first byte of block #2, and its
+    /// ciphertext is `openssl enc -aes-128-cfb -K
+    /// 2b7e151628aed2a6abf7158809cf4f3c -iv 000102030405060708090a0b0c0d0e0f`
+    /// over that input (the first 16 bytes must equal the F.3.13 block #1
+    /// ciphertext; the 17th byte continues the stream). xxd is absent in
+    /// the sandbox, so the OpenSSL transcript used python3 bytes.fromhex /
+    /// od -An -tx1 for hex conversion — full transcript in the run report.
+    #[test]
+    fn cfb128_stream_arbitrary_lengths() {
+        let key = from_hex("2b7e151628aed2a6abf7158809cf4f3c");
+        let aes = aes::Aes::new(&key);
+        let iv: [u8; 16] = from_hex("000102030405060708090a0b0c0d0e0f")
+            .try_into()
+            .unwrap();
+        for l in [1usize, 15, 17, 31, 33] {
+            let pt: Vec<u8> = (0..l).map(|i| (i * 13 + 7) as u8).collect();
+            let mut buf = pt.clone();
+            cfb128::encrypt(&aes, &iv, &mut buf);
+            assert_eq!(buf.len(), l, "ct length {}", l);
+            cfb128::decrypt(&aes, &iv, &mut buf);
+            assert_eq!(buf, pt, "roundtrip len {}", l);
+        }
+        let mut buf = from_hex("6bc1bee22e409f96e93d7e117393172aae");
+        cfb128::encrypt(&aes, &iv, &mut buf);
+        assert_eq!(
+            to_hex(&buf),
+            "3b3fd92eb72dad20333449f8e83cfb4ac8",
+            "17-byte OpenSSL cross-check"
+        );
+    }
+
     #[test]
     fn evp_bytes_to_key_shape() {
         let k = evp_bytes_to_key(b"password", 32);
@@ -1724,6 +2562,818 @@ mod tests {
             blake2s::hex(&ctx_input),
             "6a411f08ce25adcdfb02aba641451cec53c598b24f4fc787fbdc88797f4c1dfe",
             "RFC 7693 Appendix E blake2s grand hash of hashes"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // TLS 1.3 key schedule (RFC 8446 §7.1, trace RFC 8448 §3)
+    //
+    // Every hex string below was extracted mechanically (whitespace-stripped)
+    // from the fetched https://www.rfc-editor.org/rfc/rfc8448.txt §3 "Simple
+    // 1-RTT Handshake" transcript — never transcribed from memory. The trace
+    // step names in the comments are the literal "{server}/{client} ..." step
+    // titles of the RFC; the page numbers are the RFC's own page breaks.
+    // -----------------------------------------------------------------------
+
+    /// RFC 8446 §7.1 HkdfLabel wire structure. RFC 8448 §3 prints the exact
+    /// `info` blobs fed to HKDF-Expand — each one IS an encoded HkdfLabel —
+    /// so the structure is checked against official bytes, not hand-built
+    /// ones. The bare HKDF-Expand half is pinned against RFC 5869 §A.1 TC1.
+    #[test]
+    fn tls13_rfc8446_7_1_expand_label_structure() {
+        // RFC 8448 §3 "{server} derive secret for handshake "tls13 derived":"
+        // (p.5): info (49 octets) = HkdfLabel(32, "tls13 derived", SHA256("")).
+        // The empty-transcript hash is also published there ("hash (32
+        // octets):  e3 b0 ...").
+        let empty_hash = sha256::digest(b"");
+        assert_eq!(
+            to_hex(&empty_hash),
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+        let enc = tls13::encode_hkdf_label(b"derived", &empty_hash, 32);
+        assert_eq!(
+            to_hex(&enc),
+            "00200d746c733133206465726976656420\
+             e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+        // RFC 8448 §3 "{server} derive secret "tls13 c hs traffic":" (pp.5-6):
+        // info (54 octets) = HkdfLabel(32, "tls13 c hs traffic",
+        // Transcript-Hash(ClientHello..ServerHello)).
+        let th_ch_sh = from_hex("860c06edc07858ee8e78f0e7428c58edd6b43f2ca3e6e95f02ed063cf0e1cad8");
+        let enc2 = tls13::encode_hkdf_label(b"c hs traffic", &th_ch_sh, 32);
+        assert_eq!(
+            to_hex(&enc2),
+            "002012746c7331332063206873207472616666696320\
+             860c06edc07858ee8e78f0e7428c58edd6b43f2ca3e6e95f02ed063cf0e1cad8"
+        );
+        // RFC 8448 §3 "{server} calculate finished "tls13 finished":" (p.8):
+        // info (18 octets) = HkdfLabel(32, "tls13 finished", "").
+        let enc3 = tls13::encode_hkdf_label(b"finished", &[], 32);
+        assert_eq!(to_hex(&enc3), "00200e746c7331332066696e697368656400");
+        // Bare expand phase (RFC 5869 §A.1 TC1): PRK = HMAC-Hash(Salt, IKM)
+        // with the §A.1 13-octet salt 000102030405060708090a0b0c (same salt
+        // the existing hkdf_sha256_rfc5869_tc1 test uses), expanded directly
+        // to the §A.1 OKM.
+        let prk = hmac_sha256(&from_hex("000102030405060708090a0b0c"), &[0x0b; 22]);
+        let okm = hkdf_sha256_expand(&prk, &from_hex("f0f1f2f3f4f5f6f7f8f9"), 42);
+        assert_eq!(
+            to_hex(&okm),
+            "3cb25f25faacd57a90434f64d0362f2a2d2d0a90cf1a5a4c5db02d56ecc4c5bf\
+             34007208d5b887185865"
+        );
+    }
+
+    /// RFC 8448 §3 "Simple 1-RTT Handshake": the full SHA-256 secret chain
+    /// replayed through the tls13 helpers. HKDF-Extract steps are plain
+    /// HMAC-SHA256 per RFC 5869 §2.2 (RFC 8446 §7.1 draws Extract with Salt
+    /// on top, IKM on the left; "0" = Hash.length zero bytes).
+    #[test]
+    fn tls13_rfc8448_secret_chain() {
+        // {server} extract secret "early" (p.4): salt = 0, IKM = 0.
+        let zeros = [0u8; 32];
+        let early = hmac_sha256(&zeros, &zeros);
+        assert_eq!(
+            to_hex(&early),
+            "33ad0a1c607ec03b09e6cd9893680ce210adf300aa1f2660e1b22e10f170f92a"
+        );
+
+        // {server} derive secret for handshake "tls13 derived" (p.5):
+        // hash = SHA-256("") (empty transcript), expanded = 6f26….
+        let empty_hash = sha256::digest(b"");
+        let derived_hs = tls13::derive_secret(&early, b"derived", &empty_hash);
+        assert_eq!(
+            to_hex(&derived_hs),
+            "6f2615a108c702c5678f54fc9dbab69716c076189c48250cebeac3576c3611ba"
+        );
+
+        // {server} extract secret "handshake" (p.5): salt = derived_hs,
+        // IKM = the (EC)DHE shared secret published in the trace.
+        let ecdhe = from_hex("8bd4054fb55b9d63fdfbacf9f04b9f0d35e6d63f537563efd46272900f89492d");
+        let handshake = hmac_sha256(&derived_hs, &ecdhe);
+        assert_eq!(
+            to_hex(&handshake),
+            "1dc826e93606aa6fdc0aadc12f741b01046aa6b99f691ed221a9f0ca043fbeac"
+        );
+
+        // {server} derive secret "tls13 c hs traffic" (pp.5-6) and
+        // "{server} derive secret "tls13 s hs traffic" (p.6): both over
+        // Transcript-Hash(ClientHello..ServerHello), recomputed from the raw
+        // messages published in §3 and cross-checked against the published
+        // "hash (32 octets):  86 0c …".
+        let ch = from_hex(
+            "010000c00303cb34ecb1e78163ba1c38c6dacb196a6dffa21a8d9912ec18a2ef6283\
+             024dece7000006130113031302010000910000000b0009000006736572766572ff01\
+             000100000a00140012001d0017001800190100010101020103010400230000003300\
+             260024001d002099381de560e4bd43d23d8e435a7dbafeb3c06e51c13cae4d541369\
+             1e529aaf2c002b0003020304000d0020001e04030503060302030804080508060401\
+             0501060102010402050206020202002d00020101001c00024001",
+        );
+        assert_eq!(ch.len(), 196, "RFC 8448 §3: ClientHello (196 octets)");
+        let sh = from_hex(
+            "020000560303a6af06a4121860dc5e6e60249cd34c95930c8ac5cb1434dac155772e\
+             d3e2692800130100002e00330024001d0020c9828876112095fe66762bdbf7c672e1\
+             56d6cc253b833df1dd69b1b04e751f0f002b00020304",
+        );
+        assert_eq!(sh.len(), 90, "RFC 8448 §3: ServerHello (90 octets)");
+        let th_ch_sh = sha256::digest(&[&ch[..], &sh[..]].concat());
+        assert_eq!(
+            to_hex(&th_ch_sh),
+            "860c06edc07858ee8e78f0e7428c58edd6b43f2ca3e6e95f02ed063cf0e1cad8",
+            "recomputed TH(ClientHello..ServerHello) == published hash"
+        );
+        let c_hs = tls13::derive_secret(&handshake, b"c hs traffic", &th_ch_sh);
+        assert_eq!(
+            to_hex(&c_hs),
+            "b3eddb126e067f35a780b3abf45e2d8f3b1a950738f52e9600746a0e27a55a21"
+        );
+        let s_hs = tls13::derive_secret(&handshake, b"s hs traffic", &th_ch_sh);
+        assert_eq!(
+            to_hex(&s_hs),
+            "b67b7d690cc16c4e75e54213cb2d37b4e9c912bcded9105d42befd59d391ad38"
+        );
+
+        // {server} derive secret for master "tls13 derived" (p.6):
+        // PRK = handshake secret, hash = SHA-256("") again.
+        let derived_ms = tls13::derive_secret(&handshake, b"derived", &empty_hash);
+        assert_eq!(
+            to_hex(&derived_ms),
+            "43de77e0c77713859a944db9db2590b53190a65b3ee2e4f12dd7a0bb7ce254b4"
+        );
+
+        // {server} extract secret "master" (p.6): salt = derived_ms, IKM = 0.
+        let master = hmac_sha256(&derived_ms, &zeros);
+        assert_eq!(
+            to_hex(&master),
+            "18df06843d13a08bf2a449844c5f8a478001bc4d4c627984d5a41da8d0402919"
+        );
+
+        // {server} send handshake record (pp.8-10): payload (657 octets) =
+        // EncryptedExtensions || Certificate || CertificateVerify || Finished
+        // — the server flight, verbatim.
+        let srv_flight = from_hex(
+            "080000240022000a00140012001d00170018001901000101010201030104001c\
+             00024001000000000b0001b9000001b50001b0308201ac30820115a003020102\
+             020102300d06092a864886f70d01010b0500300e310c300a0603550403130372\
+             7361301e170d3136303733303031323335395a170d3236303733303031323335\
+             395a300e310c300a0603550403130372736130819f300d06092a864886f70d01\
+             0101050003818d0030818902818100b4bb498f8279303d980836399b36c6988c\
+             0c68de55e1bdb826d3901a2461eafd2de49a91d015abbc9a95137ace6c1af19e\
+             aa6af98c7ced43120998e187a80ee0ccb0524b1b018c3e0b63264d449a6d38e2\
+             2a5fda430846748030530ef0461c8ca9d9efbfae8ea6d1d03e2bd193eff0ab9a\
+             8002c47428a6d35a8d88d79f7f1e3f0203010001a31a301830090603551d1304\
+             023000300b0603551d0f0404030205a0300d06092a864886f70d01010b050003\
+             81810085aad2a0e5b9276b908c65f73a7267170618a54c5f8a7b337d2df7a594\
+             365417f2eae8f8a58c8f8172f9319cf36b7fd6c55b80f21a03015156726096fd\
+             335e5e67f2dbf102702e608ccae6bec1fc63a42a99be5c3eb7107c3c54e9b9eb\
+             2bd5203b1c3b84e0a8b2f759409ba3eac9d91d402dcc0cc8f8961229ac9187b4\
+             2b4de100000f000084080400805a747c5d88fa9bd2e55ab085a61015b7211f82\
+             4cd484145ab3ff52f1fda8477b0b7abc90db78e2d33a5c141a078653fa6bef78\
+             0c5ea248eeaaa785c4f394cab6d30bbe8d4859ee511f602957b15411ac027671\
+             459e46445c9ea58c181e818e95b8c3fb0bf3278409d3be152a3da5043e063dda\
+             65cdf5aea20d53dfacd42f74f3140000209b9b141d906337fbd2cbdce71df4de\
+             da4ab42c309572cb7fffee5454b78f0718",
+        );
+        assert_eq!(
+            srv_flight.len(),
+            657,
+            "RFC 8448 §3: server flight payload (657 octets)"
+        );
+        // Transcript-Hash(ClientHello..server Finished) recomputed from the
+        // raw messages and cross-checked against the hash RFC 8448 §3
+        // publishes in the "tls13 c ap traffic" step (p.10).
+        let th_srv_fin = sha256::digest(&[&ch[..], &sh[..], &srv_flight[..]].concat());
+        assert_eq!(
+            to_hex(&th_srv_fin),
+            "9608102a0f1ccc6db6250b7b7e417b1a000eaada3daae4777a7686c9ff83df13",
+            "recomputed TH(ClientHello..server Finished) == published hash"
+        );
+        let c_ap = tls13::derive_secret(&master, b"c ap traffic", &th_srv_fin);
+        assert_eq!(
+            to_hex(&c_ap),
+            "9e40646ce79a7f9dc05af8889bce6552875afa0b06df0087f792ebb7c17504a5"
+        );
+        let s_ap = tls13::derive_secret(&master, b"s ap traffic", &th_srv_fin);
+        assert_eq!(
+            to_hex(&s_ap),
+            "a11af9f05531f856ad47116b45a950328204b4f44bfb6b3a4b4f1f3fcb631643"
+        );
+        let exp_master = tls13::derive_secret(&master, b"exp master", &th_srv_fin);
+        assert_eq!(
+            to_hex(&exp_master),
+            "fe22f881176eda18eb8f44529e6792c50c9a3f89452f68d8ae311b4309d3cf50"
+        );
+
+        // {server} calculate finished "tls13 finished" (p.8): finished_key =
+        // HKDF-Expand-Label(s_hs, "finished", "", 32) per RFC 8446 §4.4.4
+        // ("finished_key = HKDF-Expand-Label(BaseKey, "finished", "",
+        // Hash.length)").
+        let s_finished_key = tls13::hkdf_expand_label(&s_hs, b"finished", &[], 32);
+        assert_eq!(
+            to_hex(&s_finished_key),
+            "008d3b66f816ea559f96b537e885c31fc068bf492c652f01f288a1d8cdc19fc8"
+        );
+        // verify_data = HMAC(finished_key, Transcript-Hash(Handshake Context,
+        // Certificate*, CertificateVerify*)) (RFC 8446 §4.4.4); the server
+        // Finished handshake context is "ClientHello ... later of
+        // EncryptedExtensions/CertificateRequest" (RFC 8446 §4.4 table) plus
+        // Certificate/CertificateVerify — here ClientHello..CertificateVerify.
+        let th_to_cert_verify =
+            sha256::digest(&[&ch[..], &sh[..], &srv_flight[..srv_flight.len() - 36]].concat());
+        let s_verify = hmac_sha256(&s_finished_key, &th_to_cert_verify);
+        assert_eq!(
+            to_hex(&s_verify),
+            "9b9b141d906337fbd2cbdce71df4deda4ab42c309572cb7fffee5454b78f0718"
+        );
+
+        // {client} calculate finished "tls13 finished" (pp.12-13):
+        // finished_key = Expand-Label(c_hs, "finished", "", 32);
+        // verify_data = HMAC(finished_key, Transcript-Hash(ClientHello..
+        // server Finished)) — the client Finished handshake context is
+        // "ClientHello ... later of server Finished/EndOfEarlyData"
+        // (RFC 8446 §4.4 table).
+        let c_finished_key = tls13::hkdf_expand_label(&c_hs, b"finished", &[], 32);
+        assert_eq!(
+            to_hex(&c_finished_key),
+            "b80ad01015fb2f0bd65ff7d4da5d6bf83f84821d1f87fdc7d3c75b5a7b42d9c4"
+        );
+        let c_verify = hmac_sha256(&c_finished_key, &th_srv_fin);
+        assert_eq!(
+            to_hex(&c_verify),
+            "a8ec436d677634ae525ac1fcebe11a039ec17694fac6e98527b642f2edd5ce61"
+        );
+
+        // {client} construct a Finished handshake message (p.13):
+        // Finished (36 octets) — the client flight's handshake message.
+        let cli_finished = from_hex(
+            "14000020a8ec436d677634ae525ac1fcebe11a039ec17694fac6e98527b642f2\
+             edd5ce61",
+        );
+        assert_eq!(
+            cli_finished.len(),
+            36,
+            "RFC 8448 §3: Finished (36 octets)"
+        );
+
+        // {client} derive secret "tls13 res master" (p.13): PRK = master
+        // secret, over Transcript-Hash(ClientHello..client Finished),
+        // recomputed and cross-checked against the published "hash (32
+        // octets):  20 91 …".
+        let th_cli_fin =
+            sha256::digest(&[&ch[..], &sh[..], &srv_flight[..], &cli_finished[..]].concat());
+        assert_eq!(
+            to_hex(&th_cli_fin),
+            "209145a96ee8e2a122ff810047cc952684658d6049e86429426db87c54ad143d",
+            "recomputed TH(ClientHello..client Finished) == published hash"
+        );
+        let res_master = tls13::derive_secret(&master, b"res master", &th_cli_fin);
+        assert_eq!(
+            to_hex(&res_master),
+            "7df235f2031d2a051287d02b0241b0bfdaf86cc856231f2d5aba46c434ec196c"
+        );
+    }
+
+    /// One Derive-Secret checked end-to-end INCLUDING the transcript hashing
+    /// step: RFC 8448 §3 publishes both the raw ClientHello (196 octets) and
+    /// ServerHello (90 octets) handshake messages AND the resulting
+    /// transcript hash, so we hash the concatenated messages ourselves with
+    /// `sha256::digest` and drive Derive-Secret from the recomputed hash.
+    #[test]
+    fn tls13_derive_secret_matches_rfc8448() {
+        // RFC 8448 §3 "{client} construct a ClientHello handshake message:"
+        // (p.3), ClientHello (196 octets), verbatim:
+        let ch = from_hex(
+            "010000c00303cb34ecb1e78163ba1c38c6dacb196a6dffa21a8d9912ec18a2ef6283\
+             024dece7000006130113031302010000910000000b0009000006736572766572ff01\
+             000100000a00140012001d0017001800190100010101020103010400230000003300\
+             260024001d002099381de560e4bd43d23d8e435a7dbafeb3c06e51c13cae4d541369\
+             1e529aaf2c002b0003020304000d0020001e04030503060302030804080508060401\
+             0501060102010402050206020202002d00020101001c00024001",
+        );
+        assert_eq!(ch.len(), 196, "RFC 8448 §3: ClientHello (196 octets)");
+        // RFC 8448 §3 "{server} construct a ServerHello handshake message:"
+        // (p.4), ServerHello (90 octets), verbatim:
+        let sh = from_hex(
+            "020000560303a6af06a4121860dc5e6e60249cd34c95930c8ac5cb1434dac155772e\
+             d3e2692800130100002e00330024001d0020c9828876112095fe66762bdbf7c672e1\
+             56d6cc253b833df1dd69b1b04e751f0f002b00020304",
+        );
+        assert_eq!(sh.len(), 90, "RFC 8448 §3: ServerHello (90 octets)");
+
+        // Recompute Transcript-Hash(ClientHello..ServerHello) and check it
+        // against the hash RFC 8448 §3 publishes in the "tls13 c hs traffic"
+        // step (pp.5-6), "hash (32 octets):  86 0c …".
+        let th = sha256::digest(&[&ch[..], &sh[..]].concat());
+        assert_eq!(
+            to_hex(&th),
+            "860c06edc07858ee8e78f0e7428c58edd6b43f2ca3e6e95f02ed063cf0e1cad8",
+            "recomputed transcript hash must equal RFC 8448 §3 published hash"
+        );
+
+        // Rebuild the handshake secret through the chain (early → derived →
+        // Extract with the published ECDHE IKM, all values from §3), then
+        // Derive-Secret from OUR hash and compare with the published
+        // "tls13 c hs traffic" expanded value.
+        let zeros = [0u8; 32];
+        let early = hmac_sha256(&zeros, &zeros);
+        let empty_hash = sha256::digest(b"");
+        let derived_hs = tls13::derive_secret(&early, b"derived", &empty_hash);
+        let ecdhe = from_hex("8bd4054fb55b9d63fdfbacf9f04b9f0d35e6d63f537563efd46272900f89492d");
+        let handshake = hmac_sha256(&derived_hs, &ecdhe);
+        let c_hs = tls13::derive_secret(&handshake, b"c hs traffic", &th);
+        assert_eq!(
+            to_hex(&c_hs),
+            "b3eddb126e067f35a780b3abf45e2d8f3b1a950738f52e9600746a0e27a55a21"
+        );
+    }
+
+// ---------------------------------------------------------------------------
+// Workspace grep-audit — record-0003 A2-C4 mechanical enforcement (cfb half)
+// ---------------------------------------------------------------------------
+
+/// The raw CFB128 primitive must stay private (record-0003 A2-C4: raw CFB
+/// encrypt/decrypt types are not pub outside the authenticated wrapper
+/// module). Compile-failure half: `cfb128` and its functions are
+/// `pub(crate)` in this single-file crate, so no other crate can name them
+/// at all. This test is the audit half: ANY `cfb` reference (case-
+/// insensitive) in any other workspace .rs file fails CI. When the pub
+/// authenticated wrapper arrives, its consumer files extend ALLOWLIST
+/// below — each entry with a justification comment and a DECISIONS.md
+/// record, the visible journaled path (same pattern as holo-util's
+/// rand_split_audit, gate-0001 A2-C3).
+#[cfg(test)]
+mod cfb_audit {
+    use std::path::{Path, PathBuf};
+
+    /// Paths relative to the workspace root where `cfb` may legitimately
+    /// appear. Exactly one entry: this file (primitive + KAT tests + this
+    /// audit). Extend ONLY with a justification + DECISIONS.md record.
+    const ALLOWLIST: &[&str] = &["crates/holo-crypto/src/lib.rs"];
+
+    fn collect_rs(dir: &Path, out: &mut Vec<PathBuf>) {
+        let rd = match std::fs::read_dir(dir) {
+            Ok(rd) => rd,
+            Err(_) => return,
+        };
+        for entry in rd.flatten() {
+            let p = entry.path();
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name.starts_with('.') {
+                continue; // hidden dirs (.git, .cargo)
+            }
+            if p.is_dir() {
+                if name == "target" {
+                    continue; // build artifacts
+                }
+                collect_rs(&p, out);
+            } else if name.ends_with(".rs") {
+                out.push(p);
+            }
+        }
+    }
+
+    /// No exemptions beyond the allowlist — not even integration-test
+    /// directories: an unauthenticated raw-CFB reference is a violation
+    /// wherever it lives.
+    #[test]
+    fn cfb_usage_audit() {
+        // manifest dir = <root>/crates/holo-crypto → workspace root is two
+        // ancestors up; keeps the audit correct in any checkout path.
+        let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let root = manifest
+            .ancestors()
+            .nth(2)
+            .expect("workspace root above crates/<name>")
+            .to_path_buf();
+
+        let mut files = Vec::new();
+        collect_rs(&root, &mut files);
+        // Guard against scanning the wrong (empty) root: the workspace has
+        // 17 .rs files today and must only grow.
+        assert!(
+            files.len() >= 15,
+            "workspace scan found only {} .rs files — wrong root?",
+            files.len()
+        );
+
+        let mut hits: Vec<String> = Vec::new();
+        for f in &files {
+            let rel = f
+                .strip_prefix(&root)
+                .expect("scanned path is under root")
+                .to_string_lossy()
+                .replace('\\', "/");
+            if ALLOWLIST.contains(&rel.as_str()) {
+                continue;
+            }
+            let src = match std::fs::read_to_string(f) {
+                Ok(s) => s,
+                Err(_) => continue,
+            };
+            for (i, line) in src.lines().enumerate() {
+                if line.to_lowercase().contains("cfb") {
+                    hits.push(format!("{}:{}: matched \"cfb\"", rel, i + 1));
+                }
+            }
+        }
+
+        assert!(
+            hits.is_empty(),
+            "cfb-usage violation (record-0003 A2-C4): raw CFB128 is private to \
+             crates/holo-crypto/src/lib.rs and may only be exposed through a pub \
+             authenticated wrapper API. Offenders:\n  {}\nIf a consumer is genuinely \
+             needed, extend the audit ALLOWLIST with a justification comment and \
+             a DECISIONS.md record — never reach around the wrapper.",
+            hits.join("\n  ")
+        );
+    }
+
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // -----------------------------------------------------------------------
+    // -----------------------------------------------------------------------
+    // bignum + RSA (RFC 8017 §8.1.2 / §8.2.2 / §9.1 / §9.2)
+    //
+    // Ground truth (generated BEFORE the implementation was frozen):
+    // /home/z/my-project/scratch/rsa_ground_truth.py — Python 3.12 big
+    // ints + OpenSSL 3.5.7 cross-check; FULL transcript in
+    // /home/z/my-project/scratch/bignum_report.md.
+    //
+    // DEVIATION NOTE (recorded): the task pointed at an "RFC 8017 §A.1.1
+    // example 1024-bit key" — RFC 8017 §A.1.1 ("RSA Public Key Syntax")
+    // defines ASN.1 SYNTAX only and contains no key material (verified by
+    // grep on the fetched rfc8017.txt; same for rfc3447/rfc2437). The
+    // "never transcribe constants from memory" rule is honoured by
+    // GENERATING the test key deterministically (sha256-seeded candidate
+    // scan + fixed-basis Miller-Rabin in the ground-truth script; p and q
+    // confirmed with `openssl prime`), and requiring the Python pow()
+    // signatures to be byte-identical with OpenSSL 3.5.7 signatures before
+    // embedding (v1.5: `pkeyutl` over the raw DigestInfo + `dgst -sha256
+    // -sign`; PSS: an OpenSSL-produced PSS signature is decoded by the same
+    // Python EMSA-PSS-VERIFY and its recovered salt checked).
+    //
+    // Key facts: n is 1023 bits → k = 128 octets = 16 u64 limbs; PSS runs
+    // with emBits = 1022, emLen = 128 (the leftmost 2 bits are checked).
+    // Test hash h1 = bytes 0..31 (000102…1f); PSS salt = 32 × 0xA5.
+    // All hex below is big-endian, as produced by the ground-truth run.
+
+    /// deterministic test modulus n = p·q (see ground-truth script)
+    const RSA_N: &str = "4000000000000000000000000000000000000000000000000000000000000000\
+    163981027bdb16cc22cc6ece7114cdfe22bcb1d41feb80dec7d8ae2a4bcba87b\
+    01ed8391a59c3c6d945f356eacf709e9741d39a14b6636182c32302ff8295fd9\
+    c3326cd222ba3435c91c58c5257cfa26d74b8113979b087189066b0410c8fe35";
+
+    const RSA_E: &str = "010001";
+
+    /// Test hash h1 = bytes 0..31 (the pre-hashed message; the verify API
+    /// takes H directly, RFC 8017 §8.2.2 step 1 / §9.2 step 1).
+    const RSA_MHASH: &str = "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
+
+    /// PKCS#1 v1.5 signature over EM(h1) — Python pow(em, d, n),
+    /// byte-identical to the OpenSSL 3.5.7 `pkeyutl` raw-DigestInfo signature
+    const RSA_SIG_PKCS15: &str = "06235b6053193a407370e3e89295b1bd5af82adefb9852df0d04e3e481b57b13\
+    a51ea8dcc65a0eb4b8475459afc119a60ec376782e34acf531170b65d21c0671\
+    c29fa954a7c88dec29fdb913cdd9ca597f00374c46927c36af86d0b29c1984cb\
+    824739217598d27869dfca8c6e38e3c6ffe479cf96addf42624b066b2918f317";
+
+    /// RSA_SIG_PKCS15 with the last byte's LSB flipped (s′ = s+1 < n)
+    const RSA_SIG_PKCS15_FLIP: &str = "06235b6053193a407370e3e89295b1bd5af82adefb9852df0d04e3e481b57b13\
+    a51ea8dcc65a0eb4b8475459afc119a60ec376782e34acf531170b65d21c0671\
+    c29fa954a7c88dec29fdb913cdd9ca597f00374c46927c36af86d0b29c1984cb\
+    824739217598d27869dfca8c6e38e3c6ffe479cf96addf42624b066b2918f316";
+
+    /// PSS signature over EMSA-PSS(h1, salt = 32 × 0xA5) — Python
+    /// pow(em, d, n); roundtrip-decoded to recover exactly that salt
+    const RSA_SIG_PSS: &str = "2435a8ff3b7710ff47cbd6379925e4a5e0dda7ed2f537084c308f9ec3442a913\
+    f9f0685faa76a681533ceeeae8c69ec3d0bd53afbccdd2e54ed0285cfe8fb7b2\
+    be0a36a5b5c504bd4fd567edbf70b89e7185b5196ce73db420ba65e9f5d6f490\
+    a236da7ae44a0a9880b5cdb923ba4104ee4bf9942e78f08afc55d3c7e511e1c9";
+
+    /// EMSA-PKCS1-v1_5 encoding of h1 (what sig^e mod n must equal)
+    const RSA_EM_PKCS15: &str = "0001ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\
+    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\
+    ffffffffffffffffffffffff003031300d060960864801650304020105000420\
+    000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f";
+
+    /// sha256("wrong hash") — a valid but different digest.
+    const RSA_WRONG_HASH: &str = "e385e5689bb882cc7f9fb31c192bcc5010b61d4dc38390080af8be3a3783c5fe";
+    #[test]
+    fn bignum_os2ip_i2osp_roundtrip() {
+        // roundtrip arbitrary byte strings of every length 0..70
+        for len in 0..70usize {
+            let bytes: Vec<u8> = (0..len).map(|i| (i * 89 + 7) as u8).collect();
+            let x = bignum::os2ip(&bytes);
+            assert_eq!(bignum::i2osp(&x, len).unwrap(), bytes, "roundtrip len {len}");
+        }
+        // leading zero octets do not change the value
+        assert_eq!(bignum::os2ip(&[0x00, 0x00, 0x01, 0x00]), bignum::os2ip(&[0x01, 0x00]));
+        // i2osp zero-pads and rejects oversized values ("integer too large")
+        let x = bignum::os2ip(&from_hex("0001ff"));
+        assert_eq!(bignum::i2osp(&x, 8).unwrap(), vec![0, 0, 0, 0, 0, 0, 1, 0xff]);
+        assert_eq!(bignum::i2osp(&x, 1).unwrap_err(), "i2osp: integer too large");
+        assert_eq!(bignum::i2osp(&bignum::os2ip(&[]), 5).unwrap(), vec![0u8; 5]);
+        // add/sub sanity — sub is Option, None on underflow (documented)
+        let a = bignum::os2ip(&from_hex("01ffffffffffffffff"));
+        let sum = bignum::add(&a, &bignum::os2ip(&[0x02]));
+        assert_eq!(
+            to_hex(&bignum::i2osp(&sum, 9).unwrap()),
+            "020000000000000001"
+        );
+        let diff = bignum::sub(&sum, &bignum::os2ip(&[0x02])).unwrap();
+        assert_eq!(
+            to_hex(&bignum::i2osp(&diff, 9).unwrap()),
+            "01ffffffffffffffff"
+        );
+        assert!(bignum::sub(&bignum::os2ip(&[0x02]), &sum).is_none());
+        // cmp
+        assert_eq!(bignum::cmp(&a, &sum), std::cmp::Ordering::Less);
+        assert_eq!(bignum::cmp(&sum, &a), std::cmp::Ordering::Greater);
+        assert_eq!(bignum::cmp(&sum, &sum), std::cmp::Ordering::Equal);
+    }
+
+    #[test]
+    fn bignum_mul_schoolbook_vs_python() {
+        // products computed independently with Python 3 big ints
+        // (x*y hex values in the cross-check transcript)
+        let cases: [(&str, &str, &str); 4] = [
+            (
+                "01",
+                "ffffffffffffffff",
+                "ffffffffffffffff",
+            ),
+            (
+                "deadbeefcafebabe0123456789abcdef",
+                "0123456789abcdefdeadbeefcafebabe",
+                "fd5bdeeeb2a01e4069a26f490b6e279038f0d670e5ea427eb689f4ea447d62",
+            ),
+            (
+                "8000000000000000000000000000000000000000000000000000000000000000\
+                16df6978f2a93e8aac2d6940a30ef7a2f7ec96fbb0e138b71dabdb21ad8dbc25",
+                "8000000000000000000000000000000000000000000000000000000000000000\
+                1593988c050cef0d996b745c3f1aa4594d8cccac8ef5c90672058132ea0994d1",
+                "4000000000000000000000000000000000000000000000000000000000000000\
+                163981027bdb16cc22cc6ece7114cdfe22bcb1d41feb80dec7d8ae2a4bcba87b\
+                01ed8391a59c3c6d945f356eacf709e9741d39a14b6636182c32302ff8295fd9\
+                c3326cd222ba3435c91c58c5257cfa26d74b8113979b087189066b0410c8fe35",
+            ),
+            (
+                "7fffffffffffffffffffffffffffffff",
+                "fffffffffffffffffffffffffffffffe",
+                "7ffffffffffffffffffffffffffffffe00000000000000000000000000000002",
+            ),
+        ];
+        for (i, (x, y, xy)) in cases.iter().enumerate() {
+            let prod = bignum::mul(&bignum::os2ip(&from_hex(x)), &bignum::os2ip(&from_hex(y)));
+            let want = from_hex(xy);
+            assert_eq!(
+                bignum::i2osp(&prod, want.len()).unwrap(),
+                want,
+                "mul case {} ({} × {})",
+                i,
+                x,
+                y
+            );
+        }
+    }
+
+    #[test]
+    fn montgomery_cios_matches_plain_modmul() {
+        let n = bignum::os2ip(&from_hex(RSA_N));
+        // Python: n0' = -n^-1 mod 2^64 = fd932e3d99fb1be3
+        let n0p = bignum::montgomery_context(&n);
+        assert_eq!(n0p, 0xfd932e3d99fb1be3);
+        // mont_mul computes x·y·R⁻¹ mod n; the expected values are
+        // (x·y·R⁻¹) mod n with R = 2^1024, computed in Python by the
+        // ground-truth script (which also simulates this CIOS limb-for-limb
+        // and confirms T < 2n for every tuple). The three tuples are
+        // sha256-seeded pseudo-random operands < n (limbs 1..3, exercising
+        // the short-operand padding paths); n0' below is the Python value.
+        let cases: [(&str, &str, &str); 3] = [
+            (
+                "f8cfab9ce960960379109c89fdc1748a0c9ff087a452d39f4a0be41660da530a",
+                "e0042490088cfb1775a7a4dd84462a2d62cdd3a20aad4d3ec09b2cb02e816017",
+                "060ecf6174d0af311df9116b49d739aa0f144203e0f931461197e07d8d047096\
+                acb8667499bef66c54da01b453f632f862473f15d536e05fe43d592c5402f3ea\
+                ea3fce9f6f3a4d53dff0c3e8aead09942df97cae7f67d3b3cf737c2bde553db5\
+                ad5ed0f4600f115d691306ffa804bd46d96fbad1d63d36f9f3a63b18930298d6",
+            ),
+            (
+                "08d33327959093d32a8136413ff469ce037bebb0753acd4ae563cd9dc248cb25",
+                "151bb76f1f4cfa9186d0eb65ce4733532bc7289a23c5f05137eaa033783fd860",
+                "01169f50239264500bc260459a8b83cef2e6ac26019b7b908717b86a3479601d\
+                f5b1702545f5c442b18e54075add4f0aabfc147e2c25bfb8fe6db904fea8d9fe\
+                4db64582e2930357f6f0144130f7450897a59c13a4bad9267df7ad3ec8881e45\
+                40045a1da39b43dbb9638153f72b54b8fa6069472e24356617e0746d17925675",
+            ),
+            (
+                "2d566f4eb9dc25cba5fe21d959b5e975f43c78a82878278a946d5cb0d6e919f5",
+                "21170acadb726c53b48fb7bd84c9ac4adde4a7c86b2d100258595b898db1d42c",
+                "21404b58e41648b3a991e0ff6730a47d2da47a164c6e9673f0d496a95932224f\
+                dd0176b0d085593b9fc1b331b4d009ce06c7f57fc83032990aac002b565fbc58\
+                3667f733fe6f244b7609af59f45d2c6a83c442c0d61346e952c552c955b756e8\
+                a6c8a8fcfa53cf0571cff7e9080bcfe382608eb2ad18c9f224ae08ef65f836f8",
+            ),
+        ];
+        for (i, (x, y, expected)) in cases.iter().enumerate() {
+            let xl = bignum::os2ip(&from_hex(x));
+            let yl = bignum::os2ip(&from_hex(y));
+            let got = bignum::mont_mul(&xl, &yl, &n, n0p);
+            assert_eq!(
+                bignum::i2osp(&got, 128).unwrap(),
+                from_hex(expected),
+                "montgomery case {} (x={}, y={})",
+                i,
+                x,
+                y
+            );
+        }
+    }
+
+    /// n − 1 (the EDGEX value from the cross-check).
+    const RSA_N_MINUS_1: &str = "4000000000000000000000000000000000000000000000000000000000000000\
+    163981027bdb16cc22cc6ece7114cdfe22bcb1d41feb80dec7d8ae2a4bcba87b\
+    01ed8391a59c3c6d945f356eacf709e9741d39a14b6636182c32302ff8295fd9\
+    c3326cd222ba3435c91c58c5257cfa26d74b8113979b087189066b0410c8fe34";
+    /// (n−1)·(n−1)·R⁻¹ mod n — the EDGE expected result.
+    const RSA_EDGE_RESULT: &str = "00f0045e4d3294d2f2ea696c292f44610f513aaaf3ae6aa57109b03eb10f0b25\
+    eb6d8816f76be707e80edd2d0dd1c79d2ab0db1efbcab190725ee33ead804b12\
+    a0bb732af655df48b2a43d153a7240413c1b15fed41a29c216ba50d085553ad0\
+    503261f67404d7d5bad475cfefeeae6a382a1e7a00c7556eddd715f142741fbd";
+    /// (n−1)·2·R⁻¹ mod n — the NOEDGE expected result.
+    const RSA_NOEDGE_RESULT: &str = "3e1ff743659ad65a1a2b2d27ada1773de15d8aaa18a32ab51dec9f829de1e9b4\
+    3f5e70d48d0348bc52aeb47455713ec3cd5afb9628561dbde31ae7acf0cb1255\
+    c0769d3bb8f07ddc2f16bb4438128966fbe70da3a331e293febd8e8eed7eea39\
+    22cda8e53ab0848a53736d25459f9d5266f7441f960c5d93cd583f218be0bebb";
+
+    #[test]
+    fn montgomery_cios_final_carry_edge() {
+        // Pairs chosen so the Python CIOS simulation in the ground-truth
+        // script (which mirrors this implementation limb-for-limb) confirms
+        // the FINAL-CARRY-LIMB branch:
+        //   EDGE:    x = y = n−1 → the k+1-limb accumulator BEFORE the final
+        //            conditional subtract is
+        //            T = 40f0045e4d3294d2f2ea696c292f44610f513aaaf3ae6aa57109b03eb10f0b2601a709197346fdd40adb4bfb7ee6959b4d6d8cf31bb6326f3a379168f94bf38da2a8f6bc9bf21bb647037283e7694a2ab0384fa01f805fda42ec81007d7e9aaa1364cec896bf0c0b83f0ce95156ba8910f759f8d98625de066dd80f5533d1df2
+        //            (T ≥ n ⇒ the single final subtraction fires);
+        //   NOEDGE:  x = n−1, y = 2 → T < n, no subtraction.
+        // Both results equal Python's (x·y·R⁻¹) mod n.
+        let n = bignum::os2ip(&from_hex(RSA_N));
+        let n0p = bignum::montgomery_context(&n);
+        let edge = bignum::mont_mul(
+            &bignum::os2ip(&from_hex(RSA_N_MINUS_1)),
+            &bignum::os2ip(&from_hex(RSA_N_MINUS_1)),
+            &n,
+            n0p,
+        );
+        assert_eq!(
+            bignum::i2osp(&edge, 128).unwrap(),
+            from_hex(RSA_EDGE_RESULT),
+            "edge case: product ≥ n must survive the final subtract"
+        );
+        let noedge = bignum::mont_mul(
+            &bignum::os2ip(&from_hex(RSA_N_MINUS_1)),
+            &bignum::os2ip(&[0x02]),
+            &n,
+            n0p,
+        );
+        assert_eq!(
+            bignum::i2osp(&noedge, 128).unwrap(),
+            from_hex(RSA_NOEDGE_RESULT),
+            "no-edge case: T < n, unchanged by the final subtract"
+        );
+    }
+
+    #[test]
+    fn rsa_pkcs1_v1_5_sha256_verify_rfc8017_key() {
+        // Test-name note: RFC 8017 ships no example key (§A.1.1 is ASN.1
+        // syntax only — see DEVIATION NOTE above); the embedded key/signature
+        // pair is the deterministically generated one whose Python and
+        // OpenSSL 3.5.7 signatures are byte-identical (PKCS#1 v1.5 is
+        // deterministic).
+        let n = from_hex(RSA_N);
+        let e = from_hex(RSA_E);
+        let mhash = from_hex(RSA_MHASH);
+        let sig = from_hex(RSA_SIG_PKCS15);
+        rsa::verify_pkcs1_v1_5_sha256(&n, &e, &mhash, &sig).unwrap();
+        // direct primitive cross-check (exercises the spec-named API):
+        // mont_pow(sig, e, n, ctx) must I2OSP to the exact EMSA-PKCS1-v1_5
+        // encoding computed by Python (00 01 ff… 00 ||
+        // 3031300d060960864801650304020105000420 || h1)
+        let n_big = bignum::os2ip(&n);
+        let ctx = bignum::montgomery_context(&n_big);
+        let m = bignum::mont_pow(&bignum::os2ip(&sig), &bignum::os2ip(&e), &n_big, ctx);
+        assert_eq!(
+            bignum::i2osp(&m, n.len()).unwrap(),
+            from_hex(RSA_EM_PKCS15),
+            "modpow(sig, e, n) must decode to the Python-computed EM"
+        );
+    }
+
+    #[test]
+    fn rsa_pkcs1_v1_5_rejects_bitflip_and_wrong_hash() {
+        let n = from_hex(RSA_N);
+        let e = from_hex(RSA_E);
+        let mhash = from_hex(RSA_MHASH);
+        // last signature byte flipped (…aed4bc → …aed4bd): s changes ⇒ the
+        // recovered EM cannot match ⇒ rejected at the EM-compare stage
+        assert_eq!(
+            rsa::verify_pkcs1_v1_5_sha256(&n, &e, &mhash, &from_hex(RSA_SIG_PKCS15_FLIP))
+                .unwrap_err(),
+            "rsa: PKCS#1 v1.5 encoded message mismatch"
+        );
+        // same signature against a different (valid) hash: EM' differs
+        assert_eq!(
+            rsa::verify_pkcs1_v1_5_sha256(&n, &e, &from_hex(RSA_WRONG_HASH), &from_hex(RSA_SIG_PKCS15))
+                .unwrap_err(),
+            "rsa: PKCS#1 v1.5 encoded message mismatch"
+        );
+    }
+
+    #[test]
+    fn rsa_pss_sha256_verify_fixed_salt() {
+        let n = from_hex(RSA_N);
+        let e = from_hex(RSA_E);
+        let mhash = from_hex(RSA_MHASH);
+        let sig = from_hex(RSA_SIG_PSS);
+        // fixed salt = 32 × 0xA5, emBits = 1022: the Python pow() signature
+        // roundtrip-decodes (public-key math) to exactly salt a5×32, and the
+        // same Python EMSA-PSS-VERIFY also accepts an OpenSSL 3.5.7-produced
+        // PSS signature (recovered salt, 32 bytes) — see ground truth.
+        rsa::verify_pss_sha256(&n, &e, 32, &mhash, &sig).unwrap();
+        // any corrupted signature must be rejected (stage unspecified)
+        let mut bad = sig.clone();
+        let mid = bad.len() / 2;
+        bad[mid] ^= 0x01;
+        assert!(rsa::verify_pss_sha256(&n, &e, 32, &mhash, &bad).is_err());
+    }
+
+    #[test]
+    fn rsa_pss_rejects_wrong_salt_len() {
+        // Distinct error per §9.1.2 stage, exactly as recorded in the
+        // ground truth: the real DB is 62 zero octets, 0x01, salt.
+        let n = from_hex(RSA_N);
+        let e = from_hex(RSA_E);
+        let mhash = from_hex(RSA_MHASH);
+        let sig = from_hex(RSA_SIG_PSS);
+        // sLen = 31: ps_len grows to 63 so the 0x01 lands inside the
+        // checked-zero region
+        assert_eq!(
+            rsa::verify_pss_sha256(&n, &e, 31, &mhash, &sig).unwrap_err(),
+            "rsa/pss: DB padding zeros corrupted"
+        );
+        // sLen = 33: ps_len shrinks to 61, DB[61] = 0x00 ≠ 0x01
+        assert_eq!(
+            rsa::verify_pss_sha256(&n, &e, 33, &mhash, &sig).unwrap_err(),
+            "rsa/pss: DB separator byte (0x01) missing"
+        );
+        // sLen = 0: the whole DB including 0x01 must be zero ⇒ fails early
+        assert_eq!(
+            rsa::verify_pss_sha256(&n, &e, 0, &mhash, &sig).unwrap_err(),
+            "rsa/pss: DB padding zeros corrupted"
+        );
+        // sLen = 200: emLen < hLen + sLen + 2 ⇒ length stage
+        assert_eq!(
+            rsa::verify_pss_sha256(&n, &e, 200, &mhash, &sig).unwrap_err(),
+            "rsa/pss: encoded message too short for salt length"
+        );
+    }
+
+    #[test]
+    fn rsa_rejects_wrong_sig_length() {
+        let n = from_hex(RSA_N);
+        let e = from_hex(RSA_E);
+        let mhash = from_hex(RSA_MHASH);
+        let sig = from_hex(RSA_SIG_PKCS15);
+        let sig_pss = from_hex(RSA_SIG_PSS);
+        // §8.2.2 / §8.1.2 step 1: S must be exactly k = 128 octets
+        assert_eq!(
+            rsa::verify_pkcs1_v1_5_sha256(&n, &e, &mhash, &sig[..127]).unwrap_err(),
+            "rsa: signature length != modulus length"
+        );
+        let mut long = sig.clone();
+        long.push(0x00);
+        assert_eq!(
+            rsa::verify_pkcs1_v1_5_sha256(&n, &e, &mhash, &long).unwrap_err(),
+            "rsa: signature length != modulus length"
+        );
+        assert_eq!(
+            rsa::verify_pss_sha256(&n, &e, 32, &mhash, &sig_pss[..127]).unwrap_err(),
+            "rsa: signature length != modulus length"
+        );
+        assert_eq!(
+            rsa::verify_pss_sha256(&n, &e, 32, &mhash, &long).unwrap_err(),
+            "rsa: signature length != modulus length"
+        );
+        // RSAVP1 §5.2.2 range check: s = n is in-range-length but out of
+        // range ⇒ distinct error
+        assert_eq!(
+            rsa::verify_pkcs1_v1_5_sha256(&n, &e, &mhash, &n).unwrap_err(),
+            "rsa: signature representative out of range"
+        );
+        assert_eq!(
+            rsa::verify_pss_sha256(&n, &e, 32, &mhash, &n).unwrap_err(),
+            "rsa: signature representative out of range"
         );
     }
 }

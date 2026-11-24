@@ -117,8 +117,27 @@ edges, check/RAG-smoke green locally); fix push e3c8304 = run
 Windows (visible 87/86/86 + redirected socks 10); README/ARCHITECTURE
 citations updated.**
 
-Next dev: X25519 (execution-mode decision first), AES-CFB (+ planned
-mechanical grep-audit), ExpandLabel, bignum/RSA.
+RUN 10 (2026-11-25, owner-authorized autonomous session): S1b items
+3/4/5 LANDED via a five-agent parallel batch into isolated scratch
+workspaces (two agent deaths — X25519 taken over by the lead mid-session):
+AES-CFB128 (SP 800-38A; `pub(crate) mod cfb128` + `cfb_usage_audit`
+grep-test, negative demo LIVE — D-0030); tls13 HKDF-Expand-Label /
+Derive-Secret (RFC 8446 §7.1; RFC 8448 §3 chain replayed with recomputed
+transcripts); bignum (CIOS Montgomery, Newton n0', final-carry
+exactly-once edge-tested) + rsa VERIFY-ONLY (PKCS#1 v1.5 + PSS SHA-256,
+MGF1, ct_eq; ground truth = python big-int pow + OpenSSL 3.5.7 — RFC
+8017 §A.1.1 defines syntax ONLY, no example key: deterministic key
+generated + documented — D-0031 CT accepted-risk). Merge surgery:
+3-way diff + 3 rustc-caught structural repairs (documented in the
+journal). Local 114-green (97+5+3+9), static 116, lock v3 HELD; spot-
+checks green (openssl CFB KAT, python HMAC early secret,
+rsa_ground_truth.py rerun ALL PASSED). CI verification rides the run-10
+push. X25519 (item 2) in progress by the lead — D-0032 execution-mode
+decision pending.
+
+Next dev: X25519 (execution-mode decision first; IN PROGRESS this
+session), then S1→S2 gate record 0004. ~~AES-CFB, ExpandLabel,
+bignum/RSA~~ DONE run 10.
 
 ## Verification contracts (how "done" is proven)
 
@@ -133,12 +152,12 @@ mechanical grep-audit), ExpandLabel, bignum/RSA.
 - Memory regression budget: RSS growth < 8 MB over 64 MB relayed
   (D-0015; local reference +88–376 KB; runner variance absorbed).
 - 89→99 `#[test]` countable: `grep -rn "#\[test\]" engine/crates
-  --include="*.rs" | wc -l` → 99 (97 runnable on Linux after run 9's
-  +5 BLAKE2s tests — no cfg gates, so +5 on macOS/Windows too).
-  Local 97-green; **CI-verified: 97 Linux / 96 macOS / 96 Windows @
-  e3c8304, run 44897540455 all-green (6/6; visible 87/86/86 +
-  redirected socks 10, reconciled; run-9's first push 6331952 failed
-  only the graph-coverage gate — fixed by extending graph.json).**
+  --include="*.rs" | wc -l` → 116 (114 runnable on Linux after run
+  10's +5 CFB +3 tls13 +9 bignum — no per-OS cfg gates on the new
+  tests; macOS/Windows expected 113 each, socks reconciliation as
+  always). Local 114-green; CI verification rides the run-10 push
+  (previous CI-verified tree: 97 Linux / 96 macOS / 96 Windows @
+  e3c8304, run 44897540455).
 - Every run ends: `bash harness/scripts/backup.sh "<summary>"`
   (WORKFLOW §1.2; push = completion). Gate records quote SHA-256 in
   the BACKUPS.md line; next record number = 0004 (S1→S2 gate,
@@ -224,7 +243,7 @@ mechanical grep-audit), ExpandLabel, bignum/RSA.
 ## Recent Progress & Git Activity
 
 ```text
+### Commit: c76844e - backup: run 9 closure: CI-VERIFIED 44897540455 @ e3c8304 all-green 6/6, per-OS ledger 97 Linux/96 macOS/96 Windows (visible 87/86/86 + socks 10 reconciled); README badge + Status block and ARCHITECTURE data p (maniesh-NR, 2026-11-21)
 ### Commit: e3c8304 - backup: run 9 fix: graph coverage — SES-2026-11-21b + 4 T-blake2s nodes + 6 edges (harness-audit had failed 44896588214 on the missing session node; all 5 test jobs were green); graph check + RAG smoke gree (maniesh-NR, 2026-11-21)
 ### Commit: 6331952 - backup: run 9: BLAKE2s RFC 7693 (S1b item 1): SIGMA dual-sourced, Appendix B trace + Appendix E self-test + 16 KATs (re-verified vs Python+OpenSSL); +5 tests, local 97-green, static 99, lock v3 held (maniesh-NR, 2026-11-21)
-### Commit: 880661e - backup: FAILED 2026-11-21T05:44:58Z (push did not land) (maniesh-NR, 2026-11-21)
 ```

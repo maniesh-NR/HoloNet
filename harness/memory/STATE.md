@@ -1,6 +1,16 @@
 # HoloNet State Snapshot
 
-Last updated: 2026-11-21 (UTC, run 9 — S1b OPENS: BLAKE2s shipped,
+Last updated: 2026-11-25 (UTC, run 10 — S1b items 3/4/5 LANDED via a
+five-agent parallel batch: AES-CFB128 (SP 800-38A, D-0030 mechanical
+pub(crate)+grep-audit enforcement, negative demo live), tls13
+HKDF-Expand-Label/Derive-Secret (RFC 8446 §7.1, RFC 8448 chain), bignum
+CIOS Montgomery + rsa VERIFY-ONLY (PKCS#1 v1.5 + PSS; D-0031 CT
+accepted-risk). Local 114-green (97+5+3+9), static 116, lock v3 held.
+X25519 in progress by the lead (two subagent deaths — taken over
+mid-session); CI verification rides the run-10 push. Full narrative:
+harness/memory/sessions/2026-11-25-s1b-completion.md.
+
+Prior state: 2026-11-21 (UTC, run 9 — S1b OPENS: BLAKE2s shipped,
 first S1b/S1c crypto primitive). Restore ritual: warm path (runbook
 0/0b) — remote reconciliation MATCH at 880661e == origin/main (the
 run-8 closure retry push landed; its LANDED ledger line was found

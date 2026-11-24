@@ -1505,6 +1505,86 @@
    "refs": [
     "engine/crates/holo-crypto/src/lib.rs"
    ]
+  },
+  {
+   "id": "SES-2026-11-25",
+   "type": "session",
+   "label": "S1b items 3/4/5 landed (AES-CFB128, TLS 1.3 schedule, bignum+RSA verify)",
+   "status": "recorded",
+   "summary": "Owner-authorized autonomous roadmap session. Three parallel implementation agents delivered into isolated scratch workspaces (AES-CFB128 SP 800-38A w/ mechanical pub(crate)+grep-audit enforcement; tls13 HKDF-Expand-Label/Derive-Secret RFC 8446 §7.1 with RFC 8448 chain replay; bignum CIOS Montgomery + RSA PKCS#1 v1.5/PSS verify with Python-big-int + OpenSSL ground truth). X25519 and the python-KAT subagents died twice (empty/deadline); X25519 taken over by the lead mid-session. Lead merged the three lib.rs deliverables via 3-way diff (2 conflicts, additive; 3 brace-structure repairs; cfg(test) gates re-added to helpers whose enclosing test module the merge dropped). Independent spot-checks green (openssl CFB KAT, python HMAC early secret, rsa_ground_truth.py rerun). cfb_usage_audit negative demo live (planted holo-socks probe -> FAIL file:line -> removed -> green). Local 114-green (97+5+3+9), static 116, lock v3 held.",
+   "refs": [
+    "harness/memory/sessions/2026-11-25-s1b-completion.md"
+   ]
+  },
+  {
+   "id": "D-0030",
+   "type": "decision",
+   "label": "D-0030: CFB128 mechanical enforcement (pub(crate) + single-entry grep-audit)",
+   "status": "accepted",
+   "summary": "record-0003 A2-C4 execution: raw CFB128 encrypt/decrypt are pub(crate) in holo-crypto (no pub wrapper consumer chartered yet, so crate privacy IS the compile-failure half); cfb_usage_audit workspace grep-test allowlists exactly crates/holo-crypto/src/lib.rs with a >=15-file floor; consumers extend the allowlist only with justification + DECISIONS record (rand-split D-0024 pattern). CFB stays unauthenticated-forbidden outside an authenticated wrapper.",
+   "refs": [
+    "harness/memory/DECISIONS.md"
+   ]
+  },
+  {
+   "id": "D-0031",
+   "type": "decision",
+   "label": "D-0031: bignum/RSA constant-time accepted-risk (public-operand verify path)",
+   "status": "accepted",
+   "summary": "A3-C6/F13 criterion recorded as accepted-risk: bignum+rsa process PUBLIC data only (sigs, pubkeys, e, hashes, salts); variable-time mont_pow/final-subtract accepted for this stage; no secret-operand op in scope; secret-operand CT becomes a consumer requirement (S2 client-side) — handed to A2 at the S1->S2 gate. RSA shipped verify-only.",
+   "refs": [
+    "harness/memory/DECISIONS.md"
+   ]
+  },
+  {
+   "id": "T-cfb128-kats",
+   "type": "test",
+   "label": "cfb128_sp800_38a_aes128/192/256 + cfb128_stream_arbitrary_lengths",
+   "status": "passing",
+   "summary": "SP 800-38A Appendix F CFB128 vectors (pdftotext-extracted), verified both directions vs OpenSSL 3.5.7 (prefix-stream technique); stream mode roundtrips 1/15/17/31/33-byte lengths.",
+   "refs": [
+    "engine/crates/holo-crypto/src/lib.rs"
+   ]
+  },
+  {
+   "id": "T-cfb-usage-audit",
+   "type": "test",
+   "label": "cfb_usage_audit",
+   "status": "passing",
+   "summary": "Workspace grep-audit (allowlist [crates/holo-crypto/src/lib.rs], >=15-file floor, file:line output). Negative path demonstrated live 2026-11-25: planted holo-socks probe file -> FAIL with file:line; removed -> green.",
+   "refs": [
+    "engine/crates/holo-crypto/src/lib.rs"
+   ]
+  },
+  {
+   "id": "T-tls13-schedule",
+   "type": "test",
+   "label": "tls13_rfc8446_7_1_expand_label_structure / _secret_chain / _derive_secret_matches_rfc8448",
+   "status": "passing",
+   "summary": "HkdfLabel wire-structure check + full RFC 8448 SHA-256 secret chain replay (transcripts recomputed from published raw messages, self-checked against published hashes); agent caught and fixed 3 transcription/spec errors en route (dropped nibble, 12-vs-13-octet salt, server-Finished context).",
+   "refs": [
+    "engine/crates/holo-crypto/src/lib.rs"
+   ]
+  },
+  {
+   "id": "T-bignum-montgomery",
+   "type": "test",
+   "label": "bignum_os2ip_i2osp_roundtrip / _mul_schoolbook_vs_python / montgomery_cios_* (4)",
+   "status": "passing",
+   "summary": "OS2IP/I2OSP roundtrip, schoolbook vs Python, CIOS vs plain modmul on the ground-truth key, final-carry edge (x*y >= n, subtract fires exactly once); ground truth = python big-int + OpenSSL (scratch/rsa_ground_truth.py, ALL PASSED rerun 2026-11-25).",
+   "refs": [
+    "engine/crates/holo-crypto/src/lib.rs"
+   ]
+  },
+  {
+   "id": "T-rsa-verify",
+   "type": "test",
+   "label": "rsa_pkcs1_v1_5_* (2) / rsa_pss_* (2) / rsa_rejects_wrong_sig_length",
+   "status": "passing",
+   "summary": "PKCS#1 v1.5 + PSS SHA-256 verify against python/OpenSSL-generated signatures (fixed 0xA5*32 salt), negative tests (bitflip, wrong hash, wrong salt len, wrong sig length, RSAVP1 range check with distinct error strings).",
+   "refs": [
+    "engine/crates/holo-crypto/src/lib.rs"
+   ]
   }
  ],
  "edges": [
@@ -2049,6 +2129,61 @@
    "src": "holo-crypto",
    "rel": "tested_by",
    "dst": "T-blake2s-selftest"
+  },
+  {
+   "src": "SES-2026-11-25",
+   "rel": "implements",
+   "dst": "S1",
+   "note": "S1b items 3 (AES-CFB128), 4 (TLS 1.3 key schedule), 5 (bignum+RSA verify prep) in one parallel-agent batch"
+  },
+  {
+   "src": "SES-2026-11-25",
+   "rel": "cites",
+   "dst": "D-0030",
+   "note": "CFB enforcement shape (A2-C4 mechanical)"
+  },
+  {
+   "src": "SES-2026-11-25",
+   "rel": "cites",
+   "dst": "D-0031",
+   "note": "bignum/RSA CT accepted-risk (A3-C6/F13)"
+  },
+  {
+   "src": "holo-crypto",
+   "rel": "tested_by",
+   "dst": "T-cfb128-kats"
+  },
+  {
+   "src": "holo-crypto",
+   "rel": "tested_by",
+   "dst": "T-cfb-usage-audit"
+  },
+  {
+   "src": "holo-crypto",
+   "rel": "tested_by",
+   "dst": "T-tls13-schedule"
+  },
+  {
+   "src": "holo-crypto",
+   "rel": "tested_by",
+   "dst": "T-bignum-montgomery"
+  },
+  {
+   "src": "holo-crypto",
+   "rel": "tested_by",
+   "dst": "T-rsa-verify"
+  },
+  {
+   "src": "D-0030",
+   "rel": "affects",
+   "dst": "holo-crypto",
+   "note": "cfb128 module privacy + audit allowlist"
+  },
+  {
+   "src": "D-0031",
+   "rel": "affects",
+   "dst": "holo-crypto",
+   "note": "bignum/rsa CT criterion"
   }
  ]
 }

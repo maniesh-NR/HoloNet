@@ -412,3 +412,35 @@
   stray pasted commit-message line ("dd6f4ba (…)") that had ridden to
   the top of the D-0028 entry on origin/main, and the duplicated
   misplaced NUMBERING NOTE above D-0027.
+- **D-0030 (2026-11-25, run 10 — record-0003 A2-C4 execution, S1 item 3
+  AES-CFB):** the mechanical shape of the CFB constraint. SP 800-38A
+  CFB128 (AES-128/192/256) landed as `pub(crate) mod cfb128` inside
+  holo-crypto (raw in-place encrypt/decrypt over the existing `Aes`,
+  AES-encrypt-based in BOTH directions per the mode definition,
+  arbitrary-length stream semantics); raw functions are NOT `pub`, and
+  no authenticated wrapper consumer is chartered yet, so crate privacy
+  IS the compile-failure half of the enforcement — no other crate can
+  name them at all. Audit half: the `cfb_usage_audit` workspace
+  grep-test (allowlist exactly `["crates/holo-crypto/src/lib.rs"]`,
+  ≥15-file floor, file:line failure output); negative path demonstrated
+  live this run — a planted holo-socks probe file containing "cfb" made
+  the audit FAIL with `crates/holo-socks/src/cfb_probe_scratch.rs:1`,
+  removal restored green. When a `pub` authenticated wrapper IS
+  chartered (S4 legacy import paths / S7), consumer files extend the
+  allowlist WITH a justification comment and a DECISIONS record — the
+  visible, journaled path, same pattern as rand-split (D-0024). The
+  legacy-provider constraint is unchanged: CFB is unauthenticated and
+  forbidden outside such a wrapper.
+- **D-0031 (2026-11-25, run 10 — progress review 0002 A3-C6/F13
+  constant-time bar for the bignum item, S1 item 5):** recorded as an
+  ACCEPTED-RISK decision. `holo-crypto::bignum` + `rsa` process PUBLIC
+  data only — signatures, public keys, the exponent e, message hashes
+  and salts are attacker-visible in the verification path — so
+  variable-time behaviour (bit-branching `mont_pow`, the data-dependent
+  final subtraction) is accepted FOR THIS STAGE, not an oversight. No
+  secret-operand operation is in scope; RSA is shipped VERIFY-ONLY (no
+  private-key ops). A future consumer that routes SECRET operands
+  through this module (e.g. S2 client-side operations holding RSA
+  private keys) MUST treat constant-time execution as its own
+  requirement; this code does not provide it. This is the recorded
+  criterion handed to A2 at the S1→S2 gate.

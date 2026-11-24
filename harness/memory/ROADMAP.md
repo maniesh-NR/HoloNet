@@ -119,11 +119,41 @@ annotations: BLAKE2b cut-or-justify, constant-time bar for X25519/bignum.
    authenticated wrapper module, and a CI grep-audit fails on any `cfb`
    reference outside that module (same spirit as the rand-split audit,
    binding condition 7).**
+   **DONE 2026-11-25 run 10 (D-0030):** CFB128-AES128/192/256 in
+   `holo-crypto::cfb128` (pub(crate) — no pub wrapper consumer chartered
+   yet, crate privacy IS the compile-failure half); SP 800-38A Appendix
+   F vectors pdftotext-extracted, OpenSSL 3.5.7 cross-checked BOTH
+   directions; stream roundtrips 1/15/17/31/33-byte lengths;
+   `cfb_usage_audit` grep-test (allowlist = the one lib.rs file,
+   ≥15-file floor); negative path demonstrated LIVE (planted holo-socks
+   probe → FAIL file:line → removed → green); +5 tests, local 114-green.
 4. TLS 1.3 key schedule helpers: HKDF-Expand-Label / Derive-Secret per
    RFC 8446 §7.1.
+   **DONE 2026-11-25 run 10:** `holo-crypto::hkdf_sha256_expand` exposed
+   (delegates to the existing private `expand` — no duplicated logic);
+   `tls13::encode_hkdf_label` / `hkdf_expand_label` / `derive_secret`
+   with the §7.1 pseudocode quoted verbatim; RFC 8448 SHA-256 secret
+   chain replayed end-to-end (transcripts recomputed from the published
+   raw messages, self-checked against the published hashes; agent
+   caught+fixed 3 transcription/spec errors en route — dropped nibble,
+   12-vs-13-octet RFC 5869 salt, server-Finished covering CH..CV not
+   CH..SH); python HMAC spot-check matched (early secret
+   33ad0a1c…170f92a); +3 tests.
 5. **Bignum + RSA verification prep (moved from S2, A2-F9):** CIOS
    Montgomery multiplication, RSA PKCS#1 v1.5 + PSS verify — S2's
    CertVerify needs them; final-carry-limb pitfall applies.
+   **DONE 2026-11-25 run 10 (D-0031 = the CT accepted-risk criterion):**
+   `holo-crypto::bignum` (u64 LE limbs, os2ip/i2osp, schoolbook mul,
+   CIOS with Newton n0' = −n⁻¹ mod 2⁶⁴ and the final-carry subtract —
+   edge-tested with x·y ≥ n, exactly-once) + `holo-crypto::rsa`
+   VERIFY-ONLY (PKCS#1 v1.5 + PSS, SHA-256, MGF1, ct_eq compares,
+   distinct per-stage error strings, RSAVP1 range check). Vector note,
+   honestly recorded: RFC 8017 §A.1.1 defines ASN.1 SYNTAX ONLY — no
+   example key exists in the RFC — so a deterministic 1024-bit key was
+   generated and ground-truthed via Python big-int `pow` + OpenSSL
+   3.5.7 (v1.5 sig byte-identical via raw-DigestInfo pkeyutl; PSS salt
+   fixed 0xA5×32); ground-truth script rerun green 2026-11-25. +9
+   tests.
 
 Server-path hardening backlog (A2-F5; **lands in S1** — tightened from
 "by S2" at progress review 0002, A3-C5/F7):
