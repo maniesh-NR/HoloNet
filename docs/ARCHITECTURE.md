@@ -25,7 +25,9 @@ engine/crates/
   holo-util/     hex, base64, JSON model, randomness (fail-closed os_fill
                  + non-security splitmix; entropy policy D-0008)
   holo-crypto/   ChaCha20/Poly1305/AEAD/XChaCha20/AES-256-GCM/SHA-2/HMAC/
-                 HKDF/EVP_BytesToKey — RFC/NIST vectors (17 tests)
+                 HKDF/EVP_BytesToKey/BLAKE2s/X25519/AES-CFB128/TLS 1.3
+                 key schedule/bignum(CIOS Montgomery)+RSA verify —
+                 RFC/NIST vectors (51 countable tests)
   holo-theme/    Material You color engine (reference, 10 tests + goldens)
   holo-proto/    driver SPI: Params, Conn/Dialer/Driver/Registry
   holo-config/   Profile/Settings/Store + share-link importer for all 7
@@ -48,8 +50,8 @@ docs/            MATERIAL_YOU.md · RESTORE.md · TECHNIQUES.md ·
 
 The first data plane is LIVE: `session.connect` → reachability probe →
 local SOCKS5 → Shadowsocks AEAD tunnel (end-to-end integration tests
-over real loopback TCP; 97 Linux / 96 macOS / 96 Windows tests, all
-green on CI — run 44897540455; platform-gated). The remaining planes (TLS 1.3, QUIC,
+over real loopback TCP; 120 Linux / 119 macOS / 119 Windows tests, all
+green on CI — run 45491740796; platform-gated). The remaining planes (TLS 1.3, QUIC,
 provider-fed profiles, system crates) are staged in
 `harness/memory/ROADMAP.md`; every not-yet-live protocol honestly
 reports a per-driver milestone error at connect — nothing fakes

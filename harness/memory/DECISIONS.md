@@ -463,3 +463,26 @@
   the PUBLIC constant exponent p−2; the all-zero check via
   `crate::ct_eq`; no division on secret data). Both items are handed
   to A2 at the S1→S2 gate.
+- **D-0033 (2026-11-25, gate 0004 — resolves the S2 charter's binding
+  pre-start amendment, A3-C2/F6 + A1-C1):** "SNI masking" is CUT from
+  S2. Justification: the S2 client pins the SPKI of the specific server
+  it intends to reach; the SNI field is what selects the certificate a
+  server returns, so a masked/borrowed SNI would make the pin certify
+  an identity the client did NOT actually reach — breaking pinning
+  semantics — while adding a distinct fingerprinting surface (a client
+  that masks SNI behaves measurably differently from both an honest
+  client and the browser population it mimics). ECH/encrypted-SNI is
+  out of scope for a no-X.509-parser client. The S2 charter body no
+  longer lists SNI masking (ROADMAP amended at gate 0004). If a future
+  stage charters censorship circumvention that genuinely needs SNI
+  flexibility, it must come back through a new decision with its own
+  threat-model amendment.
+- **D-0034 (2026-11-25, gate 0004 — executes A2-C1):** RSA public-
+  exponent validation is ENFORCED in the verify path (not deferred):
+  `public_key_checks` now rejects e < 3 or even e with the distinct
+  error "rsa: public exponent must be an odd integer >= 3" (RFC 8017
+  §3.1); named negative test `rsa_rejects_degenerate_exponent` pins the
+  error for e = 1 / 2 / empty across BOTH verify fns and asserts e = 3
+  passes the exponent gate. This closes the forged-signature hole an
+  attacker-supplied e = 1 key would otherwise open before any S2
+  consumer accepts keys from config.

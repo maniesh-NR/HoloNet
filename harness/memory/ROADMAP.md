@@ -261,17 +261,27 @@ Acceptance criteria (all measurable):
   chosen for the Windows 7 SP1 floor (BCryptGenRandom alone is Win8+);
   (d) THREAT-MODEL §G updated from "interim fail-closed" to the shipped
   provenance.
-- RFC 7693 official vectors for BLAKE2s/b (keyed and unkeyed) pass.
+- RFC 7693 official vectors for BLAKE2s (keyed and unkeyed) pass —
+  BLAKE2b stays CUT (A3-C6/F13, no consumer; the stale "BLAKE2s/b"
+  wording here was corrected at gate 0004, A3-F4).
 - RFC 7748 §5.2 test vectors (including iteration counts) pass; the
   all-zero shared secret is rejected as an error, not silently accepted.
 - NIST SP 800-38A CFB128 vectors pass.
 - ExpandLabel: RFC 8446 §7.1 defines the construction; the recorded
   key-schedule vectors come from RFC 8448 (Simple 1-RTT handshake) —
   port those, plus in-crate loopback transcripts (A3-C4 citation fix).
-- RSA/bignum: CIOS Montgomery verified against published Montgomery
-  test vectors; PKCS#1 v1.5 verify against RFC 8017 §9.2 vectors; PSS
-  against RFC 8017 §9.1.2 vectors; PLUS an in-crate RSA-2048 self-test
-  cert (self-made, labeled as such — NOT an official vector set).
+- RSA/bignum (amended at gate 0004 per A3-C3 — the original bullets
+  cited vector sources that do not exist as vectors): CIOS Montgomery
+  verified by an in-crate differential (mont_mul vs plain modmul on the
+  ground-truth key) plus a limb-level Python CIOS simulation with T < 2n
+  asserted (rsa_ground_truth.py, rerun green 2026-11-25); PKCS#1 v1.5
+  and PSS verify per RFC 8017 §9.2/§9.1.2 PROCEDURES (those sections
+  define encodings, not vectors) with signatures ground-truthed via
+  Python big-int pow + OpenSSL 3.5.7 on a deterministic key (RFC 8017
+  §A.1.1 defines ASN.1 syntax only — no example key exists); the
+  in-crate RSA-2048 self-test cert is RE-SCOPED into the S2 charter's
+  embedded loopback-server cert (self-made, labeled as such — the S1
+  1024-bit verify fixture is the primitive; no cert/PEM ships from S1).
 - Server-path hardening, named tests (A3-C2, checked at the S1→S2 gate):
   **~~salt-replay cache rejects a replayed salt+first-chunk connection
   (progress review 0002, A2-C1)~~ DONE 2026-11-20 run 4 — `SaltCache`
@@ -326,9 +336,10 @@ Acceptance criteria (all measurable):
 ## S2 — holo-tls: from-scratch TLS 1.3 client (RFC 8446)
 
 X25519, suites 0x1301/02/03, HRR cookie, RSA CertVerify (PKCS#1 v1.5 +
-PSS via CIOS Montgomery bignum — final carry limb!), SPKI pinning, SNI
-masking, hostname match, in-crate loopback server with embedded RSA-2048
-cert. ~18 tests. Acceptance: full handshake + application data over
+PSS via CIOS Montgomery bignum — final carry limb!), SPKI pinning,
+hostname match, in-crate loopback server with embedded RSA-2048
+cert (self-made, labeled as such — re-scoped from S1 at gate 0004,
+A3-C3). ~18 tests. Acceptance: full handshake + application data over
 loopback; transcript-hash mismatch and pin mismatch rejected; downgrade
 attempts rejected.
 
@@ -339,8 +350,14 @@ attempts rejected.
   not just the library.**
 - **No X.509 parser — SPKI pinning operates on raw DER; hidden ASN.1
   dependencies are a charter violation if any appear.**
-- **"SNI masking" must be defined-and-tested or cut before S2 starts**
-  (as written it is untestable).
+- ~~**"SNI masking" must be defined-and-tested or cut before S2 starts**~~
+  **RESOLVED at gate 0004 (D-0033): CUT** — justification: the S2 client
+  pins SPKI of the specific server; the SNI field selects the server's
+  certificate, so a masked/borrowed SNI would break SPKI pinning
+  semantics (pin would no longer certify the identity the client
+  actually reached) and add a fingerprinting surface; ECH/encrypted-SNI
+  is out of scope for a no-X.509-parser client. The charter body no
+  longer lists SNI masking (amended above).
 - Green-R2 feasibility check: feasible-as-scoped ≈1.5–3k LOC given S1
   crypto (calibration: TIIGER-TLS/tls13tutorial precedents); the hard
   parts (chain building, tickets, 0-RTT) are exactly what
@@ -481,8 +498,12 @@ above), S5 reorder+cuts (applied above), S6 Salamander rescoping
 proxy-mode-only caveat; macOS notarization and Play org-account are
 owner-cost decisions to record when S7 charters), WireGuard Noise-IK
 coverage note (S1 crypto list covers Noise-IKpsk2 except: generalize
-ct_eq into holo-util, ensure BLAKE2s keyed-mode vectors — folded into
-S1 items 1–2 annotations), trojan descope naming (applied above).
+ct_eq into holo-util, ensure BLAKE2s keyed-mode vectors — the BLAKE2s
+keyed vectors landed (run 9); the ct_eq-into-holo-util generalization
+is OPEN, owned by the WireGuard stage (correction at gate 0004, A3-C5:
+the earlier "folded into S1 items 1–2 annotations" claim was false —
+ct_eq remains holo-crypto-only and holo-engine consumes
+holo_crypto::ct_eq); trojan descope naming (applied above).
 
 ## Binding conditions carried from gate 0001
 

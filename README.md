@@ -7,7 +7,7 @@
 [![Rust](https://img.shields.io/badge/engine-Rust%201.77%2B-orange.svg)](engine/Cargo.toml)
 [![Platforms](https://img.shields.io/badge/platforms-Win7%20%E2%80%93%2011%20%7C%20macOS%2010.15%2B%20%7C%20Linux%20%7C%20Android%208%2B-lightgrey.svg)](#platform-matrix)
 [![Crates](https://img.shields.io/badge/dependencies-0%20third--party%20crates-success.svg)](ATTRIBUTION.md)
-[![Tests](https://img.shields.io/badge/tests-96-green-brightgreen.svg)](#status--honesty)
+[![Tests](https://img.shields.io/badge/tests-120-green-brightgreen.svg)](#status--honesty)
 
 HoloNet pairs a Rust engine (`holonetd`) with native frontends: Flutter for
 Android, Kotlin Multiplatform (Compose) for macOS, and Qt 6/QML for Windows
@@ -54,11 +54,14 @@ Flutter (Android)   Compose (macOS)   Qt6/QML (Win+Linux)
 - **Engine wiring**: `session.connect` probes the server, starts the local
   SOCKS listener from `proxy_listen`, and reports honest per-driver
   milestone errors for every protocol that is not live yet.
-- **96/96 tests green** (71 at v0.3.0 plus gate-0001 hardening tests
+- **120/120 tests green** (71 at v0.3.0 plus gate-0001 hardening tests
   plus the S1 hardening items plus the run-8 XChaCha standardization
-  plus the run-9 BLAKE2s primitive —
-  CI-verified run 44897540455: 97 Linux / 96 macOS / 96 Windows,
-  cfg-gated counts differ),
+  plus the run-9 BLAKE2s primitive plus the run-10 S1b crypto batch
+  (X25519 / AES-CFB128 / TLS 1.3 key schedule / bignum+RSA verify) —
+  stage-2 tree CI-verified run 45491740796: 120 Linux / 119 macOS /
+  119 Windows, cfg-gated counts differ; the gate-0004 closure push
+  adds one RSA exponent-validation test — expected 121/120/120, CI
+  rides that push),
   including 6 end-to-end integration tests over real loopback TCP
   (IPC → import → connect → SOCKS → AEAD tunnel → echo → stats →
   disconnect) plus throughput and memory-bounding regressions.
@@ -133,7 +136,7 @@ owner-held key is the recorded S7 packaging criterion.
 
 ```bash
 cd engine
-cargo test                        # 87 tests on Linux (86 macOS / 86 Windows — cfg-gated; CI-verified run 44728988531)
+cargo test                        # 120 tests on Linux (119 macOS / 119 Windows — cfg-gated; CI-verified run 45491740796)
 cargo build --release -p holonetd -p holonetctl
 ./target/release/holonetd &       # data dir + IPC token auto-created
 ./target/release/holonetctl theme dark     # the full M3 role map

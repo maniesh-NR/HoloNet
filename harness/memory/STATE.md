@@ -9,8 +9,16 @@ accepted-risk). Local 114-green (97+5+3+9), static 116, lock v3 held.
 X25519 SHIPPED by the lead (two subagent deaths — taken over mid-session;
 first-compile green; RFC's own python decode+ladder ALL 9 CHECKS PASSED;
 1,000-iter release 0.12 s + 1M-iter release 124.46 s per D-0032).
-Stage 1 (items 3/4/5) CI-VERIFIED: run 45488934917 @ d6c37a0 SUCCESS.
-Local 120-green. Stage-2 (X25519) CI rides the next push. Full narrative:
+Stage 1 (items 3/4/5) CI-VERIFIED run 45488934917 @ d6c37a0 AND stage 2
+(X25519) CI-VERIFIED run 45491740796 @ 9cf3114 — BOTH SUCCESS (6/6;
+per-OS ledger 120 Linux / 119 macOS / 119 Windows, visible 110/109/109
++ socks 10 reconciled). GATE 0004 (S1→S2) CONVENED: four blind reviewers
+ALL returned PROCEED_WITH_CONDITIONS (0 BLOCK) — transition ALLOWED;
+conditions executed in this closure push (SNI masking CUT D-0033, RSA
+exponent validation enforced D-0034 +1 test, ledger citations refreshed,
+verify scripts deposited in harness/scripts/verify/, LESSONS entries,
+ROADMAP acceptance-text amendments). Record: harness/adversarial/verdicts/
+0004-S2-gate.md (chain to 0003 verified). Local 121-green. Full narrative:
 harness/memory/sessions/2026-11-25-s1b-completion.md.
 
 Prior state: 2026-11-21 (UTC, run 9 — S1b OPENS: BLAKE2s shipped,

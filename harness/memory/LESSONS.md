@@ -292,3 +292,12 @@
   the graph is part of "done", not optional bookkeeping. The local
   pre-push ritual is `memory_graph.py check` + `memory_rag.py smoke`
   alongside `cargo test`.
+- (run 10, gate 0004) poll_ci.sh's `head_sha=` API filter returned a
+  stale empty result for ~25 min after a push while the run existed
+  (first false negative of the script). Rule adopted: a "no run yet"
+  from the poll script is NEVER authoritative — confirm with a direct
+  authenticated runs query (or by branch) before recording any CI
+  conclusion. Related: a nohup'd background cargo run DIED silently
+  mid-compile when its parent shell closed in this sandbox — local
+  background runs are not an authoritative verification channel; CI
+  (or a synchronous foreground run) is the anchor.

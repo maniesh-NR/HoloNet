@@ -970,7 +970,7 @@ pub fn ct_eq(a: &[u8], b: &[u8]) -> bool {
 // AES (FIPS-197) — encryption only (GCM needs no block decryption)
 // ---------------------------------------------------------------------------
 
-pub mod aes {
+pub(crate) mod aes {
     /// S-box generated from the GF(2^8) inverse + FIPS-197 affine transform
     /// (computed once, then cached — never transcribed by hand).
     fn sbox() -> &'static [u8; 256] {
@@ -1016,16 +1016,6 @@ pub mod aes {
             b >>= 1;
         }
         p
-    }
-
-    pub fn xtime(x: u8) -> u8 {
-        let hi = x & 0x80;
-        let r = x << 1;
-        if hi != 0 {
-            r ^ 0x1b
-        } else {
-            r
-        }
     }
 
     pub struct Aes {
@@ -1791,6 +1781,7 @@ pub mod rsa {
     /// representative s < n. Returns (n, s, k).
     fn public_key_checks(
         n: &[u8],
+        e: &[u8],
         sig: &[u8],
     ) -> Result<(Vec<u64>, Vec<u64>, usize), &'static str> {
         if n.is_empty() {
@@ -1798,6 +1789,13 @@ pub mod rsa {
         }
         if n[n.len() - 1] & 1 == 0 {
             return Err("rsa: modulus must be odd");
+        }
+        // Degenerate-exponent guard (gate-0004 A2-C1): an attacker-supplied
+        // key with e = 1 (or e = 0/2) would otherwise "verify" sig = EM
+        // verbatim. RFC 8017 §3.1 requires e to be an odd integer ≥ 3.
+        let e_big = bignum::os2ip(e);
+        if bignum::cmp(&e_big, &[3]) == Ordering::Less || e[e.len() - 1] & 1 == 0 {
+            return Err("rsa: public exponent must be an odd integer >= 3");
         }
         if sig.len() != n.len() {
             return Err("rsa: signature length != modulus length");
@@ -1820,7 +1818,7 @@ pub mod rsa {
         message_hash: &[u8],
         sig: &[u8],
     ) -> Result<(), &'static str> {
-        let (n_big, s, k) = public_key_checks(n, sig)?;
+        let (n_big, s, k) = public_key_checks(n, e, sig)?;
         if message_hash.len() != H_LEN {
             return Err("rsa: expected a 32-byte SHA-256 message hash");
         }
@@ -1861,7 +1859,7 @@ pub mod rsa {
         message_hash: &[u8],
         sig: &[u8],
     ) -> Result<(), &'static str> {
-        let (n_big, s, _k) = public_key_checks(n, sig)?;
+        let (n_big, s, _k) = public_key_checks(n, e, sig)?;
         if message_hash.len() != H_LEN {
             return Err("rsa: expected a 32-byte SHA-256 message hash");
         }
@@ -3375,6 +3373,38 @@ mod tests {
         assert_eq!(
             rsa::verify_pss_sha256(&n, &e, 32, &mhash, &n).unwrap_err(),
             "rsa: signature representative out of range"
+        );
+    }
+
+    #[test]
+    fn rsa_rejects_degenerate_exponent() {
+        // Gate-0004 A2-C1: an attacker-supplied key with e = 1 (or e = 0/2)
+        // must NOT verify sig = EM verbatim; RFC 8017 §3.1 requires an odd
+        // integer >= 3. Distinct error string pinned by both verify fns.
+        let n = from_hex(
+            "c8a2064596d7b2f4c9b0a1e60d97f4ce2a1a4a0d45c3b0d1e2f3a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f91",
+        );
+        let e_one = vec![0x01u8];
+        let e_two = vec![0x02u8];
+        let e_zero: Vec<u8> = Vec::new();
+        let sig = vec![0x01u8; n.len()];
+        let mhash = [0u8; 32];
+        for bad_e in [&e_one, &e_two, &e_zero] {
+            assert_eq!(
+                rsa::verify_pkcs1_v1_5_sha256(&n, bad_e, &mhash, &sig).unwrap_err(),
+                "rsa: public exponent must be an odd integer >= 3"
+            );
+            assert_eq!(
+                rsa::verify_pss_sha256(&n, bad_e, 32, &mhash, &sig).unwrap_err(),
+                "rsa: public exponent must be an odd integer >= 3"
+            );
+        }
+        // e = 3 (odd, >= 3) passes the exponent gate; its failure mode is
+        // downstream (not the exponent error):
+        let e_three = vec![0x03u8];
+        assert_ne!(
+            rsa::verify_pkcs1_v1_5_sha256(&n, &e_three, &mhash, &sig).unwrap_err(),
+            "rsa: public exponent must be an odd integer >= 3"
         );
     }
 }

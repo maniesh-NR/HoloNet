@@ -138,8 +138,17 @@ python decode+ladder ALL 9 CHECKS PASSED, iterated release runs 0.12 s
 (1k) + 124.46 s (1M) per D-0032; local 120-green (114+6); CI rides the
 stage-2 push.
 
-Next: S1→S2 gate record 0004 (all S1b items landed). ~~X25519,
-AES-CFB, ExpandLabel, bignum/RSA~~ ALL DONE run 10.
+**GATE 0004 (S1→S2) PASSED 2026-11-25** — four blind reviewers ALL
+PROCEED_WITH_CONDITIONS, 0 BLOCK (record verdicts/0004-S2-gate.md,
+chain → 0003 verified; prompts archived verbatim). S1 CLOSED; S2
+(holo-tls) STARTS per the amended charter (D-0033 SNI masking CUT;
+D-0034 RSA exponent validation enforced + rsa_rejects_degenerate_exponent;
+pub(crate) aes; ledger citations refreshed; verify scripts at
+harness/scripts/verify/; R-05→S2, R-07→standing practice, R-09/R-13→S6).
+Both run-10 pushes CI-verified (45488934917 @ d6c37a0, 45491740796 @
+9cf3114 — ledger 120/119/119 reconciled); the closure push adds +1
+test (expected 121/120/120). ~~X25519, AES-CFB, ExpandLabel,
+bignum/RSA~~ ALL DONE run 10.
 
 ## Verification contracts (how "done" is proven)
 
@@ -245,7 +254,7 @@ AES-CFB, ExpandLabel, bignum/RSA~~ ALL DONE run 10.
 ## Recent Progress & Git Activity
 
 ```text
+### Commit: 9cf3114 - backup: run 10 stage 2: X25519 RFC 7748 (S1b item 2) shipped by the lead after two subagent deaths: RFC §4 ladder verbatim, §5 clamps + non-canonical u acceptance, all-zero ct_eq rejection, p-2 inversion (0 (maniesh-NR, 2026-11-24)
 ### Commit: d6c37a0 - backup: run 10 stage 1: S1b items 3/4/5 landed (parallel-agent batch): AES-CFB128 SP 800-38A w/ D-0030 pub(crate)+grep-audit enforcement (negative demo live), tls13 HKDF-Expand-Label/Derive-Secret RFC 8446 § (maniesh-NR, 2026-11-24)
 ### Commit: c76844e - backup: run 9 closure: CI-VERIFIED 44897540455 @ e3c8304 all-green 6/6, per-OS ledger 97 Linux/96 macOS/96 Windows (visible 87/86/86 + socks 10 reconciled); README badge + Status block and ARCHITECTURE data p (maniesh-NR, 2026-11-21)
-### Commit: e3c8304 - backup: run 9 fix: graph coverage — SES-2026-11-21b + 4 T-blake2s nodes + 6 edges (harness-audit had failed 44896588214 on the missing session node; all 5 test jobs were green); graph check + RAG smoke gree (maniesh-NR, 2026-11-21)
 ```

@@ -206,3 +206,42 @@ in-session:
    the CI-verified ledger (expected 114 Linux / 113 macOS / 113
    Windows visible 104/103/103 + socks 10 — reconcile per-OS).
 5. Deferred owner items unchanged (D-0014; CVE backfill; PAT rotation).
+
+## Addendum 2 (gate 0004: S1→S2 PASSED + conditions executed)
+
+- Stage-2 CI confirmed independently: **run 45491740796 @ 9cf3114f
+  completed SUCCESS** (6/6; per-OS ledger 120 Linux / 119 macOS /
+  119 Windows — visible 110/109/109 + socks 10, reconciled by the A1
+  reviewer from the CI job logs).
+- GATE 0004 (S1→S2) convened per ADVERSARIAL.md: four blind parallel
+  reviewers, prompts archived verbatim
+  (verdicts/0004-reviewer-prompts.md), verdicts transcribed exactly
+  (verdicts/0004-S2-gate.md). Result: **ALL FOUR
+  PROCEED_WITH_CONDITIONS, 0 BLOCK → transition ALLOWED.** The chain
+  anchors to record 0003's blob hash 2ad6fe71…f08f (verified by A4 in
+  review).
+- The reviewers' strongest catches, all legitimate: SNI masking was an
+  open binding pre-start condition (→ D-0033 CUT with justification);
+  RSA verify accepted e = 1 keys (→ D-0034 exponent validation
+  enforced + named test); `pub mod aes` defeated the name-based CFB
+  audit (→ `pub(crate) mod aes`, unused xtime removed); three
+  acceptance bullets cited vector sources that don't exist as vectors
+  (→ ROADMAP amended); the verification scripts weren't in-repo
+  (→ deposited at harness/scripts/verify/); ledger citations were
+  stale across three eras (→ README badge/status/quickstart +
+  ARCHITECTURE refreshed to the 9cf3114 ledger, closure-push +1
+  expected); the ct_eq-into-holo-util "folded into S1" claim was false
+  (→ re-annotated OPEN, owned by the WireGuard stage); poll_ci.sh
+  false-negative + background-job fragility (→ LESSONS entries).
+- A2's dissent stands unsmoothed: the X25519 CT claim is a source-level
+  checklist, not a formal guarantee (THREAT-MODEL §F scope note covers
+  the residual); inherited by S2 as a review bar.
+- Conditions carried into S2 (from the record's reconciliation): R-05
+  interop harness during S2 CI work; CT-checklist review bar for
+  secret-operand S2 code; top-level-test-fn tidy at S2's first
+  holo-crypto refactor; A3-C7 dispositions (R-05→S2, R-07→standing
+  practice, R-09→S6, R-13→S6; owner residuals D-0014/CVE/PAT carried).
+- Local suite after conditions execution: **121 passed, 0 failed**
+  (120 + rsa_rejects_degenerate_exponent); lock v3 held; graph
+  159 nodes/122 edges check+smoke OK. This closure push's CI verifies
+  the +1 tree (expected 121/120/120).

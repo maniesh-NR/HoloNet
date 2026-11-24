@@ -1615,6 +1615,46 @@
    "refs": [
     "engine/crates/holo-crypto/src/lib.rs"
    ]
+  },
+  {
+   "id": "D-0033",
+   "type": "decision",
+   "label": "D-0033: SNI masking CUT from S2 (gate 0004)",
+   "status": "accepted",
+   "summary": "Resolves the S2 charter's binding pre-start amendment (A3-C2/F6 + A1-C1): SNI masking CUT — masked SNI would break SPKI-pinning semantics (the pin would not certify the identity actually reached) and add fingerprinting surface; ECH out of scope for a no-X.509-parser client. S2 charter body amended.",
+   "refs": [
+    "harness/memory/DECISIONS.md"
+   ]
+  },
+  {
+   "id": "D-0034",
+   "type": "decision",
+   "label": "D-0034: RSA public-exponent validation enforced (gate 0004, A2-C1)",
+   "status": "accepted",
+   "summary": "public_key_checks rejects e < 3 or even e (RFC 8017 §3.1) with a distinct error string; named test rsa_rejects_degenerate_exponent pins e=1/2/empty across both verify fns. Closes the forged-signature hole before any S2 config-sourced keys.",
+   "refs": [
+    "harness/memory/DECISIONS.md"
+   ]
+  },
+  {
+   "id": "GATE-0004",
+   "type": "gate_record",
+   "label": "Record 0004: the S1->S2 gate — PASSED (4x PROCEED_WITH_CONDITIONS, 0 BLOCK)",
+   "status": "passed",
+   "summary": "Four blind parallel reviewers (prompts archived verbatim, verdicts transcribed exactly): ALL PROCEED_WITH_CONDITIONS -> transition ALLOWED. S1 CLOSED at 9cf3114f (CI 45491740796, ledger 120/119/119 reconciled). Conditions executed in the closure push: D-0033 SNI cut, D-0034 exponent validation, pub(crate) aes (A2-C2), ledger citations refreshed (A1-C2/A3-C6/A4-C2), verify scripts deposited harness/scripts/verify/ (A1-C3/A3-C4), LESSONS entries (poll_ci false-negative + background-job fragility), ROADMAP acceptance-text amendments + ct_eq-exception re-annotation (A3-C3/C5), R-05/07/09/13 dispositions carried (A3-C7). S2 STARTS.",
+   "refs": [
+    "harness/adversarial/verdicts/0004-S2-gate.md"
+   ]
+  },
+  {
+   "id": "T-rsa-degenerate-exponent",
+   "type": "test",
+   "label": "rsa_rejects_degenerate_exponent",
+   "status": "passing",
+   "summary": "Pins 'rsa: public exponent must be an odd integer >= 3' for e = 1/2/empty across PKCS#1 v1.5 and PSS verify; e=3 passes the exponent gate (D-0034, gate-0004 A2-C1).",
+   "refs": [
+    "engine/crates/holo-crypto/src/lib.rs"
+   ]
   }
  ],
  "edges": [
@@ -2236,6 +2276,47 @@
    "rel": "affects",
    "dst": "holo-crypto",
    "note": "x25519 module: iterated-test gating + CT checklist"
+  },
+  {
+   "src": "SES-2026-11-25",
+   "rel": "cites",
+   "dst": "D-0033",
+   "note": "gate-0004 condition execution (SNI cut)"
+  },
+  {
+   "src": "SES-2026-11-25",
+   "rel": "cites",
+   "dst": "D-0034",
+   "note": "gate-0004 condition execution (exponent validation)"
+  },
+  {
+   "src": "GATE-0004",
+   "rel": "gates",
+   "dst": "S2",
+   "note": "S1->S2 transition ALLOWED (4x PWC, 0 BLOCK)"
+  },
+  {
+   "src": "GATE-0004",
+   "rel": "cites",
+   "dst": "D-0033",
+   "note": "SNI masking resolution"
+  },
+  {
+   "src": "GATE-0004",
+   "rel": "cites",
+   "dst": "D-0034",
+   "note": "exponent validation execution"
+  },
+  {
+   "src": "holo-crypto",
+   "rel": "tested_by",
+   "dst": "T-rsa-degenerate-exponent"
+  },
+  {
+   "src": "D-0034",
+   "rel": "affects",
+   "dst": "holo-crypto",
+   "note": "rsa public_key_checks exponent gate"
   }
  ]
 }
