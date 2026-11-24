@@ -137,7 +137,61 @@ journal. update_memory.py run pre-backup.
 
 ## Stage 2: X25519 (lead-implemented after two agent deaths)
 
-(appendendum follows after implementation)
+Two 2-a launches died (empty response ×2 — the heaviest scope: full
+field arithmetic + ladder + 1M-iter). The lead took over and shipped it
+in-session:
+
+- RFC 7748 fetched (rfc-editor.org, /tmp/rfc7748x.txt 1235 lines);
+  §4 ladder pseudocode, §5 decodeScalar25519/decodeUCoordinate + the
+  MUST-mask sentence, §5.2 vectors (both single-iteration pairs, the
+  iterated definition + published 1/1,000/1M values), §6.1 DH vector,
+  the cswap XOR-mask definition and §5.1 side-channel text — all
+  quoted/extracted verbatim; a24 = 121665 quoted from §4.
+- p−2 derived programmatically (python): LE bytes eb ff…7f; 2^64-radix
+  limb 0 = 0xffffffffffffffeb (the roadmap's "0xffffffeb…" pin);
+  51-bit limbs [0x7ffffffffffeb, 0x7ffffffffffff ×4].
+- Implementation (scratch/x25519_module.rs → appended to lib.rs):
+  5×51-bit u64 limbs + u128 intermediates (Poly1305 limb style); a
+  shared fe_carry + fe_reduce (FOUR unconditional carry→fold rounds —
+  termination proven by the geometric carry bounds: 2^54 → ≤2^8 → ≤1 →
+  0; a first draft with ad-hoc rounds had a ping-pong fold bug, caught
+  by self-review BEFORE compiling and rewritten); ladder = RFC §4
+  verbatim (255 iterations, XOR-mask cswap); inversion = modpow p−2
+  branching only on the public constant; all-zero shared secret → None
+  via crate::ct_eq; BASEPOINT const; public_from_private with the
+  order argument documented (clamped k = 2^254+8j ≢ 0 mod ℓ since 8ℓ >
+  2^255 and ℓ odd).
+- **FIRST-COMPILE GREEN: 48 passed (42+6), 2 ignored; workspace
+  120-green (114+6), 0 failed; lock v3 held; zero new warnings.**
+- Independent verification (scripts/verify_x25519_rfc7748.py): the
+  RFC's OWN §5 python decode functions + a §4-pseudocode transcription
+  → ALL 9 CHECKS PASSED (vector1, vector2, §6.1 both publics + both
+  shared-secret directions, u=0 zero-output case, iterated 1 and
+  1,000) — every PASS line quotes ≥16 hex chars.
+- Release-mode iterated runs (D-0032): 1,000-iter PASSED in 0.12 s
+  (`cargo test -p holo-crypto --release x25519_iterated_rfc7748_1000
+  -- --ignored`); the 1M run executed in release in the background —
+  result in the addendum below.
+- Memory: D-0032 recorded (execution mode + CT checklist); ROADMAP
+  item 2 DONE-annotated; graph extended (+D-0032, T-x25519-vectors,
+  T-x25519-iterated).
+
+## Addendum 1 (stage-1 CI + 1M iterated run)
+
+- **STAGE 1 CI-VERIFIED: run 45488934917 @ d6c37a05 completed SUCCESS**
+  (started 21:13:44Z, immediately after the push). The poll_ci.sh
+  head_sha loop kept reporting "no run yet" for ~25 min (stale API
+  filter response — first false negative of that script); the direct
+  authenticated runs query is authoritative and shows completed/success.
+  Poll script quirk recorded for a future LESSONS entry if it repeats.
+- **1M-ITERATED RFC 7748 §5.2 VECTOR PASSED release-mode: 124.46 s**
+  test time (`cargo test -p holo-crypto --release
+  x25519_iterated_rfc7748_1m -- --ignored` → `1 passed; 0 failed`),
+  matching the RFC-published
+  7c3911e0ab2586fd864497297e575e6f3bc601c0883c30df5f4dd2d24f665424.
+  Lock v3 held post-run. D-0032's execution-mode evidence complete.
+  (The first nohup attempt died silently mid-compile when its parent
+  shell closed — restarted synchronously; the log timestamps caught it.)
 
 ## Next
 

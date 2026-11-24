@@ -444,3 +444,22 @@
   private keys) MUST treat constant-time execution as its own
   requirement; this code does not provide it. This is the recorded
   criterion handed to A2 at the S1→S2 gate.
+- **D-0032 (2026-11-25, run 10 — progress review 0002 A3-C5/F5
+  execution-mode decision + A3-C6/F13 constant-time bar for X25519, S1
+  item 2):** (a) EXECUTION MODE: RFC 7748 §5.2's iterated vectors
+  (1,000 and 1,000,000 iterations) are `#[ignore]`-gated tests that run
+  RELEASE-MODE ONLY (`cargo test -p holo-crypto --release
+  x25519_iterated_rfc7748_1000 -- --ignored`) — never part of the
+  default debug-mode CI suite. Executed 2026-11-25: the 1,000-iteration
+  vector PASSED release-mode in 0.12 s (local); the 1M-iteration vector
+  PASSED release-mode locally (wall time in the journal addendum). The
+  DEFAULT suite carries the RFC's published single-iteration vectors
+  (§5.2 pair incl. the top-bit-set u of vector 2, §6.1 DH pair) — the
+  same arithmetic exercised in milliseconds. (b) CONSTANT-TIME BAR:
+  recorded in the CHECKLIST form — `holo-crypto::x25519`'s module docs
+  carry the checklist verbatim (branch-free ladder arithmetic with
+  fixed fold rounds; XOR-mask cswap per RFC §4/§5; branch-free decode
+  clamps; a fixed 255-iteration ladder; fe_invert branching only on
+  the PUBLIC constant exponent p−2; the all-zero check via
+  `crate::ct_eq`; no division on secret data). Both items are handed
+  to A2 at the S1→S2 gate.

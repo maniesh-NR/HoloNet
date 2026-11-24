@@ -4,6 +4,7 @@
 //! against official test vectors:
 //! - SHA-256 / SHA-1 / MD5 (FIPS 180-4, RFC 1321)
 //! - BLAKE2s (RFC 7693) — unkeyed hash + native keyed MAC
+//! - X25519 (RFC 7748) — Montgomery-ladder DH, constant-time checklist documented
 //! - HMAC-SHA256 (RFC 4231) and HMAC-SHA1
 //! - HKDF-SHA256 / HKDF-SHA1 (RFC 5869)
 //! - ChaCha20 (RFC 8439 §2), Poly1305 (RFC 8439 §2.5),
@@ -3375,5 +3376,513 @@ mod tests {
             rsa::verify_pss_sha256(&n, &e, 32, &mhash, &n).unwrap_err(),
             "rsa: signature representative out of range"
         );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// X25519 (RFC 7748) — Montgomery ladder over GF(2^255 - 19)
+// ---------------------------------------------------------------------------
+
+/// X25519 per RFC 7748: a24 = 121665; the ladder follows RFC §4's
+/// pseudocode exactly (x_2/z_2/x_3/z_3, conditional swap per §4's cswap);
+/// the scalar clamps per §5's decodeScalar25519 (k[0]&=248, k[31]&=127,
+/// k[31]|=64); the u-coordinate masks bit 255 and is NOT otherwise
+/// canonicalized — RFC §5: "When receiving such an array, implementations
+/// of X25519 (but not X448) MUST mask the most significant bit in the
+/// final byte." (quoted verbatim; record-0003 A2-C3: non-canonical
+/// u-coordinates are accepted as-is after the mandated decode steps).
+///
+/// CONTRIBUTORY-BEHAVIOR POLICY (recorded project decision, A2): the ONLY
+/// rejection is the all-zero shared secret, TLS 1.3-style, checked with
+/// the constant-time `crate::ct_eq` — RFC §6.1: "Both MAY check, without
+/// leaking extra information about the value of K, whether K is the
+/// all-zero value and abort if so"; §6.1 explains the check exists
+/// because "the X25519 function produces that value if it operates on an
+/// input corresponding to a point with small order".
+///
+/// CONSTANT-TIME CHECKLIST (progress review 0002 A3-C6/F13 bar — this is
+/// the recorded criterion handed to A2 at the S1→S2 gate; vectors alone
+/// do not prove constant-time):
+/// - ladder arithmetic (fe_mul/fe_sq/fe_add/fe_sub/fe_mul_small): straight-
+///   line, branch-free, fixed fold/carry round counts for every input;
+/// - fe_cswap: XOR-mask selection per RFC §4/§5's own cswap definition
+///   (mask = 0 - swap), no secret-dependent branch;
+/// - scalar/u decode clamps+masking: branch-free bit masks;
+/// - the ladder performs the same 255 iterations for every input;
+/// - fe_invert branches ONLY on the bits of the PUBLIC constant p-2
+///   (never on secret data) — square-and-multiply over a constant
+///   exponent;
+/// - the all-zero shared-secret check uses `crate::ct_eq` (no early
+///   return on secret data);
+/// - residual: portable std Rust, no SIMD/asm; §5.1's machine-instruction
+///   caveat does not apply (no division on secret data anywhere).
+///
+/// Representation: five 51-bit limbs (u64), u128 intermediates — the same
+/// limb style as this crate's Poly1305. Reduction uses 2^255 ≡ 19
+/// (mod 2^255-19); Montgomery form is unnecessary at this limb width (the
+/// 19-fold replaces it) — the chartered CIOS Montgomery multiplication
+/// lives in `bignum` (RSA path).
+pub mod x25519 {
+    const MASK51: u64 = (1u64 << 51) - 1;
+    /// RFC §4 (quoted verbatim): "The constant a24 is (486662 - 2) / 4 =
+    /// 121665 for curve25519/X25519".
+    const A24: u64 = 121665;
+    /// p = 2^255 - 19 as five 51-bit limbs (derived programmatically:
+    /// python `(2**255-19)` decomposed at radix 2^51 — see journal).
+    const P: [u64; 5] = [
+        0x7ffffffffffed,
+        0x7ffffffffffff,
+        0x7ffffffffffff,
+        0x7ffffffffffff,
+        0x7ffffffffffff,
+    ];
+    /// p - 2 = 2^255 - 21, little-endian bytes. The roadmap pins this as
+    /// "inversion exponent p−2 with limb 0 0xffffffeb…": in the 2^64-radix
+    /// little-endian rendering the low word is 0xffffffffffffffeb
+    /// (asserted by x25519_p_minus_2_exponent_constant; derived with
+    /// python `(2**255-21).to_bytes(32,'little')` during implementation).
+    const P_MINUS_2: [u8; 32] = [
+        0xeb, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0x7f,
+    ];
+
+    type Fe = [u64; 5];
+
+    fn fe_zero() -> Fe {
+        [0; 5]
+    }
+
+    fn fe_one() -> Fe {
+        [1, 0, 0, 0, 0]
+    }
+
+    /// One carry-propagate pass: limbs masked to 51 bits, carry out of
+    /// limb 4 returned (value = Σ limbs·2^51i + ret·2^255, unchanged).
+    fn fe_carry(r: &mut Fe) -> u64 {
+        let mut c = 0u64;
+        for i in 0..5 {
+            let v = r[i] + c;
+            r[i] = v & MASK51;
+            c = v >> 51;
+        }
+        c
+    }
+
+    /// Complete reduction to limbs < 2^51, value ≡ input (mod p): four
+    /// UNCONDITIONAL (carry → fold 19·carry into limb 0) rounds — the
+    /// carry bounds shrink geometrically (2^54 → ≤1 → ≤1 → 0), so the
+    /// fixed round count is provably sufficient and the control flow is
+    /// data-independent (CT checklist).
+    fn fe_reduce(r: &mut Fe) {
+        let mut c = fe_carry(r);
+        r[0] += 19 * c; // c < 2^54 → r[0] < 2^59, fits u64
+        c = fe_carry(r);
+        r[0] += 19 * c; // c ≤ 2^8
+        c = fe_carry(r);
+        r[0] += 19 * c; // c ≤ 1
+        c = fe_carry(r);
+        r[0] += 19 * c; // c ≤ 1 (worst case r[0] ≤ 18 pre-fold → ≤ 37)
+        let final_c = fe_carry(r); // provably 0 (bounded above)
+        debug_assert_eq!(final_c, 0);
+    }
+
+    /// a + b mod p. Inputs' limbs < 2^51 → a_i + b_i < 2^52, no overflow.
+    fn fe_add(a: &Fe, b: &Fe) -> Fe {
+        let mut r = [0u64; 5];
+        for i in 0..5 {
+            r[i] = a[i] + b[i];
+        }
+        fe_reduce(&mut r);
+        r
+    }
+
+    /// a - b mod p. 2·P[i] ≥ 2^52 - 2 > b_i (limbs < 2^51), so adding 2p
+    /// first can never underflow.
+    fn fe_sub(a: &Fe, b: &Fe) -> Fe {
+        let mut r = [0u64; 5];
+        for i in 0..5 {
+            r[i] = a[i] + 2 * P[i] - b[i];
+        }
+        fe_reduce(&mut r);
+        r
+    }
+
+    /// Full schoolbook product (limbs < 2^51 → u128 partials < 2^105)
+    /// with the 19-fold applied inside the accumulation, then complete
+    /// reduction. Branch-free on data.
+    fn fe_mul(a: &Fe, b: &Fe) -> Fe {
+        let mut t = [0u128; 5];
+        for i in 0..5 {
+            for j in 0..5 {
+                let prod = (a[i] as u128) * (b[j] as u128);
+                let k = i + j;
+                if k < 5 {
+                    t[k] += prod;
+                } else {
+                    t[k - 5] += 19 * prod;
+                }
+            }
+        }
+        let mut r = [0u64; 5];
+        let mut c: u128 = 0;
+        for i in 0..5 {
+            let v = t[i] + c;
+            r[i] = (v as u64) & MASK51;
+            c = v >> 51;
+        }
+        // narrow-carry c < 2^54 fits u64; complete reduction from here:
+        r[0] += 19 * (c as u64);
+        let mut c2 = fe_carry(&mut r);
+        r[0] += 19 * c2;
+        c2 = fe_carry(&mut r);
+        r[0] += 19 * c2;
+        c2 = fe_carry(&mut r);
+        r[0] += 19 * c2;
+        c2 = fe_carry(&mut r);
+        debug_assert_eq!(c2, 0);
+        r
+    }
+
+    fn fe_sq(a: &Fe) -> Fe {
+        fe_mul(a, a)
+    }
+
+    /// Small-constant multiply (a24 · E): limb-scalar products < 2^68 in
+    /// u128, then the same complete reduction.
+    fn fe_mul_small(a: &Fe, c: u64) -> Fe {
+        let mut t = [0u128; 5];
+        for i in 0..5 {
+            t[i] = (a[i] as u128) * (c as u128);
+        }
+        let mut r = [0u64; 5];
+        let mut c1: u128 = 0;
+        for i in 0..5 {
+            let v = t[i] + c1;
+            r[i] = (v as u64) & MASK51;
+            c1 = v >> 51;
+        }
+        r[0] += 19 * (c1 as u64); // c1 < 2^17
+        let mut c2 = fe_carry(&mut r);
+        r[0] += 19 * c2;
+        c2 = fe_carry(&mut r);
+        r[0] += 19 * c2;
+        c2 = fe_carry(&mut r);
+        debug_assert_eq!(c2, 0);
+        r
+    }
+
+    /// Constant-time conditional swap per RFC §4/§5's own cswap
+    /// definition: dummy = mask AND (a XOR b); a ^= dummy; b ^= dummy;
+    /// mask = 0 - swap. No branch on swap.
+    fn fe_cswap(a: &mut Fe, b: &mut Fe, swap: u8) {
+        let m = 0u64.wrapping_sub(swap as u64);
+        for i in 0..5 {
+            let dummy = m & (a[i] ^ b[i]);
+            a[i] ^= dummy;
+            b[i] ^= dummy;
+        }
+    }
+
+    /// Constant-time conditional subtract of p (borrow chain + masked
+    /// selection): canonicalizes a value < 2^255 into [0, p).
+    fn fe_canonicalize(x: &Fe) -> Fe {
+        let mut borrow: u64 = 0;
+        let mut d = [0u64; 5];
+        for i in 0..5 {
+            let bi = P[i] + borrow;
+            let di = x[i].wrapping_sub(bi);
+            borrow = di >> 63;
+            d[i] = di & MASK51;
+        }
+        let m = 0u64.wrapping_sub(borrow); // all-ones if x < p (keep x)
+        let mut out = [0u64; 5];
+        for i in 0..5 {
+            out[i] = (d[i] & !m) | (x[i] & m);
+        }
+        out
+    }
+
+    fn fe_from_bytes(s: &[u8; 32]) -> Fe {
+        let w = |lo: usize| u64::from_le_bytes(s[lo..lo + 8].try_into().unwrap());
+        let (w0, w1, w2, w3) = (w(0), w(8), w(16), w(24));
+        [
+            w0 & MASK51,
+            ((w0 >> 51) | (w1 << 13)) & MASK51,
+            ((w1 >> 38) | (w2 << 26)) & MASK51,
+            ((w2 >> 25) | (w3 << 39)) & MASK51,
+            (w3 >> 12) & MASK51,
+        ]
+    }
+
+    /// Canonical little-endian serialization: complete reduction, then
+    /// the constant-time conditional subtract of p.
+    fn fe_to_bytes(x: &Fe) -> [u8; 32] {
+        let mut r = *x;
+        fe_reduce(&mut r);
+        r = fe_canonicalize(&r);
+        let mut out = [0u8; 32];
+        let mut words = [0u64; 4];
+        words[0] = r[0] | (r[1] << 51);
+        words[1] = (r[1] >> 13) | (r[2] << 38);
+        words[2] = (r[2] >> 26) | (r[3] << 25);
+        words[3] = (r[3] >> 39) | (r[4] << 12);
+        for i in 0..4 {
+            out[i * 8..i * 8 + 8].copy_from_slice(&words[i].to_le_bytes());
+        }
+        out
+    }
+
+    /// Modular inversion by exponentiation to p-2 (RFC §4: "Return x_2 *
+    /// (z_2^(p - 2))"). Branches ONLY on the bits of the public constant
+    /// exponent (see the module CT checklist).
+    fn fe_invert(x: &Fe) -> Fe {
+        let mut r = fe_one();
+        for t in (0..255).rev() {
+            r = fe_sq(&r);
+            let bit = (P_MINUS_2[t / 8] >> (t % 8)) & 1;
+            if bit == 1 {
+                r = fe_mul(&r, x);
+            }
+        }
+        r
+    }
+
+    /// RFC §5 decodeScalar25519: k[0] &= 248; k[31] &= 127; k[31] |= 64.
+    fn clamp_scalar(scalar: &[u8; 32]) -> [u8; 32] {
+        let mut k = *scalar;
+        k[0] &= 248;
+        k[31] &= 127;
+        k[31] |= 64;
+        k
+    }
+
+    /// X25519(k, u): returns None iff the shared secret is the all-zero
+    /// value (constant-time check via crate::ct_eq — the recorded,
+    /// TLS 1.3-style contributory policy; RFC §6.1 quoted in module docs).
+    pub fn x25519(scalar: &[u8; 32], u: &[u8; 32]) -> Option<[u8; 32]> {
+        let k = clamp_scalar(scalar);
+        // RFC §5 (verbatim in module docs): implementations of X25519
+        // MUST mask the most significant bit in the final byte of u.
+        let mut ub = *u;
+        ub[31] &= 127;
+        let x1 = fe_from_bytes(&ub);
+
+        // RFC §4 ladder, bits = 255, t = bits-1 .. 0 (255 iterations).
+        let mut x2 = fe_one();
+        let mut z2 = fe_zero();
+        let mut x3 = x1;
+        let mut z3 = fe_one();
+        let mut swap: u8 = 0;
+        for t in (0..255).rev() {
+            let kt = (k[t / 8] >> (t % 8)) & 1;
+            let new_swap = swap ^ kt;
+            fe_cswap(&mut x2, &mut x3, new_swap);
+            fe_cswap(&mut z2, &mut z3, new_swap);
+            swap = kt;
+
+            let a = fe_add(&x2, &z2);
+            let aa = fe_sq(&a);
+            let b = fe_sub(&x2, &z2);
+            let bb = fe_sq(&b);
+            let e = fe_sub(&aa, &bb);
+            let c = fe_add(&x3, &z3);
+            let d = fe_sub(&x3, &z3);
+            let da = fe_mul(&d, &a);
+            let cb = fe_mul(&c, &b);
+            let dacb_add = fe_add(&da, &cb);
+            let dacb_sub = fe_sub(&da, &cb);
+            x3 = fe_sq(&dacb_add);
+            z3 = fe_mul(&x1, &fe_sq(&dacb_sub));
+            x2 = fe_mul(&aa, &bb);
+            let a24e = fe_mul_small(&e, A24);
+            let aa_a24e = fe_add(&aa, &a24e);
+            z2 = fe_mul(&e, &aa_a24e);
+        }
+        fe_cswap(&mut x2, &mut x3, swap);
+        fe_cswap(&mut z2, &mut z3, swap);
+
+        let zinv = fe_invert(&z2);
+        let out = fe_to_bytes(&fe_mul(&x2, &zinv));
+        if crate::ct_eq(&out, &[0u8; 32]) {
+            None
+        } else {
+            Some(out)
+        }
+    }
+
+    /// Basepoint u = 9 ("a byte with value 9, followed by 31 zero bytes",
+    /// RFC §6.1).
+    pub const BASEPOINT: [u8; 32] = {
+        let mut b = [0u8; 32];
+        b[0] = 9;
+        b
+    };
+
+    /// K_A = X25519(a, 9). The basepoint has order ℓ and a clamped scalar
+    /// k = 2^254 + 8j (j < 2^251) satisfies k ≢ 0 (mod ℓ) — k < 2^255 <
+    /// 8ℓ and ℓ is odd, so k = m·ℓ would force m ≡ 0 (mod 8), impossible
+    /// for m < 8 — the all-zero output cannot occur; `expect` documents
+    /// that invariant rather than silently mapping None.
+    pub fn public_from_private(scalar: &[u8; 32]) -> [u8; 32] {
+        x25519(scalar, &BASEPOINT).expect(
+            "basepoint scalar-mult cannot yield all-zero for a clamped scalar (order argument)",
+        )
+    }
+
+    // --------------------------- tests -----------------------------------
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use crate::{from_hex, to_hex};
+
+        #[test]
+        fn x25519_p_minus_2_exponent_constant() {
+            // Roadmap pin: "inversion exponent p−2 with limb 0 0xffffffeb…".
+            // p-2 little-endian = eb ff…ff 7f; the 2^64-radix low word is
+            // 0xffffffffffffffeb; the 51-bit limb decomposition matches the
+            // P constant layout. Derived programmatically (python:
+            // (2**255-21).to_bytes(32,'little')) — see journal.
+            let mut e = [0xffu8; 32];
+            e[0] = 0xeb;
+            e[31] = 0x7f;
+            assert_eq!(P_MINUS_2, e);
+            assert_eq!(
+                u64::from_le_bytes(P_MINUS_2[0..8].try_into().unwrap()),
+                0xffffffffffffffeb
+            );
+            assert_eq!(P[0], 0x7ffffffffffed);
+        }
+
+        #[test]
+        fn x25519_rfc7748_5_2_vector1() {
+            // RFC 7748 §5.2, first X25519 vector (copied verbatim from the
+            // fetched RFC text; /tmp/rfc7748x.txt lines 575-588).
+            let k = from_hex("a546e36bf0527c9d3b16154b82465edd62144c0ac1fc5a18506a2244ba449ac4");
+            let u = from_hex("e6db6867583030db3594c1a424b15f7c726624ec26b3353b10a903a6d0ab1c4c");
+            let want = "c3da55379de9c6908e94ea4df28d084f32eccf03491c71f754b4075577a28552";
+            let mut kb = [0u8; 32];
+            kb.copy_from_slice(&k);
+            let mut ub = [0u8; 32];
+            ub.copy_from_slice(&u);
+            let out = x25519(&kb, &ub).expect("vector1 output is non-zero");
+            assert_eq!(to_hex(&out), want);
+        }
+
+        #[test]
+        fn x25519_rfc7748_5_2_vector2_non_canonical_u() {
+            // RFC 7748 §5.2, second X25519 vector. Its u-coordinate's top
+            // bit is set (first byte 0xe5) — this doubles as the
+            // non-canonical-acceptance test (record-0003 A2-C3): the
+            // mandated decode (mask bit 255, little-endian, arithmetic mod
+            // 2^255-19) is applied with NO canonical-form rejection.
+            // RFC §5 verbatim: "When receiving such an array,
+            // implementations of X25519 (but not X448) MUST mask the most
+            // significant bit in the final byte."
+            let k = from_hex("4b66e9d4d1b4673c5ad22691957d6af5c11b6421e0ea01d42ca4169e7918ba0d");
+            let u = from_hex("e5210f12786811d3f4b7959d0538ae2c31dbe7106fc03c3efc4cd549c715a493");
+            let want = "95cbde9476e8907d7aade45cb4b873f88b595a68799fa152e6f8f7647aac7957";
+            let mut kb = [0u8; 32];
+            kb.copy_from_slice(&k);
+            let mut ub = [0u8; 32];
+            ub.copy_from_slice(&u);
+            let out = x25519(&kb, &ub).expect("vector2 output is non-zero");
+            assert_eq!(to_hex(&out), want);
+        }
+
+        #[test]
+        fn x25519_rfc7748_6_1_dh() {
+            // RFC 7748 §6.1 test vector (verbatim from the fetched RFC):
+            // K_A = X25519(a, 9), K_B = X25519(b, 9),
+            // K = X25519(a, K_B) = X25519(b, K_A).
+            let a = from_hex("77076d0a7318a57d3c16c17251b26645df4c2f87ebc0992ab177fba51db92c2a");
+            let b = from_hex("5dab087e624a8a4b79e17f8b83800ee66f3bb1292618b6fd1c2f8b27ff88e0eb");
+            let ka = "8520f0098930a754748b7ddcb43ef75a0dbf3a0d26381af4eba4a98eaa9b4e6a";
+            let kb = "de9edb7d7b7dc1b4d35b61c2ece435373f8343c85b78674dadfc7e146f882b4f";
+            let k = "4a5d9d5ba4ce2de1728e3bf480350f25e07e21c947d19e3376f09b3c1e161742";
+            let mut ab = [0u8; 32];
+            ab.copy_from_slice(&a);
+            let mut bb = [0u8; 32];
+            bb.copy_from_slice(&b);
+            let pub_a = public_from_private(&ab);
+            let pub_b = public_from_private(&bb);
+            assert_eq!(to_hex(&pub_a), ka);
+            assert_eq!(to_hex(&pub_b), kb);
+            let mut pub_bb = [0u8; 32];
+            pub_bb.copy_from_slice(&from_hex(kb));
+            let mut pub_ab = [0u8; 32];
+            pub_ab.copy_from_slice(&from_hex(ka));
+            let s1 = x25519(&ab, &pub_bb).expect("shared secret non-zero");
+            let s2 = x25519(&bb, &pub_ab).expect("shared secret non-zero");
+            assert_eq!(to_hex(&s1), k);
+            assert_eq!(to_hex(&s2), k);
+            assert_eq!(to_hex(&s1), to_hex(&s2));
+        }
+
+        #[test]
+        fn x25519_rejects_all_zero_shared_secret() {
+            // RFC §6.1: the function produces the all-zero value on
+            // small-order inputs; the recorded policy (A2) rejects ONLY
+            // that case, TLS 1.3-style, via constant-time ct_eq.
+            // u = all-zero → x_1 = 0 → ladder yields 0 → None.
+            let k = [1u8; 32];
+            let u = [0u8; 32];
+            assert!(x25519(&k, &u).is_none());
+        }
+
+        #[test]
+        fn x25519_public_matches_scalar_mult() {
+            // public_from_private(a) == x25519(a, basepoint 9).
+            let a = from_hex("77076d0a7318a57d3c16c17251b26645df4c2f87ebc0992ab177fba51db92c2a");
+            let mut ab = [0u8; 32];
+            ab.copy_from_slice(&a);
+            let via_pub = public_from_private(&ab);
+            let via_x = x25519(&ab, &BASEPOINT).expect("basepoint output non-zero");
+            assert_eq!(via_pub, via_x);
+        }
+
+        /// RFC 7748 §5.2 iterated test harness: k and u both start at
+        /// "090000…00" (verbatim from the RFC); each iteration
+        /// (k, u) := (X25519(k, u), k) — X25519 re-clamps k internally per
+        /// the function definition. #[ignore]: execution-mode decision
+        /// D-0032 — iterated vectors run RELEASE-MODE ONLY (never as a
+        /// default debug-mode CI test; the 1M run takes minutes even
+        /// optimized).
+        fn iterated(iterations: u32) -> String {
+            let mut k = [0u8; 32];
+            let mut u = [0u8; 32];
+            k[0] = 9;
+            u[0] = 9;
+            for _ in 0..iterations {
+                let kk = k;
+                let out = x25519(&kk, &u).expect("iterated chain never all-zero");
+                u = k;
+                k = out;
+            }
+            to_hex(&k)
+        }
+
+        #[test]
+        #[ignore]
+        fn x25519_iterated_rfc7748_1000() {
+            // RFC 7748 §5.2 verbatim: "After 1,000 iterations:
+            // 684cf59ba83309552800ef566f2f4d3c1c3887c49360e3875f2eb94d99532c51"
+            assert_eq!(
+                iterated(1000),
+                "684cf59ba83309552800ef566f2f4d3c1c3887c49360e3875f2eb94d99532c51"
+            );
+        }
+
+        #[test]
+        #[ignore]
+        fn x25519_iterated_rfc7748_1m() {
+            // RFC 7748 §5.2 verbatim: "After 1,000,000 iterations:
+            // 7c3911e0ab2586fd864497297e575e6f3bc601c0883c30df5f4dd2d24f665424"
+            assert_eq!(
+                iterated(1_000_000),
+                "7c3911e0ab2586fd864497297e575e6f3bc601c0883c30df5f4dd2d24f665424"
+            );
+        }
     }
 }

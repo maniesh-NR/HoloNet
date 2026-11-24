@@ -6,8 +6,11 @@ pub(crate)+grep-audit enforcement, negative demo live), tls13
 HKDF-Expand-Label/Derive-Secret (RFC 8446 §7.1, RFC 8448 chain), bignum
 CIOS Montgomery + rsa VERIFY-ONLY (PKCS#1 v1.5 + PSS; D-0031 CT
 accepted-risk). Local 114-green (97+5+3+9), static 116, lock v3 held.
-X25519 in progress by the lead (two subagent deaths — taken over
-mid-session); CI verification rides the run-10 push. Full narrative:
+X25519 SHIPPED by the lead (two subagent deaths — taken over mid-session;
+first-compile green; RFC's own python decode+ladder ALL 9 CHECKS PASSED;
+1,000-iter release 0.12 s + 1M-iter release 124.46 s per D-0032).
+Stage 1 (items 3/4/5) CI-VERIFIED: run 45488934917 @ d6c37a0 SUCCESS.
+Local 120-green. Stage-2 (X25519) CI rides the next push. Full narrative:
 harness/memory/sessions/2026-11-25-s1b-completion.md.
 
 Prior state: 2026-11-21 (UTC, run 9 — S1b OPENS: BLAKE2s shipped,

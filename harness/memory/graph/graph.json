@@ -1585,6 +1585,36 @@
    "refs": [
     "engine/crates/holo-crypto/src/lib.rs"
    ]
+  },
+  {
+   "id": "D-0032",
+   "type": "decision",
+   "label": "D-0032: X25519 execution mode (iterated vectors release-mode-only) + CT checklist record",
+   "status": "accepted",
+   "summary": "A3-C5/F5: RFC 7748 §5.2 iterated vectors (1k + 1M) are #[ignore]-gated, RELEASE-MODE ONLY, never default debug CI; executed 2026-11-25 (1k PASS 0.12s release; 1M PASS release, journal addendum). A3-C6/F13: the constant-time criterion is recorded in CHECKLIST form in holo-crypto::x25519's module docs (branch-free ladder + fixed fold rounds; XOR-mask cswap; branch-free decodes; 255 fixed iterations; fe_invert branches only on the public p-2 constant; all-zero check via ct_eq; no division on secret data). Both handed to A2 at the S1->S2 gate.",
+   "refs": [
+    "harness/memory/DECISIONS.md"
+   ]
+  },
+  {
+   "id": "T-x25519-vectors",
+   "type": "test",
+   "label": "x25519_rfc7748_5_2_vector1/_vector2_non_canonical_u/_6_1_dh/_rejects_all_zero/_public_matches + _p_minus_2_exponent_constant",
+   "status": "passing",
+   "summary": "RFC §5.2 single-iteration pair (vector2's top-bit u doubles as the non-canonical-acceptance test with the §5 MUST-mask sentence quoted verbatim), §6.1 DH both directions, u=0 all-zero rejection via ct_eq, basepoint consistency, and the p-2 limb-0 0xffffffeb byte-form pin. Independently cross-verified: RFC's own §5 python decode code + §4 pseudocode transcription, ALL 9 CHECKS PASSED (scripts/verify_x25519_rfc7748.py).",
+   "refs": [
+    "engine/crates/holo-crypto/src/lib.rs"
+   ]
+  },
+  {
+   "id": "T-x25519-iterated",
+   "type": "test",
+   "label": "x25519_iterated_rfc7748_1000 / _1m (#[ignore], release-mode-only per D-0032)",
+   "status": "passing",
+   "summary": "RFC §5.2 iterated vectors: (k,u) := (X25519(k,u), k) from 0900...00. 1,000-iter PASSED release-mode 0.12s; 1M-iter PASSED release-mode (journal addendum). Never run in default debug CI (A3-C5/F5).",
+   "refs": [
+    "engine/crates/holo-crypto/src/lib.rs"
+   ]
   }
  ],
  "edges": [
@@ -2184,6 +2214,28 @@
    "rel": "affects",
    "dst": "holo-crypto",
    "note": "bignum/rsa CT criterion"
+  },
+  {
+   "src": "SES-2026-11-25",
+   "rel": "cites",
+   "dst": "D-0032",
+   "note": "X25519 execution mode + CT checklist record (stage 2, lead-implemented)"
+  },
+  {
+   "src": "holo-crypto",
+   "rel": "tested_by",
+   "dst": "T-x25519-vectors"
+  },
+  {
+   "src": "holo-crypto",
+   "rel": "tested_by",
+   "dst": "T-x25519-iterated"
+  },
+  {
+   "src": "D-0032",
+   "rel": "affects",
+   "dst": "holo-crypto",
+   "note": "x25519 module: iterated-test gating + CT checklist"
   }
  ]
 }

@@ -111,6 +111,24 @@ annotations: BLAKE2b cut-or-justify, constant-time bar for X25519/bignum.
    bignum item must record a constant-time criterion (code-review
    checklist or recorded accepted-risk decision) — vectors alone pass a
    variable-time implementation; handed to A2 at the S1→S2 gate.**
+   **DONE 2026-11-25 run 10 (D-0032 = both the execution-mode decision
+   and the CT checklist record):** `holo-crypto::x25519` (5×51-bit u64
+   limbs, u128 intermediates — Poly1305 limb style; 2^255 ≡ 19 fold
+   reduction with PROVEN four-round termination; Montgomery form NOT
+   needed at this width — CIOS lives in `bignum`): RFC §4 ladder verbatim
+   (255 fixed iterations, XOR-mask cswap), §5 decodeScalar25519 clamps +
+   bit-255 u masking with NO canonical rejection (vector 2's top-bit u
+   doubles as the acceptance test; §5 sentence quoted verbatim);
+   all-zero shared secret rejected via crate::ct_eq (TLS 1.3-style only,
+   A2); inversion = exponentiation to p−2 (limb-0 0xffffffeb in the
+   2^64-radix rendering — asserted in a named test); CT CHECKLIST in the
+   module docs = the recorded criterion. Independent verification: RFC's
+   own §5 python decode code + §4 pseudocode transcription → ALL 9
+   CHECKS PASSED (vectors, §6.1 both directions, u=0 zero case, iterated
+   1 + 1,000 — scripts/verify_x25519_rfc7748.py); iterated tests
+   #[ignore] release-mode-only per D-0032 (1,000-iter PASSED 0.12 s
+   release; 1M PASS in the journal addendum). +8 tests (6 default + 2
+   ignored), local 120-green, first-compile green.
 3. AES-CFB (NIST SP 800-38A) — legacy provider paths only.
    **Constraint (A2): unauthenticated; forbidden outside an authenticated
    wrapper.**
