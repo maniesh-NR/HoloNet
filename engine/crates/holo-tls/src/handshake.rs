@@ -1522,20 +1522,20 @@ mod tests {
 
     fn rfc_sh_random() -> [u8; 32] {
         let mut r = [0u8; 32];
-        r.copy_from_slice(&rfc8448::SERVER_HELLO[6..38]);
+        r.copy_from_slice(&rfc8448::server_hello()[6..38]);
         r
     }
 
     fn rfc_ch_random() -> [u8; 32] {
         let mut r = [0u8; 32];
-        r.copy_from_slice(&rfc8448::CLIENT_HELLO[6..38]);
+        r.copy_from_slice(&rfc8448::client_hello()[6..38]);
         r
     }
 
     #[test]
     fn client_hello_rfc8448_trace_parses_and_roundtrips() {
         // RFC 8448 §3, lines 177-186 (196 octets).
-        let msg = &*rfc8448::CLIENT_HELLO;
+        let msg = &*rfc8448::client_hello();
         let ch = ClientHello::decode(msg).unwrap();
 
         assert_eq!(ch.legacy_version, 0x0303, "§4.1.2 line 1583");
@@ -1593,8 +1593,8 @@ mod tests {
         // The complete RECORD (RFC 8448 line 201: "16 03 01 00 c4 ...") also
         // decodes: type handshake, legacy_record_version 0x0301 (initial
         // ClientHello compatibility, §5.1 line 4414).
-        let (rec, used) = TlsPlaintext::decode(&rfc8448::CLIENT_HELLO_RECORD).unwrap();
-        assert_eq!(used, rfc8448::CLIENT_HELLO_RECORD.len());
+        let (rec, used) = TlsPlaintext::decode(&rfc8448::client_hello_record()).unwrap();
+        assert_eq!(used, rfc8448::client_hello_record().len());
         assert_eq!(rec.content_type, crate::record::ContentType::Handshake);
         assert_eq!(rec.legacy_record_version, 0x0301);
         assert_eq!(rec.fragment, *msg);
@@ -1603,7 +1603,7 @@ mod tests {
     #[test]
     fn server_hello_rfc8448_trace_parses_and_roundtrips() {
         // RFC 8448 §3, lines 241-245 (90 octets).
-        let msg = &*rfc8448::SERVER_HELLO;
+        let msg = &*rfc8448::server_hello();
         let sh = ServerHello::decode(msg).unwrap();
 
         assert_eq!(sh.legacy_version, 0x0303);
@@ -1643,19 +1643,19 @@ mod tests {
         // First prove the vector equals the four published messages
         // (lines 376-378, 382-411, 415-421, 441-443) concatenated.
         assert_eq!(
-            &rfc8448::SERVER_FLIGHT_PAYLOAD[..],
+            &rfc8448::server_flight_payload()[..],
             &[
-                rfc8448::ENCRYPTED_EXTENSIONS.clone(),
-                rfc8448::CERTIFICATE.clone(),
-                rfc8448::CERTIFICATE_VERIFY.clone(),
-                rfc8448::SERVER_FINISHED.clone(),
+                rfc8448::encrypted_extensions().to_vec(),
+                rfc8448::certificate().to_vec(),
+                rfc8448::certificate_verify().to_vec(),
+                rfc8448::server_finished().to_vec(),
             ].concat()[..]
         );
 
         let rec = TlsPlaintext::new(
             crate::record::ContentType::Handshake,
             crate::record::LEGACY_VERSION_OTHER,
-            rfc8448::SERVER_FLIGHT_PAYLOAD.clone(),
+            rfc8448::server_flight_payload().to_vec(),
         )
         .unwrap();
         let mut asm = crate::record::HandshakeAssembler::new();
@@ -1702,10 +1702,10 @@ mod tests {
         );
 
         // Round-trip every decoded message back to wire bytes.
-        assert_eq!(ee.encode(), rfc8448::ENCRYPTED_EXTENSIONS[..]);
-        assert_eq!(cert.encode(), rfc8448::CERTIFICATE[..]);
-        assert_eq!(cv.encode(), rfc8448::CERTIFICATE_VERIFY[..]);
-        assert_eq!(fin.encode(), rfc8448::SERVER_FINISHED[..]);
+        assert_eq!(ee.encode(), rfc8448::encrypted_extensions()[..]);
+        assert_eq!(cert.encode(), rfc8448::certificate()[..]);
+        assert_eq!(cv.encode(), rfc8448::certificate_verify()[..]);
+        assert_eq!(fin.encode(), rfc8448::server_finished()[..]);
     }
 
     #[test]
@@ -1745,7 +1745,7 @@ mod tests {
         })
         .unwrap();
         assert_eq!(built.len(), 196);
-        assert_eq!(built, rfc8448::CLIENT_HELLO[..], "byte-identity with RFC 8448 §3");
+        assert_eq!(built, rfc8448::client_hello()[..], "byte-identity with RFC 8448 §3");
 
         // The builder refuses duplicate extensions (§4.2 lines 2083-2084).
         let mut dup = extensions.clone();
@@ -1785,7 +1785,7 @@ mod tests {
         );
 
         // RFC 8448 §5, lines 1656-1664: a real HRR on the wire.
-        let hrr = ServerHello::decode(&rfc8448::HELLO_RETRY_REQUEST_SERVER_HELLO).unwrap();
+        let hrr = ServerHello::decode(&rfc8448::hello_retry_request_server_hello()).unwrap();
         assert!(hrr.is_hello_retry_request());
         assert_eq!(hrr.random, HELLO_RETRY_REQUEST_RANDOM);
         assert_eq!(hrr.legacy_session_id_echo, Vec::<u8>::new());
@@ -1806,10 +1806,10 @@ mod tests {
         assert_eq!(parse_supported_versions_sh(&hrr.extensions[2].data).unwrap(), 0x0304);
 
         // Byte-identity on re-encode.
-        assert_eq!(hrr.encode(), rfc8448::HELLO_RETRY_REQUEST_SERVER_HELLO[..]);
+        assert_eq!(hrr.encode(), rfc8448::hello_retry_request_server_hello()[..]);
 
         // Negative: the plain ServerHello of §3 is not an HRR.
-        let sh = ServerHello::decode(&rfc8448::SERVER_HELLO).unwrap();
+        let sh = ServerHello::decode(&rfc8448::server_hello()).unwrap();
         assert!(!sh.is_hello_retry_request());
         // ...and an HRR without supported_versions is invalid (§4.1.4 line 1823).
         let no_sv = ServerHello {
@@ -2088,7 +2088,7 @@ mod tests {
     #[test]
     fn client_hello_codec_rejects_illegal_parameters() {
         // Base a valid CH on the RFC 8448 trace, then mutate field by field.
-        let valid = rfc8448::CLIENT_HELLO.clone();
+        let valid = rfc8448::client_hello().to_vec();
 
         // legacy_version != 0x0303 (§4.1.2 line 1583) → distinct error.
         let mut bad = valid.clone();

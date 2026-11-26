@@ -73,14 +73,14 @@ mod tests {
         ];
         // The two raw handshake messages (4-byte headers included, record
         // headers excluded) exactly as published in RFC 8448 §3.
-        let th = transcript_hash(&[&rfc8448::CLIENT_HELLO, &rfc8448::SERVER_HELLO]);
+        let th = transcript_hash(&[&rfc8448::client_hello(), &rfc8448::server_hello()]);
         assert_eq!(th, expect);
 
         // Splitting the same bytes into differently-ordered slices would be
         // wrong; feeding the concatenation as one slice must give the same
         // answer as two slices (associativity of ||).
-        let mut joined = rfc8448::CLIENT_HELLO.clone();
-        joined.extend_from_slice(&rfc8448::SERVER_HELLO);
+        let mut joined = rfc8448::client_hello().to_vec();
+        joined.extend_from_slice(&rfc8448::server_hello());
         assert_eq!(transcript_hash(&[&joined]), expect);
 
         // Transcript-Hash of the empty transcript = SHA-256 of nothing =

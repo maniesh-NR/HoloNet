@@ -48,3 +48,4 @@ UTC time | prev-commit | run summary
 2026-11-26T07:31:40Z | prev=94d2908 | run 11 addendum: D-0036 standing schedule — CVE-poll job 549422 replaced by daily 18:00 UTC autonomous session (job 549467): poll + gated roadmap + per-stage backups + parallel agents + mandatory ne
 2026-11-26T18:51:39Z | prev=1db4c4a | run 12 stage 1: S2 batch 1 (4 agents): holo-tls crate 21T RFC 8448, rsa_sign 10T CAVS+Wycheproof+OpenSSL, spki 17T, schedule 12T RFC 8448; D-0037 audit hex exception; 181/0/3 lock v3 --allow-untracked
 2026-11-26T19:36:24Z | prev=1395e37 | run 12 stage 2: S2 batch 2 lead takeover: fixed flight double-wrap + server transcript + Debug; holo-tls 63T e2e loopback (3 suites, HRR, rejections); 194/0/3 lock v3 --allow-untracked
+2026-11-26T19:44:19Z | prev=b8e37b3 | run 12 stage 2b: MSRV fix — LazyLock(1.80)->OnceLock across holo-tls server+rfc8448 accessors, unused E static removed; 1.77.2 canary red->fix; workspace 194/0/3 lock v3

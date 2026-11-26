@@ -36,7 +36,7 @@
 
 use std::io::{Read, Write};
 use std::net::{Shutdown, TcpListener, TcpStream};
-use std::sync::LazyLock;
+use std::sync::OnceLock;
 
 use holo_crypto::rsa_sign;
 use holo_crypto::sha256;
@@ -96,14 +96,25 @@ fn unhex(s: &str) -> Vec<u8> {
         .collect()
 }
 
+// OnceLock, not LazyLock: LazyLock stabilized in Rust 1.80 and the workspace
+// MSRV floor is 1.77.2 (the Win7/Catalina CI canary enforces it — found by
+// that canary on the first batch-2 push).
 /// Decoded fixture certificate DER.
-pub static LOOPBACK_CERT_DER: LazyLock<Vec<u8>> = LazyLock::new(|| unhex(LOOPBACK_CERT_DER_HEX));
+static LOOPBACK_CERT_DER: OnceLock<Vec<u8>> = OnceLock::new();
 /// Decoded fixture RSA modulus.
-pub static LOOPBACK_RSA_N: LazyLock<Vec<u8>> = LazyLock::new(|| unhex(LOOPBACK_RSA_N_HEX));
-/// Decoded fixture RSA public exponent.
-pub static LOOPBACK_RSA_E: LazyLock<Vec<u8>> = LazyLock::new(|| unhex(LOOPBACK_RSA_E_HEX));
+static LOOPBACK_RSA_N: OnceLock<Vec<u8>> = OnceLock::new();
 /// Decoded fixture RSA private exponent (TEST-ONLY material).
-pub static LOOPBACK_RSA_D: LazyLock<Vec<u8>> = LazyLock::new(|| unhex(LOOPBACK_RSA_D_HEX));
+static LOOPBACK_RSA_D: OnceLock<Vec<u8>> = OnceLock::new();
+
+pub(crate) fn loopback_cert_der() -> &'static [u8] {
+    LOOPBACK_CERT_DER.get_or_init(|| unhex(LOOPBACK_CERT_DER_HEX))
+}
+pub(crate) fn loopback_rsa_n() -> &'static [u8] {
+    LOOPBACK_RSA_N.get_or_init(|| unhex(LOOPBACK_RSA_N_HEX))
+}
+pub(crate) fn loopback_rsa_d() -> &'static [u8] {
+    LOOPBACK_RSA_D.get_or_init(|| unhex(LOOPBACK_RSA_D_HEX))
+}
 
 // ---------------------------------------------------------------------------
 // Errors — every failure stage a distinct "tls: server(loopback): ..." string
@@ -421,7 +432,7 @@ impl LoopbackServer {
         let cert = CertificateMsg {
             certificate_request_context: vec![],
             entries: vec![CertificateEntry {
-                cert_data: LOOPBACK_CERT_DER.clone(),
+                cert_data: loopback_cert_der().to_vec(),
                 extensions: vec![],
             }],
         }
@@ -442,7 +453,7 @@ impl LoopbackServer {
         let (alg, sig) = if self.use_pkcs1 {
             (
                 signature_scheme::RSA_PKCS1_SHA256,
-                rsa_sign::sign_pkcs1_v1_5_sha256(&LOOPBACK_RSA_N, &LOOPBACK_RSA_D, &md)
+                rsa_sign::sign_pkcs1_v1_5_sha256(loopback_rsa_n(), loopback_rsa_d(), &md)
                     .map_err(ServerError::CertSignFailed)?,
             )
         } else {
@@ -452,7 +463,7 @@ impl LoopbackServer {
                 .map_err(ServerError::Entropy)?;
             (
                 signature_scheme::RSA_PSS_RSAE_SHA256,
-                rsa_sign::sign_pss_sha256(&LOOPBACK_RSA_N, &LOOPBACK_RSA_D, &md, &salt)
+                rsa_sign::sign_pss_sha256(loopback_rsa_n(), loopback_rsa_d(), &md, &salt)
                     .map_err(ServerError::CertSignFailed)?,
             )
         };

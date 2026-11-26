@@ -1699,7 +1699,7 @@ impl ClientConn {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::server::{LoopbackServer, ServerError, LOOPBACK_CERT_DER};
+    use crate::server::{loopback_cert_der, LoopbackServer, ServerError};
     use crate::spki;
     use std::net::SocketAddr;
 
@@ -1731,7 +1731,7 @@ mod tests {
     }
 
     fn correct_pin() -> [u8; 32] {
-        spki::spki_pin_sha256(&LOOPBACK_CERT_DER).expect("fixture certificate parses")
+        spki::spki_pin_sha256(loopback_cert_der()).expect("fixture certificate parses")
     }
 
     fn cfg_for(hostname: &str) -> ClientConfig {

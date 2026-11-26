@@ -464,7 +464,7 @@ mod tests {
         // records" shape.  legacy_record_version: 0x0301 would be used for
         // the first flight; here we use 0x0303 for all (both legal for
         // decode — the field MUST be ignored, §5.1 line 4397).
-        let raw = &*rfc8448::CLIENT_HELLO;
+        let raw = &*rfc8448::client_hello();
         let pieces = fragment_message(raw, 60).unwrap();
         assert_eq!(pieces.len(), 4, "196 bytes split at 60: 60+60+60+16");
         assert!(pieces.iter().all(|p| p.len() <= 60));
@@ -500,7 +500,7 @@ mod tests {
         // Finished into ONE record.  We rebuild that coalescing from the
         // individual published messages and re-parse it through one record
         // (the §5.1 "coalesced into a single TLSPlaintext record" shape).
-        let flight = rfc8448::SERVER_FLIGHT_PAYLOAD.clone();
+        let flight = rfc8448::server_flight_payload().to_vec();
         let rec = TlsPlaintext::new(ContentType::Handshake, LEGACY_VERSION_OTHER, flight.clone()).unwrap();
         let wire = rec.encode();
         assert_eq!(wire.len(), 5 + 657);
@@ -527,7 +527,7 @@ mod tests {
         // more records, there MUST NOT be any other records between them."
         // Synthetic case: the RFC 8448 ClientHello is split in half and an
         // ALERT record is inserted between the two fragments.
-        let raw = &*rfc8448::CLIENT_HELLO;
+        let raw = &*rfc8448::client_hello();
         let (first, second) = raw.split_at(100);
         let rec1 = TlsPlaintext::new(ContentType::Handshake, LEGACY_VERSION_OTHER, first.to_vec()).unwrap();
         let rec2 = TlsPlaintext::new(ContentType::Handshake, LEGACY_VERSION_OTHER, second.to_vec()).unwrap();
@@ -548,8 +548,8 @@ mod tests {
         // Negative control: a complete handshake record followed by an alert
         // record and another complete handshake record is NOT interleaving —
         // no split is open between them.
-        let ee = rfc8448::ENCRYPTED_EXTENSIONS.clone();
-        let cv = rfc8448::CERTIFICATE_VERIFY.clone();
+        let ee = rfc8448::encrypted_extensions().to_vec();
+        let cv = rfc8448::certificate_verify().to_vec();
         let rec_ee = TlsPlaintext::new(ContentType::Handshake, LEGACY_VERSION_OTHER, ee).unwrap();
         let rec_cv = TlsPlaintext::new(ContentType::Handshake, LEGACY_VERSION_OTHER, cv).unwrap();
         let mut asm2 = HandshakeAssembler::new();
@@ -564,7 +564,7 @@ mod tests {
         // byte, §5.1 TLSPlaintext struct); attempting to smuggle a second
         // content stream inside a handshake record fails as a decode error
         // when the trailing bytes are not a valid handshake header.
-        let mut smuggle = rfc8448::ENCRYPTED_EXTENSIONS.clone();
+        let mut smuggle = rfc8448::encrypted_extensions().to_vec();
         // Complete bogus message whose type byte 0x15 (21 = alert content
         // type!) is not a HandshakeType — a stream that "smuggles" a second
         // content type inside a handshake record cannot be routed anywhere;
