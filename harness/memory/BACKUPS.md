@@ -44,3 +44,4 @@ UTC time | prev-commit | run summary
 2026-11-24T21:30:09Z | prev=d6c37a0 | run 10 stage 2: X25519 RFC 7748 (S1b item 2) shipped by the lead after two subagent deaths: RFC §4 ladder verbatim, §5 clamps + non-canonical u acceptance, all-zero ct_eq rejection, p-2 inversion (0
 2026-11-24T21:51:08Z | prev=9cf3114 | run 10 closure + GATE 0004 (S1->S2) PASSED: 4x PROCEED_WITH_CONDITIONS 0 BLOCK, record 0004-S2-gate.md blob sha256 55f3f989dc9b90d90f497ed6f5507150f244685c861c1d781c8c80ce1eb4a3e4; conditions executed
 2026-11-26T06:56:32Z | prev=d8aac80 | run 11: owner decisions D-0035 — D-0014 RATIFIED unchanged, PAT kept (residual accepted), CVE poll delegated (first poll 2026-11-26: cve_id null, daily poll scheduled); docs/harness-only, baseline d
+2026-11-26T07:06:10Z | prev=441d4d0 | run 11 closure: CI-VERIFIED 45771702896 @ 441d4d0 SUCCESS; LESSONS poll_ci recurrence update (run 11 direct-query rule proven)

@@ -301,3 +301,9 @@
   mid-compile when its parent shell closed in this sandbox — local
   background runs are not an authoritative verification channel; CI
   (or a synchronous foreground run) is the anchor.
+  UPDATE run 11 (2026-11-26): RECURRED — the filter stayed empty for
+  8+ min while run 45771702896 existed (created 06:56:37Z, direct
+  query showed it immediately). Systematic, not transient; the
+  direct-query rule is proven necessary. Do not "fix" poll_ci.sh by
+  re-trying the same filter — query without the filter and match the
+  sha client-side, as the rule says.

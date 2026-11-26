@@ -272,7 +272,7 @@ bignum/RSA~~ ALL DONE run 10.
 ## Recent Progress & Git Activity
 
 ```text
+### Commit: 441d4d0 - backup: run 11: owner decisions D-0035 — D-0014 RATIFIED unchanged, PAT kept (residual accepted), CVE poll delegated (first poll 2026-11-26: cve_id null, daily poll scheduled); docs/harness-only, baseline d (maniesh-NR, 2026-11-26)
 ### Commit: d8aac80 - backup: run 10 closure + GATE 0004 (S1->S2) PASSED: 4x PROCEED_WITH_CONDITIONS 0 BLOCK, record 0004-S2-gate.md blob sha256 55f3f989dc9b90d90f497ed6f5507150f244685c861c1d781c8c80ce1eb4a3e4; conditions executed (maniesh-NR, 2026-11-24)
 ### Commit: 9cf3114 - backup: run 10 stage 2: X25519 RFC 7748 (S1b item 2) shipped by the lead after two subagent deaths: RFC §4 ladder verbatim, §5 clamps + non-canonical u acceptance, all-zero ct_eq rejection, p-2 inversion (0 (maniesh-NR, 2026-11-24)
-### Commit: d6c37a0 - backup: run 10 stage 1: S1b items 3/4/5 landed (parallel-agent batch): AES-CFB128 SP 800-38A w/ D-0030 pub(crate)+grep-audit enforcement (negative demo live), tls13 HKDF-Expand-Label/Derive-Secret RFC 8446 § (maniesh-NR, 2026-11-24)
 ```
