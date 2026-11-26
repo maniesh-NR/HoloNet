@@ -138,6 +138,27 @@ python decode+ladder ALL 9 CHECKS PASSED, iterated release runs 0.12 s
 (1k) + 124.46 s (1M) per D-0032; local 120-green (114+6); CI rides the
 stage-2 push.
 
+RUN 12 (2026-11-26, cron-fired 18:00 UTC session, job 549467 per
+D-0036): **S2 BATCHES 1+2 LANDED** — the new **holo-tls crate**
+(record/codec/transcript/alerts, RFC 8448 byte-identical, 21T),
+**rsa_sign** (PKCS#1 v1.5 + PSS sign, CAVS+Wycheproof+OpenSSL
+byte-exact, +10T), **spki** (raw-DER pinning + RFC 6125 hostname
+rules, 17T), **schedule** (RFC 8446 §7.1 full chain, 12T), then the
+**client handshake state machine + loopback test server + e2e over
+REAL loopback TCP** (13T: 3 suites, HRR + fresh key share,
+transcript/pin/hostname/downgrade/wrong-sig rejections). Incidents
+honestly recorded: the handshake agent DIED post-delivery (lead took
+over; fixed client flight DOUBLE-WRAP + server transcript missing own
+Finished + Debug derive); cfb audit hex-data exception (D-0037);
+LazyLock MSRV violation (canary caught; OnceLock now); **holo-tls was
+missing from the CI per-package test list** (compiled but never run —
+caught by ledger reconciliation; Tests (holo-tls) step added).
+**CI-VERIFIED: run 45886693866 @ da7aa42 6/6 SUCCESS — ledger 194
+Linux / 193 macOS / 193 Windows**; workspace local 194/0/3, lock v3,
+static 198 #[test]. S2 REMAINING: the session.connect driver
+deliverable (trojan framing, binding condition 1) + R-05 interop
+harness, then gate 0005. Graph 170/135 green.
+
 RUN 11 (2026-11-26, owner decisions — D-0035): **D-0014 RATIFIED
 unchanged** (trojan over holo-tls = the named v1.0 second live
 protocol; the "owner may override" window closed); **PAT rotation
@@ -283,7 +304,7 @@ bignum/RSA~~ ALL DONE run 10.
 ## Recent Progress & Git Activity
 
 ```text
+### Commit: da7aa42 - backup: run 12 stage 2c: CI gap fix — holo-tls tests were NOT in the workflow's per-package list (compiled but never run; caught by ledger reconciliation); added Tests (holo-tls) step; workspace 194/0/3 loc (maniesh-NR, 2026-11-26)
 ### Commit: 0ff442d - backup: run 12 stage 2b: MSRV fix — LazyLock(1.80)->OnceLock across holo-tls server+rfc8448 accessors, unused E static removed; 1.77.2 canary red->fix; workspace 194/0/3 lock v3 (maniesh-NR, 2026-11-26)
 ### Commit: b8e37b3 - backup: run 12 stage 2: S2 batch 2 lead takeover: fixed flight double-wrap + server transcript + Debug; holo-tls 63T e2e loopback (3 suites, HRR, rejections); 194/0/3 lock v3 --allow-untracked (maniesh-NR, 2026-11-26)
-### Commit: 1395e37 - backup: run 12 stage 1: S2 batch 1 (4 agents): holo-tls crate 21T RFC 8448, rsa_sign 10T CAVS+Wycheproof+OpenSSL, spki 17T, schedule 12T RFC 8448; D-0037 audit hex exception; 181/0/3 lock v3 --allow-untracked (maniesh-NR, 2026-11-26)
 ```

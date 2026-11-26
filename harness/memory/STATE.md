@@ -1,6 +1,37 @@
 # HoloNet State Snapshot
 
-Last updated: 2026-11-26 (UTC, run 11 — OWNER DECISIONS EXECUTED,
+Last updated: 2026-11-26 (UTC, run 12 — cron-fired 18:00 UTC session,
+job 549467 per D-0036): **S2 BATCHES 1+2 LANDED**. Batch 1 (four
+parallel agents): the NEW holo-tls crate (record layer + handshake
+codec + transcript + alerts, RFC 8448 traces byte-identical, 21
+tests), holo-crypto rsa_sign (RSASP1 + PKCS#1 v1.5 + PSS SIGN, NIST
+CAVS 186-2 + Wycheproof + OpenSSL byte-exact, salt entropy seam, +10),
+holo-tls spki (own DER walker, pin over the full SPKI span incl.
+tag+len, RFC 6125 hostname rules, 11 python-verified fixture pins, the
+loopback RSA-2048 key+cert fixture, 17), holo-tls schedule (FULL RFC
+8446 §7.1 chain, RFC 8448 pinned incl. both Finished verify_data, 12).
+D-0037: cfb_usage_audit hex-data exception (3 DER fixtures tripped the
+substring scan; matcher exempts ≥12-char hex runs only; negative demo
+re-run green). Batch 2: the handshake AGENT DIED post-delivery — lead
+took over and fixed 3 defects its own tests caught: client flight
+DOUBLE-WRAP (send_plaintext got an already-encoded record), server
+transcript missing its own Finished before verifying the client's,
+missing Debug derive; deterministic-flight hash re-pinned. MSRV
+incident: LazyLock(1.80) → OnceLock across holo-tls (canary caught it;
+run b8e37b3 FAILURE → 0ff442d SUCCESS). CI-GAP incident: holo-tls was
+never in the workflow's per-package test list (compiled but its tests
+never ran — caught by ledger reconciliation, NOT by red CI); Tests
+(holo-tls) step added. **CI-VERIFIED: run 45886693866 @ da7aa42, 6/6
+SUCCESS — ledger 194 Linux / 193 macOS / 193 Windows** (visible
+184/183/183 + socks 10; +63 holo-tls on every OS; workspace local
+194/0/3, lock v3, zero new warnings). e2e over REAL loopback TCP:
+handshake + echo, all 3 suites, HRR with fresh key share + cookie,
+transcript/pin/hostname/downgrade/wrong-sig rejections. S2 REMAINING:
+the session.connect DRIVER deliverable (trojan framing, binding
+condition 1) + R-05 interop harness, then gate 0005. Graph 170/135
+check+smoke green.
+
+Prior state: 2026-11-26 (UTC, run 11 — OWNER DECISIONS EXECUTED,
 D-0035: D-0014 trojan descope default RATIFIED unchanged — the descope
 rule is now owner-ratified, ROADMAP annotated, graph OD-d0014 decided;
 PAT rotation DECLINED this round — old token kept, exposure window

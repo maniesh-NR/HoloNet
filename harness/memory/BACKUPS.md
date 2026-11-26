@@ -50,3 +50,4 @@ UTC time | prev-commit | run summary
 2026-11-26T19:36:24Z | prev=1395e37 | run 12 stage 2: S2 batch 2 lead takeover: fixed flight double-wrap + server transcript + Debug; holo-tls 63T e2e loopback (3 suites, HRR, rejections); 194/0/3 lock v3 --allow-untracked
 2026-11-26T19:44:19Z | prev=b8e37b3 | run 12 stage 2b: MSRV fix — LazyLock(1.80)->OnceLock across holo-tls server+rfc8448 accessors, unused E static removed; 1.77.2 canary red->fix; workspace 194/0/3 lock v3
 2026-11-26T19:51:01Z | prev=0ff442d | run 12 stage 2c: CI gap fix — holo-tls tests were NOT in the workflow's per-package list (compiled but never run; caught by ledger reconciliation); added Tests (holo-tls) step; workspace 194/0/3 loc
+2026-11-26T19:58:25Z | prev=da7aa42 | run 12 closure: batches 1+2 CI-VERIFIED 45886693866 @ da7aa42 6/6, ledger 194/193/193 reconciled; D-0037; MSRV LazyLock fix; CI-gap fix (holo-tls step); cron chain 549467->550825

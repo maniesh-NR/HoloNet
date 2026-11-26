@@ -1713,7 +1713,7 @@
    "type": "component",
    "label": "holo-tls — TLS 1.3 client (RFC 8446), S2",
    "status": "in_progress",
-   "summary": "New S2 crate: record layer + handshake codec + transcript + alerts (batch 1, RFC 8448-verified); spki pinning and key schedule modules landed batch 1; client state machine + loopback server + e2e + session.connect driver deliverable remain (batch 2).",
+   "summary": "S2 crate: record/codec/transcript/alerts + spki pinning + key schedule + client handshake state machine + loopback test server (63 tests, CI-verified 194/193/193 ledger incl. e2e over real loopback TCP). REMAINS for S2 closure: the session.connect driver deliverable (trojan framing, binding condition 1) + R-05 interop harness, then gate 0005.",
    "refs": [
     "engine/crates/holo-tls/src/lib.rs"
    ]
@@ -1756,6 +1756,17 @@
    "summary": "tls13 schedule suite — 12 tests: RFC 8446 7.1 full chain, RFC 8448 3 pinned incl. both Finished verify_data",
    "refs": [
     "engine/crates/holo-tls/src/schedule.rs"
+   ]
+  },
+  {
+   "id": "T-tls-handshake-e2e",
+   "type": "test",
+   "label": "holo-tls client+server e2e suite (13 tests, real loopback TCP)",
+   "status": "passing",
+   "summary": "Batch 2: full handshake + echo over real loopback TCP (AES-128-GCM), suite negotiation 0x1302/0x1303, HRR second ClientHello with fresh key share + cookie, transcript-mismatch / SPKI-pin-mismatch / hostname-mismatch / TLS-1.2-downgrade / wrong-sig-blob rejections, PKCS#1 CertVerify accepted, nonce-XOR 5.2 anchor, deterministic flight hash (re-pinned after the double-wrap fix).",
+   "refs": [
+    "engine/crates/holo-tls/src/client.rs",
+    "engine/crates/holo-tls/src/server.rs"
    ]
   }
  ],
@@ -2490,6 +2501,12 @@
    "src": "SES-2026-11-26b",
    "rel": "part_of",
    "dst": "S2",
+   "note": ""
+  },
+  {
+   "src": "holo-tls",
+   "rel": "tested_by",
+   "dst": "T-tls-handshake-e2e",
    "note": ""
   }
  ]
