@@ -63,6 +63,7 @@ name = "holo-tls"
 version = "0.3.0"
 dependencies = [
  "holo-crypto",
+ "holo-util",
 ]
 
 [[package]]

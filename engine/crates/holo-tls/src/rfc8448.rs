@@ -40,7 +40,10 @@ pub static SERVER_FLIGHT_PAYLOAD: LazyLock<Vec<u8>> = LazyLock::new(|| hex("08 0
 pub static HELLO_RETRY_REQUEST_SERVER_HELLO: LazyLock<Vec<u8>> = LazyLock::new(|| hex("02 00 00 ac 03 03 cf 21 ad 74 e5 9a 61 11 be 1d 8c 02 1e 65 b8 91 c2 a2 11 16 7a bb 8c 5e 07 9e 09 e2 c8 a8 33 9c 00 13 01 00 00 84 00 33 00 02 00 17 00 2c 00 74 00 72 71 dc d0 4b b8 8b c3 18 91 19 39 8a 00 00 00 00 ee fa fc 76 c1 46 b8 23 b0 96 f8 aa ca d3 65 dd 00 30 95 3f 4e df 62 56 36 e5 f2 1b b2 e2 3f cc 65 4b 1b 5b 40 31 8d 10 d1 37 ab cb b8 75 74 e3 6e 8a 1f 02 5f 7d fa 5d 6e 50 78 1b 5e da 4a a1 5b 0c 8b e7 78 25 7d 16 aa 30 30 e9 e7 84 1d d9 e4 c0 34 22 67 e8 ca 0c af 57 1f b2 b7 cf f0 f9 34 b0 00 2b 00 02 03 04"));
 
 /// RFC 8448 §3, lines 162-166 — the client's ephemeral x25519 key pair.
-pub const CLIENT_X25519_PRIVATE_KEY: [u8; 32] = dehex32("49 af 42 ba 7f 79 94 85 2d 71 3e f2 78 4b cb ca a7 91 1d e2 6a dc 56 42 cb 63 45 40 e7 ea 50 05");
+/// RFC 8448 reference value retained verbatim (not consumed by a test
+    /// after the schedule module recomputed the same value from raw bytes).
+    #[allow(dead_code)]
+    pub const CLIENT_X25519_PRIVATE_KEY: [u8; 32] = dehex32("49 af 42 ba 7f 79 94 85 2d 71 3e f2 78 4b cb ca a7 91 1d e2 6a dc 56 42 cb 63 45 40 e7 ea 50 05");
 pub const CLIENT_X25519_PUBLIC_KEY: [u8; 32] = dehex32("99 38 1d e5 60 e4 bd 43 d2 3d 8e 43 5a 7d ba fe b3 c0 6e 51 c1 3c ae 4d 54 13 69 1e 52 9a af 2c");
 
 /// RFC 8448 §3, lines 287-288 — transcript hash over ClientHello ||
@@ -48,7 +51,10 @@ pub const CLIENT_X25519_PUBLIC_KEY: [u8; 32] = dehex32("99 38 1d e5 60 e4 bd 43 
 /// traffic":
 /// `86 0c 06 ed c0 78 58 ee 8e 78 f0 e7 42 8c 58 ed d6 b4 3f 2c a3 e6 e9 5f
 ///  02 ed 06 3c f0 e1 ca d8`
-pub const TH_CLIENT_HELLO_SERVER_HELLO: [u8; 32] = dehex32("86 0c 06 ed c0 78 58 ee 8e 78 f0 e7 42 8c 58 ed d6 b4 3f 2c a3 e6 e9 5f 02 ed 06 3c f0 e1 ca d8");
+/// RFC 8448 reference value retained verbatim (not consumed by a test
+    /// after the schedule module recomputed the same value from raw bytes).
+    #[allow(dead_code)]
+    pub const TH_CLIENT_HELLO_SERVER_HELLO: [u8; 32] = dehex32("86 0c 06 ed c0 78 58 ee 8e 78 f0 e7 42 8c 58 ed d6 b4 3f 2c a3 e6 e9 5f 02 ed 06 3c f0 e1 ca d8");
 
 /// RFC 8448 §3, line 190 — the complete ClientHello record
 /// (`16 03 01 00 c4` + the 196-byte message; legacy_record_version 0x0301

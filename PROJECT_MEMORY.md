@@ -283,7 +283,7 @@ bignum/RSA~~ ALL DONE run 10.
 ## Recent Progress & Git Activity
 
 ```text
+### Commit: 1395e37 - backup: run 12 stage 1: S2 batch 1 (4 agents): holo-tls crate 21T RFC 8448, rsa_sign 10T CAVS+Wycheproof+OpenSSL, spki 17T, schedule 12T RFC 8448; D-0037 audit hex exception; 181/0/3 lock v3 --allow-untracked (maniesh-NR, 2026-11-26)
 ### Commit: 1db4c4a - backup: run 11 addendum: D-0036 standing schedule — CVE-poll job 549422 replaced by daily 18:00 UTC autonomous session (job 549467): poll + gated roadmap + per-stage backups + parallel agents + mandatory ne (maniesh-NR, 2026-11-26)
 ### Commit: 94d2908 - backup: run 11 closure: CI-VERIFIED 45771702896 @ 441d4d0 SUCCESS; LESSONS poll_ci recurrence update (run 11 direct-query rule proven) (maniesh-NR, 2026-11-26)
-### Commit: 441d4d0 - backup: run 11: owner decisions D-0035 — D-0014 RATIFIED unchanged, PAT kept (residual accepted), CVE poll delegated (first poll 2026-11-26: cve_id null, daily poll scheduled); docs/harness-only, baseline d (maniesh-NR, 2026-11-26)
 ```

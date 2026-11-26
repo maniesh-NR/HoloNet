@@ -27,6 +27,15 @@
 //! - `alert`      — the alert codec (RFC 8446 §6): AlertLevel,
 //!                  AlertDescription (all RFC 8446 names), 2-byte encode and
 //!                  decode.
+//! - `client`     — the TLS 1.3 CLIENT handshake state machine (S2): real
+//!                  `std::net::TcpStream` flight exchange incl. the
+//!                  HelloRetryRequest round trip, §5.2 record protection,
+//!                  §7.1/§7.3 key-schedule wiring, SPKI-pin + hostname
+//!                  identity checks, §4.4.3 CertificateVerify and §4.4.4
+//!                  Finished verification, and application-data I/O.
+//! - `server`     — the minimal loopback TEST server (S2, shipped test
+//!                  infrastructure): full server flight over real loopback
+//!                  TCP with deterministic-failure seams for the e2e tests.
 //!
 //! Everything is byte-exact and pinned against the official handshake traces
 //! of RFC 8448 ("Example Handshake Traces for TLS 1.3").
@@ -79,6 +88,18 @@ pub(crate) mod rfc8448;
 // ---- src/schedule.rs, then uncomment the two lines below):
 pub mod spki;
 pub mod schedule;
+
+// ---- S2 batch 2: client handshake state machine + loopback test server ----
+/// TLS 1.3 client handshake state machine driving a real `std::net::TcpStream`
+/// (RFC 8446): ClientHello/HelloRetryRequest/ServerHello flight, the §7.1 key
+/// schedule wiring, §5.2 record protection, SPKI-pin + hostname server
+/// identity checks, §4.4.3 CertificateVerify verification, §4.4.4 Finished
+/// exchange, and the application-data `read`/`write` connection.
+pub mod client;
+/// Minimal TLS 1.3 loopback TEST server (holo-tls-internal test
+/// infrastructure, shipped): echoes application data over real loopback TCP
+/// for the crate's e2e tests, with deterministic-failure seams.
+pub mod server;
 
 use std::fmt;
 

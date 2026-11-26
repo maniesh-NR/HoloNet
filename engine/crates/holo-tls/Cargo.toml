@@ -7,3 +7,7 @@ description = "HoloNet TLS 1.3 record layer, handshake codec and transcript hash
 
 [dependencies]
 holo-crypto = { path = "../holo-crypto" }
+# OS entropy ONLY (holo_util::rand::os_fill — fail-closed) for the S2 client/
+# server security material (ClientHello randoms, ephemeral x25519 keys, PSS
+# salt).  No other holo-util feature is referenced.
+holo-util = { path = "../holo-util" }

@@ -1517,7 +1517,7 @@ impl Finished {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::record::{HandshakeAssembler, TlsPlaintext};
+    use crate::record::TlsPlaintext;
     use crate::rfc8448;
 
     fn rfc_sh_random() -> [u8; 32] {
