@@ -1,6 +1,22 @@
 # HoloNet State Snapshot
 
-Last updated: 2026-11-25 (UTC, run 10 — S1b items 3/4/5 LANDED via a
+Last updated: 2026-11-26 (UTC, run 11 — OWNER DECISIONS EXECUTED,
+D-0035: D-0014 trojan descope default RATIFIED unchanged — the descope
+rule is now owner-ratified, ROADMAP annotated, graph OD-d0014 decided;
+PAT rotation DECLINED this round — old token kept, exposure window
+owner-accepted residual, env-var discipline unchanged; CVE polling
+DELEGATED to the executor — first authenticated poll 2026-11-26T06:52Z:
+cve_id STILL NULL, daily automated poll scheduled, mechanical backfill
+procedure recorded in D-0035 (repo-scoped advisory endpoint is the
+reliable poll target; the global /advisories endpoint 404s until
+promotion). Session was docs/harness-ONLY: zero engine changes;
+baseline = the run-10 closure tree d8aac80 == origin/main, CI run
+45495227224 SUCCESS. Toolchain absent after a SIXTH recycle wipe —
+not reinstalled (no Rust code touched; honest fallback per
+SANDBOX-RESTORE: the CI conclusion for HEAD is the evidence). Graph
+161 nodes / 124 edges, check + RAG smoke green.)
+
+Prior state: 2026-11-25 (UTC, run 10 — S1b items 3/4/5 LANDED via a
 five-agent parallel batch: AES-CFB128 (SP 800-38A, D-0030 mechanical
 pub(crate)+grep-audit enforcement, negative demo live), tls13
 HKDF-Expand-Label/Derive-Secret (RFC 8446 §7.1, RFC 8448 chain), bignum

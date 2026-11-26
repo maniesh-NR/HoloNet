@@ -138,6 +138,19 @@ python decode+ladder ALL 9 CHECKS PASSED, iterated release runs 0.12 s
 (1k) + 124.46 s (1M) per D-0032; local 120-green (114+6); CI rides the
 stage-2 push.
 
+RUN 11 (2026-11-26, owner decisions — D-0035): **D-0014 RATIFIED
+unchanged** (trojan over holo-tls = the named v1.0 second live
+protocol; the "owner may override" window closed); **PAT rotation
+declined this round** (old token kept, owner-accepted residual,
+discipline unchanged); **CVE polling delegated to the executor** —
+first authenticated poll 2026-11-26T06:52Z: cve_id STILL NULL (poll
+the REPO endpoint; the global /advisories endpoint 404s until
+promotion); daily automated poll scheduled; mechanical backfill
+procedure recorded in D-0035. Docs/harness-only run: zero engine
+changes; baseline d8aac80 CI-VERIFIED (run 45495227224 SUCCESS);
+toolchain absent (sixth wipe) — not reinstalled, no Rust touched.
+Graph 161/124 check+smoke green.
+
 **GATE 0004 (S1→S2) PASSED 2026-11-25** — four blind reviewers ALL
 PROCEED_WITH_CONDITIONS, 0 BLOCK (record verdicts/0004-S2-gate.md,
 chain → 0003 verified; prompts archived verbatim). S1 CLOSED; S2
@@ -182,7 +195,10 @@ bignum/RSA~~ ALL DONE run 10.
 2. [owner] ~~S5 credentials model~~ DECIDED run 7 (D-0026: embedded
    with recorded risk-acceptance; D-0001 amended for S5 operational
    creds; test fixtures stay synthetic).
-3. [owner] Confirm D-0014 (trojan = named v1.0 second protocol).
+3. [owner] ~~Confirm D-0014~~ RATIFIED 2026-11-26 (D-0035: confirmed
+   unchanged — descope rule owner-ratified; same decision also records
+   PAT rotation declined this round (old token kept, residual accepted)
+   and CVE polling delegated to the executor, daily poll scheduled).
 4. [dev] ~~S1 item 0~~ DONE 2026-11-20 (D-0018; ledger 76/75/75;
    expected-red window closed).
 5. [dev] ~~S1 rest per amended charter: salt-replay cache, off-loopback
@@ -247,14 +263,16 @@ bignum/RSA~~ ALL DONE run 10.
 - Release surface (run 7): v0.3.1 family PUBLIC (4 per-OS + main with
   signed manifest + SA-0001), v0.3.0 (src), v0.2.0-linux (kept,
   unaffected), empty v0.2.0. All 7 phantom per-OS DRAFTS deleted
-  (D-0025); GHSA-8h6m-w5qj-cq9g published, CVE requested.
+  (D-0025); GHSA-8h6m-w5qj-cq9g published, CVE requested — still
+  unassigned as of the 2026-11-26 poll (cve_id null); daily automated
+  poll scheduled (D-0035).
 - Hygiene: `SaltCache::len` unused outside tests (run-4 artifact,
   warning only, recorded in the run-5 journal).
 
 ## Recent Progress & Git Activity
 
 ```text
+### Commit: d8aac80 - backup: run 10 closure + GATE 0004 (S1->S2) PASSED: 4x PROCEED_WITH_CONDITIONS 0 BLOCK, record 0004-S2-gate.md blob sha256 55f3f989dc9b90d90f497ed6f5507150f244685c861c1d781c8c80ce1eb4a3e4; conditions executed (maniesh-NR, 2026-11-24)
 ### Commit: 9cf3114 - backup: run 10 stage 2: X25519 RFC 7748 (S1b item 2) shipped by the lead after two subagent deaths: RFC §4 ladder verbatim, §5 clamps + non-canonical u acceptance, all-zero ct_eq rejection, p-2 inversion (0 (maniesh-NR, 2026-11-24)
 ### Commit: d6c37a0 - backup: run 10 stage 1: S1b items 3/4/5 landed (parallel-agent batch): AES-CFB128 SP 800-38A w/ D-0030 pub(crate)+grep-audit enforcement (negative demo live), tls13 HKDF-Expand-Label/Derive-Secret RFC 8446 § (maniesh-NR, 2026-11-24)
-### Commit: c76844e - backup: run 9 closure: CI-VERIFIED 44897540455 @ e3c8304 all-green 6/6, per-OS ledger 97 Linux/96 macOS/96 Windows (visible 87/86/86 + socks 10 reconciled); README badge + Status block and ARCHITECTURE data p (maniesh-NR, 2026-11-21)
 ```

@@ -449,7 +449,7 @@ Win7/Catalina floor; flatpak/AppImage/NSIS. Acceptance: each frontend
 displays real session state driven by the daemon; packaging reproducible
 from a clean checkout.
 
-## Descope rule (NAMED at progress review 0002 — closes gate-0001 A3-C1, one cycle late; D-0014, owner may override)
+## Descope rule (NAMED at progress review 0002 — closes gate-0001 A3-C1, one cycle late; D-0014 RATIFIED unchanged by the owner 2026-11-26, D-0035)
 
 If a stage overruns, cut breadth before cutting honesty: **v1.0 ships
 Shadowsocks AEAD + trojan (TLS-based, framing over the S2 holo-tls

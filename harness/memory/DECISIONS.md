@@ -486,3 +486,32 @@
   passes the exponent gate. This closes the forged-signature hole an
   attacker-supplied e = 1 key would otherwise open before any S2
   consumer accepts keys from config.
+- **D-0035 (2026-11-26, owner decisions — given in chat this session;
+  executes the three owner residuals re-listed by gate 0004 C7):**
+  (1) **D-0014 RATIFIED unchanged.** Trojan over the S2 holo-tls client
+  stays the named v1.0 second LIVE protocol; hy2/tuic remain the named
+  alternates iff S3 completes on schedule; the descope tripwire (N=4
+  session journals) and the terminal-gate charter are unchanged. The
+  2026-11-17 "PROPOSED DEFAULT, owner may override" status is CLOSED —
+  the descope rule is now owner-ratified (ROADMAP annotated; graph
+  OD-d0014 flipped to decided).
+  (2) **PAT: old token KEPT for now** (owner declined rotation this
+  round). The exposure window (the token transited chat/upload across
+  sessions) is an owner-accepted residual; the standing rotation
+  recommendation stays on record; the handling discipline is unchanged
+  (env var only, reloaded from the owner upload per session, never in
+  argv, files, or output).
+  (3) **CVE polling DELEGATED to the executor** ("poll the advisory
+  yourself and backfill"). First poll this session, 2026-11-26T06:52Z,
+  authenticated: **cve_id = null — still pending assignment.** Polling
+  mechanics recorded for reuse: the GLOBAL endpoint
+  `api.github.com/advisories/GHSA-8h6m-w5qj-cq9g` returns 404 (the
+  repo advisory is not yet in the global database — expected until
+  promotion, not an error state); the REPO endpoint
+  `api.github.com/repos/maniesh-NR/HoloNet/security-advisories/
+  GHSA-8h6m-w5qj-cq9g` is the reliable target. A daily automated poll
+  is scheduled; on assignment the backfill is mechanical and
+  owner-input-free: docs/advisories/SA-0001, README security section,
+  THREAT-MODEL, STATE.md, PROJECT_MEMORY.md, the graph node summary,
+  plus a DECISIONS entry and a session journal, then a backup push.
+  Nothing was backfilled this session (id still null).

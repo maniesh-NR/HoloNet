@@ -612,9 +612,9 @@
   {
    "id": "OD-d0014",
    "type": "owner_decision",
-   "label": "Confirm trojan descope",
-   "status": "pending",
-   "summary": "Confirm or override D-0014 default (trojan over holo-tls as v1.0 second protocol).",
+   "label": "Trojan descope default (D-0014)",
+   "status": "decided",
+   "summary": "DECIDED via D-0035 (2026-11-26): owner RATIFIED D-0014 unchanged — trojan over holo-tls is the named v1.0 second LIVE protocol; hy2/tuic alternates iff S3 on schedule; tripwire N=4 + terminal gate unchanged.",
    "refs": [
     "harness/memory/DECISIONS.md"
    ]
@@ -1655,6 +1655,26 @@
    "refs": [
     "engine/crates/holo-crypto/src/lib.rs"
    ]
+  },
+  {
+   "id": "D-0035",
+   "type": "decision",
+   "label": "D-0035: owner decisions 2026-11-26 (D-0014 ratified; PAT kept; CVE poll delegated)",
+   "status": "accepted",
+   "summary": "(1) D-0014 trojan descope default RATIFIED unchanged (descope rule owner-ratified; closes the 'owner may override' window). (2) PAT rotation declined this round — old token kept, owner-accepted residual; env-var discipline unchanged. (3) CVE polling delegated to the executor: first poll 2026-11-26 cve_id still null (repo-scoped advisory endpoint; global endpoint 404s until promotion); daily automated poll scheduled, mechanical backfill on assignment.",
+   "refs": [
+    "harness/memory/DECISIONS.md"
+   ]
+  },
+  {
+   "id": "SES-2026-11-26",
+   "type": "session",
+   "label": "Owner decisions executed (D-0035): D-0014 ratified, PAT kept, CVE poll delegated",
+   "status": "recorded",
+   "summary": "Docs/harness-only session (zero engine changes; baseline = d8aac80, CI run 45495227224 SUCCESS). Executed the three gate-0004-C7 owner residuals: D-0014 ratified unchanged; PAT rotation declined (residual accepted); CVE polling delegated — first authenticated poll 2026-11-26T06:52Z found cve_id null, daily automated poll scheduled with a mechanical backfill procedure recorded in D-0035. Memory: DECISIONS +D-0035, ROADMAP descope header annotated, OD-d0014 flipped to decided, STATE run-11 header, PROJECT_MEMORY playbook closed.",
+   "refs": [
+    "harness/memory/sessions/2026-11-26-owner-decisions.md"
+   ]
   }
  ],
  "edges": [
@@ -2317,6 +2337,18 @@
    "rel": "affects",
    "dst": "holo-crypto",
    "note": "rsa public_key_checks exponent gate"
+  },
+  {
+   "src": "SES-2026-11-26",
+   "rel": "authored",
+   "dst": "D-0035",
+   "note": ""
+  },
+  {
+   "src": "D-0035",
+   "rel": "closes",
+   "dst": "OD-d0014",
+   "note": "owner ratified unchanged"
   }
  ]
 }
