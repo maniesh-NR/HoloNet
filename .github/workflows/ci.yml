@@ -45,6 +45,8 @@ jobs:
           cargo test -p holo-net
       - name: Tests (holo-ss)
         run: cargo test -p holo-ss
+      - name: Tests (holo-tls)
+        run: cargo test -p holo-tls
       - name: Tests (holo-socks)
         run: |
           cargo test -p holo-socks -- --nocapture --test-threads=1 > socks-test.log 2>&1 || true

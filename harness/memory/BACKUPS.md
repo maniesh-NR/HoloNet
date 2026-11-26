@@ -49,3 +49,4 @@ UTC time | prev-commit | run summary
 2026-11-26T18:51:39Z | prev=1db4c4a | run 12 stage 1: S2 batch 1 (4 agents): holo-tls crate 21T RFC 8448, rsa_sign 10T CAVS+Wycheproof+OpenSSL, spki 17T, schedule 12T RFC 8448; D-0037 audit hex exception; 181/0/3 lock v3 --allow-untracked
 2026-11-26T19:36:24Z | prev=1395e37 | run 12 stage 2: S2 batch 2 lead takeover: fixed flight double-wrap + server transcript + Debug; holo-tls 63T e2e loopback (3 suites, HRR, rejections); 194/0/3 lock v3 --allow-untracked
 2026-11-26T19:44:19Z | prev=b8e37b3 | run 12 stage 2b: MSRV fix — LazyLock(1.80)->OnceLock across holo-tls server+rfc8448 accessors, unused E static removed; 1.77.2 canary red->fix; workspace 194/0/3 lock v3
+2026-11-26T19:51:01Z | prev=0ff442d | run 12 stage 2c: CI gap fix — holo-tls tests were NOT in the workflow's per-package list (compiled but never run; caught by ledger reconciliation); added Tests (holo-tls) step; workspace 194/0/3 loc

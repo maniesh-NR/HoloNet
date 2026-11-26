@@ -283,7 +283,7 @@ bignum/RSA~~ ALL DONE run 10.
 ## Recent Progress & Git Activity
 
 ```text
+### Commit: 0ff442d - backup: run 12 stage 2b: MSRV fix — LazyLock(1.80)->OnceLock across holo-tls server+rfc8448 accessors, unused E static removed; 1.77.2 canary red->fix; workspace 194/0/3 lock v3 (maniesh-NR, 2026-11-26)
 ### Commit: b8e37b3 - backup: run 12 stage 2: S2 batch 2 lead takeover: fixed flight double-wrap + server transcript + Debug; holo-tls 63T e2e loopback (3 suites, HRR, rejections); 194/0/3 lock v3 --allow-untracked (maniesh-NR, 2026-11-26)
 ### Commit: 1395e37 - backup: run 12 stage 1: S2 batch 1 (4 agents): holo-tls crate 21T RFC 8448, rsa_sign 10T CAVS+Wycheproof+OpenSSL, spki 17T, schedule 12T RFC 8448; D-0037 audit hex exception; 181/0/3 lock v3 --allow-untracked (maniesh-NR, 2026-11-26)
-### Commit: 1db4c4a - backup: run 11 addendum: D-0036 standing schedule — CVE-poll job 549422 replaced by daily 18:00 UTC autonomous session (job 549467): poll + gated roadmap + per-stage backups + parallel agents + mandatory ne (maniesh-NR, 2026-11-26)
 ```
