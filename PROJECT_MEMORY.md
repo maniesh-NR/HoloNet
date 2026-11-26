@@ -150,6 +150,13 @@ procedure recorded in D-0035. Docs/harness-only run: zero engine
 changes; baseline d8aac80 CI-VERIFIED (run 45495227224 SUCCESS);
 toolchain absent (sixth wipe) — not reinstalled, no Rust touched.
 Graph 161/124 check+smoke green.
+ADDENDUM same session (D-0036, ~07:20Z): standing schedule — the CVE
+poll job (549422, never fired) was REPLACED by the daily **18:00 UTC
+autonomous session** (job 549467, priority 10): poll + ALL
+owner-input-free roadmap items as far as stage gates allow +
+per-stage backups + agent parallelization + MANDATORY pre-close
+next-day task refresh (create-before-delete; id chain journaled).
+First firing 2026-11-26 18:00Z. S2 holo-tls is the open stage.
 
 **GATE 0004 (S1→S2) PASSED 2026-11-25** — four blind reviewers ALL
 PROCEED_WITH_CONDITIONS, 0 BLOCK (record verdicts/0004-S2-gate.md,
@@ -198,7 +205,11 @@ bignum/RSA~~ ALL DONE run 10.
 3. [owner] ~~Confirm D-0014~~ RATIFIED 2026-11-26 (D-0035: confirmed
    unchanged — descope rule owner-ratified; same decision also records
    PAT rotation declined this round (old token kept, residual accepted)
-   and CVE polling delegated to the executor, daily poll scheduled).
+   and CVE polling delegated to the executor). AMENDED same day
+   (D-0036): the daily poll MERGED into the standing 18:00 UTC
+   autonomous session (job 549467 — poll + owner-input-free roadmap +
+   per-stage backups + parallel agents + mandatory pre-close next-day
+   task refresh); S2 holo-tls is the open stage.
 4. [dev] ~~S1 item 0~~ DONE 2026-11-20 (D-0018; ledger 76/75/75;
    expected-red window closed).
 5. [dev] ~~S1 rest per amended charter: salt-replay cache, off-loopback
@@ -272,7 +283,7 @@ bignum/RSA~~ ALL DONE run 10.
 ## Recent Progress & Git Activity
 
 ```text
+### Commit: 94d2908 - backup: run 11 closure: CI-VERIFIED 45771702896 @ 441d4d0 SUCCESS; LESSONS poll_ci recurrence update (run 11 direct-query rule proven) (maniesh-NR, 2026-11-26)
 ### Commit: 441d4d0 - backup: run 11: owner decisions D-0035 — D-0014 RATIFIED unchanged, PAT kept (residual accepted), CVE poll delegated (first poll 2026-11-26: cve_id null, daily poll scheduled); docs/harness-only, baseline d (maniesh-NR, 2026-11-26)
 ### Commit: d8aac80 - backup: run 10 closure + GATE 0004 (S1->S2) PASSED: 4x PROCEED_WITH_CONDITIONS 0 BLOCK, record 0004-S2-gate.md blob sha256 55f3f989dc9b90d90f497ed6f5507150f244685c861c1d781c8c80ce1eb4a3e4; conditions executed (maniesh-NR, 2026-11-24)
-### Commit: 9cf3114 - backup: run 10 stage 2: X25519 RFC 7748 (S1b item 2) shipped by the lead after two subagent deaths: RFC §4 ladder verbatim, §5 clamps + non-canonical u acceptance, all-zero ct_eq rejection, p-2 inversion (0 (maniesh-NR, 2026-11-24)
 ```

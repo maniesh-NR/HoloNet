@@ -515,3 +515,33 @@
   THREAT-MODEL, STATE.md, PROJECT_MEMORY.md, the graph node summary,
   plus a DECISIONS entry and a session journal, then a backup push.
   Nothing was backfilled this session (id still null).
+- **D-0036 (2026-11-26, owner instruction — standing daily autonomous
+  session at 18:00 UTC; amends D-0035's poll vehicle):** the standalone
+  CVE-poll cron job (549422, 14:00 Asia/Rangoon daily) is REPLACED
+  before its first firing by a MERGED daily session at **18:00 UTC**
+  (owner: "reschedule the poll to start at 6PM UTC; in the same
+  session, all items on the roadmap that do not require my input
+  should be implemented; backups after each stage; parallelize across
+  as many agents as possible; the scheduled task for the next day
+  should be updated before the session concludes"). Job 549467
+  ("HoloNet daily session 18:00 UTC (poll + roadmap)", cron
+  "0 0 18 * * ?" tz UTC, priority 10) carries the full brief:
+  (1) session-start ritual per SANDBOX-RESTORE 0/0b (reconcile,
+  toolchain reinstall if wiped, baseline re-verify, memory load);
+  (2) CVE poll per D-0035 mechanics (repo-scoped endpoint; silent
+  while null); (3) owner-input-free roadmap implementation as far as
+  the STAGE GATES allow (no implementation past a gate without its
+  record; defer-and-record anything owner-gated); (4) run-10 agent-
+  parallelization pattern (isolated /tmp/wk-* workspaces, self-
+  contained briefs, lead merges/verifies/owns pushes; lead takes over
+  dead agents); (5) per-stage backup = full tests green + journal +
+  graph nodes (check + RAG smoke) + lock v3 + ledger → backup.sh push
+  → CI verified via the DIRECT runs query (poll_ci.sh filter
+  false-negatives, LESSONS runs 10/11); (6) MANDATORY pre-close
+  next-day refresh: create the replacement job FIRST (same
+  name/schedule/priority, brief updated with the session outcome),
+  verify, THEN delete the old by id; journal the old→new id chain;
+  the job degrades to CVE-poll + status report when the owner-free
+  roadmap is exhausted. Chain-integrity rule: NEVER delete before the
+  replacement exists — a duplicate firing is recoverable, a broken
+  chain is not.

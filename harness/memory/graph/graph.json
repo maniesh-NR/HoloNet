@@ -1675,6 +1675,17 @@
    "refs": [
     "harness/memory/sessions/2026-11-26-owner-decisions.md"
    ]
+  },
+  {
+   "id": "D-0036",
+   "type": "decision",
+   "label": "D-0036: standing daily autonomous session 18:00 UTC (poll + roadmap)",
+   "status": "accepted",
+   "summary": "Owner instruction: the standalone CVE-poll job (549422) is replaced by a merged daily 18:00 UTC autonomous session (job 549467) — ritual, CVE poll (D-0035 mechanics), owner-input-free roadmap implementation as far as stage gates allow, per-stage backups, run-10 agent parallelization, and a MANDATORY pre-close next-day task refresh (create replacement before deleting; journal the id chain; degrades to poll-only when the owner-free roadmap is exhausted).",
+   "refs": [
+    "harness/memory/DECISIONS.md",
+    "harness/memory/sessions/2026-11-26-owner-decisions.md"
+   ]
   }
  ],
  "edges": [
@@ -2349,6 +2360,18 @@
    "rel": "closes",
    "dst": "OD-d0014",
    "note": "owner ratified unchanged"
+  },
+  {
+   "src": "SES-2026-11-26",
+   "rel": "authored",
+   "dst": "D-0036",
+   "note": "same-session addendum"
+  },
+  {
+   "src": "D-0036",
+   "rel": "amends",
+   "dst": "D-0035",
+   "note": "poll vehicle merged into the standing session"
   }
  ]
 }

@@ -69,3 +69,32 @@ pre-commit; this journal.
    first holo-crypto refactor).
 2. Daily automated CVE poll; backfill per D-0035 when the id lands.
 3. PAT rotation recommendation stands (owner declined this round).
+
+## Addendum (same session, ~07:20Z): standing schedule change (D-0036)
+
+Owner instruction (chat): "Reschedule the poll to start at 6PM UTC. In
+the same session, all items on the roadmap that do not require my
+input should be implemented. Backups should be done after each stage
+is complete. Workflow should be parallelized across as many agents as
+possible. The scheduled task for the next day should be updated before
+the session concludes."
+
+Executed:
+
+- Job 549422 (CVE poll, 14:00 Asia/Rangoon daily) DELETED — run_count
+  0, it never fired (its first firing would have been 2026-11-27
+  14:00 Rangoon; nothing lost).
+- Standing job **549467** created: "HoloNet daily session 18:00 UTC
+  (poll + roadmap)", cron `0 0 18 * * ?` tz UTC, priority 10; first
+  firing TODAY 18:00Z. Brief = the D-0036 flow: session-start ritual
+  → CVE poll (D-0035 mechanics) → owner-input-free roadmap
+  implementation as far as the stage gates allow (S2 open per the
+  gate-0004 charter; no implementation past a gate without its
+  record) → per-stage backups (tests+journal+graph+ledger → push →
+  direct-query CI verify) → run-10 agent-parallelization pattern →
+  MANDATORY pre-close next-day task refresh (create replacement
+  BEFORE deleting the old; journal the old→new id chain; degrade to
+  poll-only when the owner-free roadmap is exhausted).
+- Memory: DECISIONS +D-0036; graph +D-0036 node (+authored/+amends
+  edges); PROJECT_MEMORY + STATE annotated (below).
+- Cron chain: ~~549422 (deleted, never fired)~~ → **549467**.

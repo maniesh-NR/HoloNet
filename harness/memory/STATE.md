@@ -14,7 +14,17 @@ baseline = the run-10 closure tree d8aac80 == origin/main, CI run
 45495227224 SUCCESS. Toolchain absent after a SIXTH recycle wipe —
 not reinstalled (no Rust code touched; honest fallback per
 SANDBOX-RESTORE: the CI conclusion for HEAD is the evidence). Graph
-161 nodes / 124 edges, check + RAG smoke green.)
+161 nodes / 124 edges, check + RAG smoke green.
+ADDENDUM ~07:20Z (D-0036, owner instruction): standing schedule —
+the CVE-poll job 549422 (14:00 Rangoon daily, never fired) was
+REPLACED by the daily **18:00 UTC autonomous session** (job 549467,
+priority 10): CVE poll + ALL owner-input-free roadmap items as far as
+the stage gates allow (S2 holo-tls open per the gate-0004 charter) +
+per-stage backups + agent parallelization (run-10 pattern) +
+MANDATORY pre-close next-day task refresh (create replacement BEFORE
+deleting the old; old→new id chain journaled in each session journal;
+degrades to poll-only when the owner-free roadmap is exhausted).
+First firing 2026-11-26 18:00Z. Graph 162/126 check+smoke green.)
 
 Prior state: 2026-11-25 (UTC, run 10 — S1b items 3/4/5 LANDED via a
 five-agent parallel batch: AES-CFB128 (SP 800-38A, D-0030 mechanical
