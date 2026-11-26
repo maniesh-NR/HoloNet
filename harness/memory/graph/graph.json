@@ -1686,6 +1686,77 @@
     "harness/memory/DECISIONS.md",
     "harness/memory/sessions/2026-11-26-owner-decisions.md"
    ]
+  },
+  {
+   "id": "D-0037",
+   "type": "decision",
+   "label": "D-0037: CFB audit matcher — hex-data exception (run 12)",
+   "status": "accepted",
+   "summary": "cfb_usage_audit tripped on three spki.rs DER fixtures whose hex constants contain 'cfb' by nibble chance. Matcher now exempts only occurrences WHOLLY inside >=12-char hex runs (data); code-context references (imports, paths, mod, comments) still trip with file:line. Allowlist unchanged. Negative demo re-run green (planted code-context reference -> FAIL -> removed -> green).",
+   "refs": [
+    "harness/memory/DECISIONS.md",
+    "harness/memory/sessions/2026-11-26-s2-batch1.md"
+   ]
+  },
+  {
+   "id": "SES-2026-11-26b",
+   "type": "session",
+   "label": "S2 batch 1 landed via 4 parallel agents (holo-tls crate, rsa_sign, spki, schedule)",
+   "status": "recorded",
+   "summary": "Cron-fired 18:00 UTC session (job 549467, D-0036). CVE poll: cve_id still null. Ritual: reconcile 1db4c4a MATCH, toolchain 7th reinstall, baseline 121-green pre-change, lock v3. Wave 1: holo-tls crate (record/codec/transcript/alerts, RFC 8448 byte-identical, 21 tests), holo-crypto rsa_sign (RSASP1 + PKCS#1 v1.5 + PSS sign, NIST CAVS + Wycheproof + OpenSSL byte-exact, salt entropy seam, +10 tests), holo-tls spki (own DER walker, pin over full SPKI span incl. tag+len, RFC 6125 hostname rules, 11 python-verified fixture pins, loopback key+cert fixture, 17 tests), holo-tls schedule (full RFC 8446 7.1 chain, RFC 8448 pinned incl. both Finished verify_data, 12 tests). Merge: drop-in mods enabled, C append-only diff-proven. Two incidents fixed: cfb_usage_audit hex false-positives (D-0037 + negative demo re-run) and Cargo.lock v4 rewrite (restored to v3, delta = holo-tls stanza only). Workspace 181 passed / 0 failed / 3 ignored (3rd = holo-tls lib.rs line-60 ignored doc-test). Zero warnings. Lead spot-check: 11/11 fixture pins re-derived in python MATCH.",
+   "refs": [
+    "harness/memory/sessions/2026-11-26-s2-batch1.md"
+   ]
+  },
+  {
+   "id": "holo-tls",
+   "type": "component",
+   "label": "holo-tls — TLS 1.3 client (RFC 8446), S2",
+   "status": "in_progress",
+   "summary": "New S2 crate: record layer + handshake codec + transcript + alerts (batch 1, RFC 8448-verified); spki pinning and key schedule modules landed batch 1; client state machine + loopback server + e2e + session.connect driver deliverable remain (batch 2).",
+   "refs": [
+    "engine/crates/holo-tls/src/lib.rs"
+   ]
+  },
+  {
+   "id": "T-tls-codec-rfc8448",
+   "type": "test",
+   "label": "holo-tls record/codec/transcript suite (21 named tests, RFC 8448 traces byte-identical)",
+   "status": "passing",
+   "summary": "holo-tls record/codec/transcript suite — 21 named tests, RFC 8448 traces byte-identical",
+   "refs": [
+    "engine/crates/holo-tls/src/lib.rs"
+   ]
+  },
+  {
+   "id": "T-rsa-sign-vectors",
+   "type": "test",
+   "label": "rsa_sign suite (10 tests)",
+   "status": "passing",
+   "summary": "rsa_sign suite — 10 tests: NIST CAVS 186-2 + Wycheproof tcIds 81-88 + frozen OpenSSL signature, byte-exact; 64 roundtrips vs verifiers",
+   "refs": [
+    "engine/crates/holo-crypto/src/lib.rs"
+   ]
+  },
+  {
+   "id": "T-spki-pinning",
+   "type": "test",
+   "label": "spki suite (17 tests)",
+   "status": "passing",
+   "summary": "spki suite — 17 tests: DER walk, pin over full SPKI span (tag+len), RFC 6125 hostname rules, NUL guard; 11 pins python-verified",
+   "refs": [
+    "engine/crates/holo-tls/src/spki.rs"
+   ]
+  },
+  {
+   "id": "T-tls-schedule-rfc8448",
+   "type": "test",
+   "label": "tls13 schedule suite (12 tests)",
+   "status": "passing",
+   "summary": "tls13 schedule suite — 12 tests: RFC 8446 7.1 full chain, RFC 8448 3 pinned incl. both Finished verify_data",
+   "refs": [
+    "engine/crates/holo-tls/src/schedule.rs"
+   ]
   }
  ],
  "edges": [
@@ -2372,6 +2443,54 @@
    "rel": "amends",
    "dst": "D-0035",
    "note": "poll vehicle merged into the standing session"
+  },
+  {
+   "src": "holo-tls",
+   "rel": "tested_by",
+   "dst": "T-tls-codec-rfc8448",
+   "note": ""
+  },
+  {
+   "src": "holo-crypto",
+   "rel": "tested_by",
+   "dst": "T-rsa-sign-vectors",
+   "note": ""
+  },
+  {
+   "src": "holo-tls",
+   "rel": "tested_by",
+   "dst": "T-spki-pinning",
+   "note": ""
+  },
+  {
+   "src": "holo-tls",
+   "rel": "tested_by",
+   "dst": "T-tls-schedule-rfc8448",
+   "note": ""
+  },
+  {
+   "src": "SES-2026-11-26b",
+   "rel": "authored",
+   "dst": "D-0037",
+   "note": ""
+  },
+  {
+   "src": "D-0037",
+   "rel": "amends",
+   "dst": "D-0030",
+   "note": "audit matcher: hex-data exception, sensitivity preserved"
+  },
+  {
+   "src": "SES-2026-11-26b",
+   "rel": "implements",
+   "dst": "S2",
+   "note": "batch 1 of the S2 charter"
+  },
+  {
+   "src": "SES-2026-11-26b",
+   "rel": "part_of",
+   "dst": "S2",
+   "note": ""
   }
  ]
 }

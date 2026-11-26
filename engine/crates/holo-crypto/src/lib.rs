@@ -2930,6 +2930,51 @@ mod cfb_audit {
         }
     }
 
+    /// Matches of "cfb" that sit WHOLLY inside a run of hexadecimal
+    /// characters at least `HEX_RUN` long are DATA, not code: protocol/DER
+    /// test fixtures embed certificates and vectors as hex `&str`
+    /// constants, and chance alone places "cfb" inside those nibble
+    /// streams (D-0037: three spki.rs cert fixtures tripped the raw
+    /// substring scan at lib.rs:436/439/444 of the merged tree). Real CODE
+    /// references always carry non-hex context (`::`, `_`, `mod`, a space)
+    /// and can never satisfy this predicate, so audit sensitivity is
+    /// preserved: every non-hex occurrence — including comments — still
+    /// trips the audit. Threshold 12: the shortest real identifier-shaped
+    /// false positive would be a 12+-char hex-only token, which no Rust
+    /// naming style produces and no fixture snippet shorter than a DER
+    /// span carries.
+    const HEX_RUN: usize = 12;
+
+    fn match_in_hex(line: &str, idx: usize, len: usize) -> bool {
+        let bytes = line.as_bytes();
+        let hex = |b: u8| b.is_ascii_hexdigit();
+        let mut start = idx;
+        while start > 0 && hex(bytes[start - 1]) {
+            start -= 1;
+        }
+        let mut end = idx + len;
+        while end < bytes.len() && hex(bytes[end]) {
+            end += 1;
+        }
+        end - start >= HEX_RUN
+    }
+
+    /// True when the line contains "cfb" OUTSIDE a long hex run — i.e. in
+    /// code context (imports, paths, `mod cfb128`, comments). All-hex
+    /// matches are fixture DATA and are ignored (D-0037).
+    fn line_has_code_context_cfb(line: &str) -> bool {
+        let needle = "cfb";
+        let mut pos = 0;
+        while let Some(off) = line[pos..].find(needle) {
+            let at = pos + off;
+            if !match_in_hex(line, at, needle.len()) {
+                return true;
+            }
+            pos = at + needle.len();
+        }
+        false
+    }
+
     /// No exemptions beyond the allowlist — not even integration-test
     /// directories: an unauthenticated raw-CFB reference is a violation
     /// wherever it lives.
@@ -2969,8 +3014,8 @@ mod cfb_audit {
                 Err(_) => continue,
             };
             for (i, line) in src.lines().enumerate() {
-                if line.to_lowercase().contains("cfb") {
-                    hits.push(format!("{}:{}: matched \"cfb\"", rel, i + 1));
+                if line_has_code_context_cfb(&line.to_lowercase()) {
+                    hits.push(format!("{}:{}: matched \"cfb\" (code context)", rel, i + 1));
                 }
             }
         }
@@ -2981,7 +3026,8 @@ mod cfb_audit {
              crates/holo-crypto/src/lib.rs and may only be exposed through a pub \
              authenticated wrapper API. Offenders:\n  {}\nIf a consumer is genuinely \
              needed, extend the audit ALLOWLIST with a justification comment and \
-             a DECISIONS.md record — never reach around the wrapper.",
+             a DECISIONS.md record — never reach around the wrapper. (Matches inside \
+             long hex runs are DATA per D-0037 and do not count.)",
             hits.join("\n  ")
         );
     }
@@ -3914,5 +3960,902 @@ pub mod x25519 {
                 "7c3911e0ab2586fd864497297e575e6f3bc601c0883c30df5f4dd2d24f665424"
             );
         }
+    }
+}
+// ===========================================================================
+// rsa_sign — RSA PRIVATE-KEY SIGNING (RSASP1) — RSASSA-PKCS1-v1_5 + RSASSA-PSS
+// (RFC 8017 §5.2.1, §8.1.1/§8.2.1, §9.1.1, §9.2). Task 1-c, S2 wave 1.
+// Needed by the S2 loopback TLS 1.3 test-server for CertificateVerify.
+//
+// MERGE SAFETY: this section is a PURE APPEND to lib.rs — no existing line
+// was modified. It reuses ONLY public APIs: crate::bignum (os2ip / i2osp /
+// cmp / bit_len / modpow), crate::sha1::digest, crate::sha256::digest.
+//
+// CONSTANT-TIME HONESTY (project bar A2 / D-0031): this crate's
+// constant-time claims apply to PUBLIC-operand paths. Private-key
+// operations (RSASP1: s = m^d mod n via bignum::modpow) are a DOCUMENTED
+// ACCEPTED RISK — mont_pow branches on private-exponent bits and runs
+// data-dependent Montgomery arithmetic, so RSASP1 leaks timing/caches to
+// co-located observers. Shipped for the loopback test-server ONLY; not for
+// production signing. Zero `unsafe` everywhere (crate-wide
+// #![forbid(unsafe_code)], mechanical).
+//
+// SALT / ENTROPY SEAM: PSS salts are an EXPLICIT PARAMETER of
+// sign_pss_sha256 / sign_pss_generic. This crate stays zero-dependency and
+// non-entropy-consuming; the caller supplies OS-entropy salt (via
+// holo_util::rand::os_fill).
+// ===========================================================================
+
+pub mod rsa_sign {
+    use crate::bignum;
+    use crate::sha256;
+    use std::cmp::Ordering;
+
+    /// EMSA-PSS trailer field octet (RFC 8017 §9.1.1 step 12: "0xbc").
+    const PSS_TRAILER: u8 = 0xbc;
+
+    /// DER encoding T of the SHA-1 DigestInfo without the hash octets —
+    /// RFC 8017 §9.2 note 1, VERBATIM: "SHA-1:   (0x)30 21 30 09 06 05 2b
+    /// 0e 03 02 1a 05 00 04 14 || H." Own copy (the crate::rsa prefix consts
+    /// are public, but this module stays self-contained for merge-safety;
+    /// equality with the hand-assembled DER is pinned by a test).
+    pub const DIGEST_INFO_SHA1: [u8; 15] = [
+        0x30, 0x21, 0x30, 0x09, 0x06, 0x05, 0x2b, 0x0e, 0x03, 0x02, 0x1a, 0x05, 0x00, 0x04,
+        0x14,
+    ];
+
+    /// RFC 8017 §9.2 note 1, VERBATIM: "SHA-256: (0x)30 31 30 0d 06 09 60 86
+    /// 48 01 65 03 04 02 01 05 00 04 20 || H." Byte-identical to
+    /// `crate::rsa::DIGEST_INFO_SHA256` (pinned equal by
+    /// rsa_sign_digestinfo_prefixes_match_crate_rsa).
+    pub const DIGEST_INFO_SHA256: [u8; 19] = [
+        0x30, 0x31, 0x30, 0x0d, 0x06, 0x09, 0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02,
+        0x01, 0x05, 0x00, 0x04, 0x20,
+    ];
+
+    /// SHA-256 wrapped as `fn(&[u8]) -> Vec<u8>` — the concrete instance the
+    /// public SHA-256 path feeds to `sign_pss_generic`. (The SHA-1 instance
+    /// for the parametric path lives in rsa_sign_tests, which drives
+    /// `sign_pss_generic` with the NIST CAVS SHA-1 vectors; the parametric
+    /// `hash: fn(&[u8]) -> Vec<u8>` parameter IS the seam.)
+    fn sha256_v(data: &[u8]) -> Vec<u8> {
+        sha256::digest(data).to_vec()
+    }
+
+    /// RSASP1 (RFC 8017 §5.2.1) with the (n, d) private-key form. The task
+    /// text said "§5.1.2" — that number is RSADP (decryption); the signature
+    /// primitive RSASP1 lives in §5.2.1 (deviation recorded in the report).
+    ///
+    /// `n`/`d` are big-endian modulus / private exponent octets, `m` the
+    /// message representative as big-endian octets. §5.2.1 step 1: "If the
+    /// message representative m is not between 0 and n − 1, output 'message
+    /// representative out of range'" (here: "rsa_sign: representative out of
+    /// range" — unsigned octets make 0 ≤ m inherent). Step 2a: s = m^d mod n
+    /// via bignum::modpow (Montgomery, MSB-first square-and-multiply — see
+    /// the constant-time note above). Step 3 analog: I2OSP(s, k), k = octet
+    /// length of n. NOT constant-time — accepted risk, see module docs.
+    pub(crate) fn rsasp1(n: &[u8], d: &[u8], m: &[u8]) -> Result<Vec<u8>, String> {
+        if n.is_empty() {
+            return Err("rsa_sign: empty modulus".to_string());
+        }
+        if n[n.len() - 1] & 1 == 0 {
+            return Err("rsa_sign: modulus must be odd (Montgomery requirement)".to_string());
+        }
+        if d.is_empty() {
+            return Err("rsa_sign: empty private exponent".to_string());
+        }
+        let n_big = bignum::os2ip(n);
+        let m_big = bignum::os2ip(m);
+        // RFC 8017 §5.2.1 step 1: 0 ≤ m < n.
+        if bignum::cmp(&m_big, &n_big) != Ordering::Less {
+            return Err("rsa_sign: representative out of range".to_string());
+        }
+        // Step 2a: s = m^d mod n.
+        let s = bignum::modpow(&m_big, &bignum::os2ip(d), &n_big);
+        // Output: exactly k = n.len() octets, big-endian. Unreachable error
+        // arm: s < n < 2^(8k) ⇒ always fits.
+        bignum::i2osp(&s, n.len())
+            .map_err(|_| "rsa_sign: I2OSP overflow (unreachable: s < n)".to_string())
+    }
+
+    /// EMSA-PKCS1-v1_5 encoding (RFC 8017 §9.2, steps 2–6, hash-agnostic):
+    /// EM = 0x00 || 0x01 || PS(0xff × (k − tLen − 3)) || 0x00 || T, with
+    /// T = digest_info_prefix || H (tLen = len(prefix) + len(H)). §9.2 step
+    /// 3 note: emLen ≥ tLen + 11 ⇒ the PS/FF run is ≥ 8 octets; violation is
+    /// the distinct "FF run" error. Deterministic by construction.
+    fn pkcs1_v15_encode(
+        k: usize,
+        digest_info_prefix: &[u8],
+        mhash: &[u8],
+    ) -> Result<Vec<u8>, String> {
+        let t_len = digest_info_prefix.len() + mhash.len();
+        if k < t_len + 11 {
+            return Err(
+                "rsa_sign: modulus too short for PKCS#1 v1.5 encoding (FF run < 8)".to_string(),
+            );
+        }
+        let mut em = Vec::with_capacity(k);
+        em.push(0x00);
+        em.push(0x01);
+        em.extend(std::iter::repeat(0xff).take(k - t_len - 3));
+        em.push(0x00);
+        em.extend_from_slice(digest_info_prefix);
+        em.extend_from_slice(mhash);
+        debug_assert_eq!(em.len(), k);
+        Ok(em)
+    }
+
+    /// RSASSA-PKCS1-v1_5-SIGN (RFC 8017 §8.2.1) with a parametric DigestInfo
+    /// prefix — §8.2.1 steps 1–3: EM = EMSA-PKCS1-V1_5-ENCODE(H, k) then
+    /// s = RSASP1(K, EM). Enables the SHA-1 NIST CAVS vectors (prefix =
+    /// DIGEST_INFO_SHA1, H = SHA-1(M)) and any future prefix; the SHA-256
+    /// path is the public `sign_pkcs1_v1_5_sha256`.
+    pub(crate) fn sign_pkcs1_v1_5_generic(
+        n: &[u8],
+        d: &[u8],
+        digest_info_prefix: &[u8],
+        mhash: &[u8],
+    ) -> Result<Vec<u8>, String> {
+        if n.is_empty() {
+            return Err("rsa_sign: empty modulus".to_string());
+        }
+        let em = pkcs1_v15_encode(n.len(), digest_info_prefix, mhash)?;
+        rsasp1(n, d, &em)
+    }
+
+    /// RSASSA-PKCS1-v1_5-SIGN, SHA-256 (RFC 8017 §8.2.1 + §9.2). `n`/`d`
+    /// big-endian; `message_hash` is H = Hash(M) (32 bytes — the caller
+    /// hashes; §9.2 step 1). Deterministic: same key + hash ⇒ same signature.
+    pub fn sign_pkcs1_v1_5_sha256(
+        n: &[u8],
+        d: &[u8],
+        message_hash: &[u8; 32],
+    ) -> Result<Vec<u8>, String> {
+        sign_pkcs1_v1_5_generic(n, d, &DIGEST_INFO_SHA256, message_hash)
+    }
+
+    /// MGF1 (RFC 8017 B.2.1): Hash(seed || counter32-be), concatenated,
+    /// truncated to `mask_len`. Counter overflow is impossible for the mask
+    /// lengths RSA produces (< 2^32 hashes); wrapping_add keeps it honest.
+    fn mgf1(hash: fn(&[u8]) -> Vec<u8>, seed: &[u8], mask_len: usize) -> Vec<u8> {
+        let mut out = Vec::with_capacity(mask_len + 32);
+        let mut counter: u32 = 0;
+        while out.len() < mask_len {
+            let mut input = Vec::with_capacity(seed.len() + 4);
+            input.extend_from_slice(seed);
+            input.extend_from_slice(&counter.to_be_bytes());
+            out.extend_from_slice(&hash(&input));
+            counter = counter.wrapping_add(1);
+        }
+        out.truncate(mask_len);
+        out
+    }
+
+    /// EMSA-PSS-ENCODE (RFC 8017 §9.1.1) + RSASP1, parametric hash. Documented
+    /// choice: RFC 8017 allows different hash functions for H and MGF1, but
+    /// every vector this crate pins (NIST CAVS SigGenPSS_186-2 and the TLS-1.3
+    /// SHA-256 path) uses the SAME hash for both — so one `hash: fn(&[u8]) ->
+    /// Vec<u8>` drives both M' hashing and MGF1, and `hlen` is passed
+    /// explicitly (a two-hash API is trivial to add if ever needed).
+    ///
+    /// `salt` is the explicit entropy seam (caller: holo_util::rand::os_fill).
+    /// modBits = bit_len(n) (§9.1.1 note 1); emBits = modBits − 1;
+    /// emLen = ⌈emBits/8⌉. §9.1.1 step 3 ("encoding error"): emLen ≥
+    /// hLen + sLen + 2 — violation is a distinct error (sLen too large).
+    pub(crate) fn sign_pss_generic(
+        n: &[u8],
+        d: &[u8],
+        mhash: &[u8],
+        hash: fn(&[u8]) -> Vec<u8>,
+        hlen: usize,
+        salt: &[u8],
+    ) -> Result<Vec<u8>, String> {
+        if n.is_empty() {
+            return Err("rsa_sign: empty modulus".to_string());
+        }
+        let n_big = bignum::os2ip(n);
+        let mod_bits = bignum::bit_len(&n_big);
+        if mod_bits == 0 {
+            return Err("rsa_sign: zero modulus".to_string());
+        }
+        let em_bits = mod_bits - 1;
+        let em_len = em_bits.div_ceil(8);
+        // §9.1.1 step 3: if emLen < hLen + sLen + 2, output "encoding error".
+        if em_len < hlen + salt.len() + 2 {
+            return Err(format!(
+                "rsa_sign/pss: emLen ({}) < hLen ({}) + sLen ({}) + 2 — salt too long for this modulus",
+                em_len, hlen, salt.len()
+            ));
+        }
+        // Steps 5–6: M' = 0x00×8 || mHash || salt; H = Hash(M').
+        let mut m_prime = Vec::with_capacity(8 + mhash.len() + salt.len());
+        m_prime.extend_from_slice(&[0u8; 8]);
+        m_prime.extend_from_slice(mhash);
+        m_prime.extend_from_slice(salt);
+        let h = hash(&m_prime);
+        // Steps 7–8: PS (emLen − sLen − hLen − 2 zeros, may be empty) and
+        // DB = PS || 0x01 || salt.
+        let db_len = em_len - hlen - 1;
+        let mut db = vec![0u8; db_len - salt.len() - 1];
+        db.push(0x01);
+        db.extend_from_slice(salt);
+        debug_assert_eq!(db.len(), db_len);
+        // Step 9: dbMask = MGF1(H, emLen − hLen − 1); step 10: maskedDB = DB ⊕ dbMask.
+        let db_mask = mgf1(hash, &h, db_len);
+        let mut masked_db: Vec<u8> = db
+            .iter()
+            .zip(db_mask)
+            .map(|(x, y)| x ^ y)
+            .collect();
+        // Step 11: zero the leftmost 8·emLen − emBits bits (≤ 7) of maskedDB.
+        let top_bits = 8 * em_len - em_bits;
+        debug_assert!(top_bits < 8);
+        if top_bits > 0 {
+            masked_db[0] &= 0xff >> top_bits;
+        }
+        // Step 12: EM = maskedDB || H || 0xbc.
+        let mut em = masked_db;
+        em.extend_from_slice(&h);
+        em.push(PSS_TRAILER);
+        debug_assert_eq!(em.len(), em_len);
+        // The signature is RSASP1(EM). EM < 2^emBits ≤ n, so the RSASP1 range
+        // check cannot fire for a well-formed modulus — still checked there.
+        rsasp1(n, d, &em)
+    }
+
+    /// RSASSA-PSS-SIGN (RFC 8017 §8.1.1) with EMSA-PSS-ENCODE (§9.1.1) and
+    /// MGF1-SHA256, for SHA-256. `message_hash` is H = Hash(M) (32 bytes);
+    /// `salt` is the explicit salt (sLen = salt.len(), typically 32) — the
+    /// entropy seam: this zero-dependency crate consumes no OS entropy; the
+    /// caller supplies fresh randomness per signature (holo_util::rand::os_fill).
+    /// Distinct error strings per failure stage. Salted ⇒ randomized signing.
+    pub fn sign_pss_sha256(
+        n: &[u8],
+        d: &[u8],
+        message_hash: &[u8; 32],
+        salt: &[u8],
+    ) -> Result<Vec<u8>, String> {
+        sign_pss_generic(n, d, message_hash, sha256_v, 32, salt)
+    }
+}
+
+// ===========================================================================
+// rsa_sign_tests — official signing vectors, roundtrips, negatives.
+//
+// Vector provenance (all fetched during task 1-c; full transcripts quoted in
+// /home/z/my-project/scratch/rsa_sign_report.md):
+//   * NIST CAVS "186-2rsatestvectors.zip" (csrc.nist.gov), files
+//     SigGen15_186-2.txt (RSASSA-PKCS1-v1_5 SigGen) and SigGenPSS_186-2.txt
+//     (RSASSA-PSS SigGen), 1024-bit SHA-1 sections: keys publish n, e, d;
+//     PSS vectors additionally publish the exact SaltVal bytes. Both chosen
+//     vectors were re-verified in pure Python (public-key decode:
+//     pow(S, e, n) == EMSA-encode(H) — independent of this crate) BEFORE
+//     being pinned here.
+//   * Wycheproof (C2SP/wycheproof == google/wycheproof @ 65ca494727a52944c)
+//     testvectors_v1/rsa_pkcs1_2048_sig_gen_test.json — the requested
+//     "rsassa_pkcs1_2048_sha256_sign_test.json" does NOT exist in either
+//     repo (404 on raw.githubusercontent; the dir was renamed testvectors →
+//     testvectors_v1 and signing files → *_sig_gen_test.json). Group 2
+//     (SHA-256), tcIds 81–88, all "valid", all verified in Python first.
+//   * FROZEN_* — deterministic RSA-2048 key (run-11; run-10 recipe reused:
+//     sha256-seeded candidate scan + fixed-basis Miller-Rabin, p/q confirmed
+//     by `openssl prime -checks 8`, whole key by `openssl pkey -check`).
+//     v1.5 signature is the OpenSSL 3.5.7 `openssl dgst -sha256 -sign`
+//     output (byte-identical to Python pow(em, d, n)). PSS signature
+//     (salt = 0xA5 × 32) is the Python pow() ground truth, "Verified OK"
+//     under `openssl dgst -sha256 -sigopt rsa_padding_mode:pss
+//     -sigopt rsa_pss_saltlen:32 -verify`.
+//
+// Roundtrip randomness choice: deterministic SplitMix64 PRNG seeded in-test
+// (documented per the task's either/or) — self-contained, reproducible;
+// production callers supply OS-entropy salts via holo_util::rand::os_fill.
+// ===========================================================================
+
+#[cfg(test)]
+mod rsa_sign_tests {
+    use crate::from_hex;
+    use crate::rsa;
+    use crate::rsa_sign;
+    use crate::rsa_sign::{DIGEST_INFO_SHA1, DIGEST_INFO_SHA256};
+    use crate::sha1;
+    use crate::sha256;
+
+    /// SHA-1 wrapped as `fn(&[u8]) -> Vec<u8>` — the concrete instance the
+    /// NIST CAVS SHA-1 PSS vectors feed to `sign_pss_generic` (SHA-1 with
+    /// MGF1-SHA1, the CAVS 186-2 configuration; the parametric
+    /// `hash: fn(&[u8]) -> Vec<u8>` parameter of sign_pss_generic IS the
+    /// seam, so SHA-1 needs no production-code entry point).
+    fn sha1_v(data: &[u8]) -> Vec<u8> {
+        sha1::digest(data).to_vec()
+    }
+
+    /// Deterministic SplitMix64 (Steele et al., widely used reference
+    /// generator) — 32-byte salts / test material only; documented choice
+    /// over python-generated constants (task allows either).
+    struct SplitMix64 {
+        state: u64,
+    }
+    impl SplitMix64 {
+        const SEED: u64 = 0x5EED_1DE5_0000_0042;
+        fn new(seed: u64) -> Self {
+            Self { state: seed }
+        }
+        fn next_u64(&mut self) -> u64 {
+            self.state = self.state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+            let mut z = self.state;
+            z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+            z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+            z ^ (z >> 31)
+        }
+        fn fill(&mut self, buf: &mut [u8]) {
+            for chunk in buf.chunks_mut(8) {
+                let v = self.next_u64().to_le_bytes();
+                chunk.copy_from_slice(&v[..chunk.len()]);
+            }
+        }
+        fn bytes(&mut self, n: usize) -> Vec<u8> {
+            let mut v = vec![0u8; n];
+            self.fill(&mut v);
+            v
+        }
+    }
+
+    /// Deterministic per-roundtrip message: SHA-256 of an 8-byte counter
+    /// (the sign APIs take H directly — the message content is irrelevant).
+    fn counter_hash(i: u64) -> [u8; 32] {
+        sha256::digest(&i.to_be_bytes())
+    }
+
+// ---- NIST CAVS SigGen15_186-2.txt, 1024-bit section, SHA-1 (v1.5) ----
+// (key publishes n, e, d; vectors publish Msg + S; k = 128)
+const NIST15_N: &str = "    c8a2069182394a2ab7c3f4190c15589c56a2d4bc42dca675b34cc950e2466304\
+    8441e8aa593b2bc59e198b8c257e882120c62336e5cc745012c7ffb063eebe53\
+    f3c6504cba6cfe51baa3b6d1074b2f398171f4b1982f4d65caf882ea4d56f32a\
+    b57d0c44e6ad4e9cf57a4339eb6962406e350c1b15397183fbf1f0353c9fc991";
+const NIST15_E: &str = "010001";
+const NIST15_D: &str = "    5dfcb111072d29565ba1db3ec48f57645d9d8804ed598a4d470268a89067a2c9\
+    21dff24ba2e37a3ce834555000dc868ee6588b7493303528b1b3a94f0b71730c\
+    f1e86fca5aeedc3afa16f65c0189d810ddcd81049ebbd0391868c50edec958b3\
+    a2aaeff6a575897e2f20a3ab5455c1bfa55010ac51a7799b1ff8483644a3d425";
+const NIST15_MSG0: &str = "    e8312742ae23c456ef28a23142c4490895832765dadce02afe5be5d31b0048fb\
+    eee2cf218b1747ad4fd81a2e17e124e6af17c3888e6d2d40c00807f423a233ca\
+    d62ce9eaefb709856c94af166dba08e7a06965d7fc0d8e5cb26559c460e47bc0\
+    88589d2242c9b3e62da4896fab199e144ec136db8d84ab84bcba04ca3b90c8e5";
+const NIST15_SIG0: &str = "    28928e19eb86f9c00070a59edf6bf8433a45df495cd1c73613c2129840f48c4a\
+    2c24f11df79bc5c0782bcedde97dbbb2acc6e512d19f085027cd575038453d04\
+    905413e947e6e1dddbeb3535cdb3d8971fe0200506941056f21243503c83eadd\
+    e053ed866c0e0250beddd927a08212aa8ac0efd61631ef89d8d049efb36bb35f";
+const NIST15_MSG1: &str = "    4c95073dac19d0256eaadff3505910e431dd50018136afeaf690b7d18069fcc9\
+    80f6f54135c30acb769bee23a7a72f6ce6d90cbc858c86dbbd64ba48a07c6d7d\
+    50c0e9746f97086ad6c68ee38a91bbeeeb2221aa2f2fb4090fd820d4c0ce5ff0\
+    25ba8adf43ddef89f5f3653de15edcf3aa8038d4686960fc55b2917ec8a8f9a8";
+const NIST15_SIG1: &str = "    53ab600a41c71393a271b0f32f521963087e56ebd7ad040e4ee8aa7c450ad18a\
+    c3c6a05d4ae8913e763cfe9623bd9cb1eb4bed1a38200500fa7df3d95dea485f\
+    032a0ab0c6589678f9e8391b5c2b1392997ac9f82f1d168878916aace9ac7455\
+    808056af8155231a29f42904b7ab87a5d71ed6395ee0a9d024b0ca3d01fd7150";
+
+// ---- NIST CAVS SigGenPSS_186-2.txt, 1024-bit section, SHA-1, salt len 20 ----
+// (key publishes n, e, d; PSS vectors additionally publish SaltVal)
+const NISTPSS_N: &str = "    bcb47b2e0dafcba81ff2a2b5cb115ca7e757184c9d72bcdcda707a146b3b4e29\
+    989ddc660bd694865b932b71ca24a335cf4d339c719183e6222e4c9ea6875acd\
+    528a49ba21863fe08147c3a47e41990b51a03f77d22137f8d74c43a5a45f4e9e\
+    18a2d15db051dc89385db9cf8374b63a8cc88113710e6d8179075b7dc79ee76b";
+const NISTPSS_E: &str = "010001";
+const NISTPSS_D: &str = "    383a6f19e1ea27fd08c7fbc3bfa684bd6329888c0bbe4c98625e7181f411cfd0\
+    853144a3039404dda41bce2e31d588ec57c0e148146f0fa65b39008ba5835f82\
+    9ba35ae2f155d61b8a12581b99c927fd2f22252c5e73cba4a610db3973e019ee\
+    0f95130d4319ed413432f2e5e20d5215cdd27c2164206b3f80edee51938a25c1";
+const NISTPSS_MSG0: &str = "    1248f62a4389f42f7b4bb131053d6c88a994db2075b912ccbe3ea7dc611714f1\
+    4e075c104858f2f6e6cfd6abdedf015a821d03608bf4eba3169a6725ec422cd9\
+    069498b5515a9608ae7cc30e3d2ecfc1db6825f3e996ce9a5092926bc1cf61aa\
+    42d7f240e6f7aa0edb38bf81aa929d66bb5d890018088458720d72d569247b0c";
+const NISTPSS_SALT0: &str = "    6f2841166a64471d4f0b8ed0dbb7db32161da13b";
+const NISTPSS_SIG0: &str = "    682cf53c1145d22a50caa9eb1a9ba70670c5915e0fdfde6457a765de2a8fe12d\
+    e9794172a78d14e668d498acedad616504bb1764d094607070080592c3a69c34\
+    3d982bd77865873d35e24822caf43443cc10249af6a1e26ef344f28b9ef6f14e\
+    09ad839748e5148bcceb0fd2aa63709cb48975cbf9c7b49abc66a1dc6cb5b31a";
+const NISTPSS_MSG1: &str = "    9968809a557bb4f892039ff2b6a0efcd06523624bc3b9ad359a7cf143c4942e8\
+    74c797b9d37a563d436fe19d5db1aad738caa2617f87f50fc7fcf4361fc85212\
+    e89a9465e7f4c361982f64c8c5c0aa5258b9e94f6e934e8dac2ace7cd6095c90\
+    9de85fe7b973632c384d0ebb165556050d28f236aee70e16b13a432d8a94c62b";
+const NISTPSS_SALT1: &str = "    6f2841166a64471d4f0b8ed0dbb7db32161da13b";
+const NISTPSS_SIG1: &str = "    8f5ea7037367e0db75670504085790acd6d97d96f51e76df916a0c2e4cd66e1a\
+    b51c4cd8e2c3e4ef781f638ad65dc49c8d6d7f6930f80b6ae199ea283a892492\
+    5a50edab79bb3f34861ffa8b2f96fdf9f8cad3d3f8f025478c81f316da61b0d6\
+    a7f71b9068efdfb33c21983a922f4669280d8e84f963ff885ef56dd3f50381db";
+
+// ---- Wycheproof rsa_pkcs1_2048_sig_gen_test.json, group 2 (SHA-256), tcIds 81-88 ----
+// (all result=valid; pinned: raw msg + its sha256 + published signature)
+// NOTE: the wycheproof JSON encodes `modulus` with one leading 00 octet;
+// the pinned WYCH_N strips it — RFC 8017 k is the octet length of the
+// modulus VALUE (2048 bits = 256 octets), which is also the published
+// signature length.
+const WYCH_N: &str = "    a2b451a07d0aa5f96e455671513550514a8a5b462ebef717094fa1fee82224e6\
+    37f9746d3f7cafd31878d80325b6ef5a1700f65903b469429e89d6eac8845097\
+    b5ab393189db92512ed8a7711a1253facd20f79c15e8247f3d3e42e46e48c98e\
+    254a2fe9765313a03eff8f17e1a029397a1fa26a8dce26f490ed81299615d981\
+    4c22da610428e09c7d9658594266f5c021d0fceca08d945a12be82de4d1ece6b\
+    4c03145b5d3495d4ed5411eb878daf05fd7afc3e09ada0f1126422f590975a19\
+    69816f48698bcbba1b4d9cae79d460d8f9f85e7975005d9bc22c4e5ac0f7c1a4\
+    5d12569a62807d3b9a02e5a530e773066f453d1f5b4c2e9cf7820283f742b9d5";
+const WYCH_E: &str = "010001";
+const WYCH_D: &str = "    7627eef3567b2a27268e52053ecd31c3a7172ccb9ddcee819b306a5b3c66b757\
+    3ca4fa88efc6f3c4a00bfa0ae7139f64543a4dac3d05823f6ff477cfcec84fe2\
+    ac7a68b17204b390232e110310c4e899c4e7c10967db4acde042dbbf19dbe00b\
+    4b4741de1020aaaaffb5054c797c9f136f7d93ac3fc8caff6654242d7821ebee\
+    517bf537f44366a0fdd45ae05b9909c2e6cc1ed9281eff4399f76c96b96233ec\
+    29ae0bbf0d752b234fc197389f51050aa1acd01c074c3ac8fbdb9ea8b651a959\
+    95e8db4ad5c43b6c8673e5a126e7ee94b8dff4c5afc01259bc8da76950bae6f8\
+    bae715f50985b0d6f66d04c6fef3b700720eecdcdf171bb7b1ecbe7289c467c1";
+const WYCH_MSG_81: &str = "";
+const WYCH_MHASH_81: &str = "    e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+const WYCH_SIG_81: &str = "    840f5dac53106dd1f9c57219224cf51289290c42f20466875ba8e830ac5690e5\
+    41536fcc8ab03b731f82bf66d83f194e7e180b3963ec7a2f3f7904a7ce49aed4\
+    7da4d4b79421eaf937d301b3e696169297b797c32c076a12be4de0b58e003c51\
+    23051a84a10c62f8dac2f42a8640008eb3c7cccd6760ff5b51b6897639225828\
+    45f048fb8150e5a7a6ca2eccc7bdc85349ad5b26c52137a79fa3fe5c29ab5cd7\
+    615013219c1941b6708e9c3c23feff5febaf0c8ebca5750b54e3e6e99a3e876b\
+    396f27860b7f3ec4e9191703c6332d944f6f69751167680c79c4f6b57f1cc875\
+    5d24b6ec158ccdbacdb23107a33cb6b332516c13274d1f9dccc21dced869e486";
+const WYCH_MSG_82: &str = "    0000000000000000000000000000000000000000";
+const WYCH_MHASH_82: &str = "    de47c9b27eb8d300dbb5f2c353e632c393262cf06340c4fa7f1b40c4cbd36f90";
+const WYCH_SIG_82: &str = "    8a1b220cb2ab415dc760eb7f5bb10335a3cca269d7dbbf7d0962ba79f9cf7b43\
+    a5fc09c99a1584f07403473d6c189a836897a5b6f8ea9fa22d601e6ba5f7411f\
+    e27c638b81b1a22363583a80fce8c7df3e40fb51bd0e60d0a6653f79f3bcb7ec\
+    3e9dc14cfb5b31ab1735bca692d50ac03f979dda92747c6430f8045efa3513ba\
+    6e0ce3e9e35570e1c30c8ebe589b44192e1344ca83dfa576fc6fdc7bf1cd7cee\
+    875b001c8c02ce8d602769e4bd9d241c4857182a0089a8b67644e73eef105c55\
+    0efa47a40874289395ac0c4e02fd4ba98e130a4c2d1b95521c6af4a002ac3bdc\
+    6e52122ae4c08cc3da1c896e059acbddec574ac0432f6103dd97273d8803c102";
+const WYCH_MSG_83: &str = "    54657374";
+const WYCH_MHASH_83: &str = "    532eaabd9574880dbf76b9b8cc00832c20a6ec113d682299550d7a6e0f345e25";
+const WYCH_SIG_83: &str = "    264491e844c119f14e425c03282139a558dcdaeb82a4628173cd407fd319f907\
+    6eaebc0dd87a1c22e4d17839096886d58a9d5b7f7aeb63efec56c45ac7bead42\
+    03b6886e1faa90e028ec0ae094d46bf3f97efdd19045cfbc25a1abda2432639f\
+    9876405c0d68f8edbf047c12a454f7681d5d5a2b54bd3723d193dbad4338baad\
+    753264006e2d08931c4b8bb79aa1c9cad10eb6605f87c5831f6e2b08e002f9c6\
+    f21141f5841d92727dd3e1d99c36bc560da3c9067df99fcaf818941f72588be3\
+    3032bad22caf6704223bb114d575b6d02d9d222b580005d930e8f40cce9f672e\
+    ebb634a20177d84351627964b83f2053d736a84ab1a005f63bd5ba943de6205c";
+const WYCH_MSG_84: &str = "    313233343030";
+const WYCH_MHASH_84: &str = "    bb5a52f42f9c9261ed4361f59422a1e30036e7c32b270c8807a419feca605023";
+const WYCH_SIG_84: &str = "    1758eb94588e6fc4f50c1be1afcaa41027869f304cad513b1fb12c2f446d63cd\
+    c05c4830a7e3e630da7b2da4f7867cc173bf6420f9732277282596de41ded32e\
+    21d0cc31441174da8765f57419c7764ea758f55bc17646eb100c435d1ac0eed6\
+    fc7ba6de5f832094ee2f479979765e05ac9976788db3c241a9e32a0da864f001\
+    9a87646ba623d63f4411af5dee1be9ec488c7e3e1b231479de70b9ac5f78a17b\
+    1f4120aece45f26c07e7bb345fdfeb05e14bcaacc614672a465fc523624cb19f\
+    66f9c6c3f642b832ca44cb25176d679f0e05606c3fed022cac24c2bf960a406d\
+    48818e3eb7ed53b0446032469047dfed95fc18088c92d91d93722c47f88163a8";
+const WYCH_MSG_85: &str = "    4d657373616765";
+const WYCH_MHASH_85: &str = "    2f77668a9dfbf8d5848b9eeb4a7145ca94c6ed9236e4a773f6dcafa5132b2f91";
+const WYCH_SIG_85: &str = "    513a5abde16b5e0ecb8659d3ca0845800adf75cfc4437d42fa34e7aafbbe35fc\
+    5984d3560cba938f9a622e932bb6162b7fbb6cd8c1cf8815f28c495995ac18cd\
+    be8fabfdce29c17aa021df192ac02d080d7c5eda6bd4c99154178a9d5e1cf3ff\
+    4177106315f4e6d74c991b601069acd60b55b3bb4dbf6316c35096a487d67561\
+    81d3394944f1c742a2f4d608ce4f6abbfb72347ad7d342ae15dd6d1049fbd0ff\
+    55f4d7c43ab805f81ff1fbe9256b5c78c2de6beb787f4b6d66d290a3d4c48573\
+    68aea5f7ebaa1296020c8f9e3670441a08038bb810e853a654e44316a4e52428\
+    745123ce2714020d00e55a9eb82f7fb41c73d852a82b003670246c6ca2045fc8";
+const WYCH_MSG_86: &str = "    61";
+const WYCH_MHASH_86: &str = "    ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb";
+const WYCH_SIG_86: &str = "    38c042a00d6f27742a46f1f963a7b2e04f0eac637849631a491b8e4e58fc721c\
+    6ce620d5e705dc8e73409c3909c1c68b6bdb2b30f882cf2797e65030b38c4e7d\
+    af6fef9d1f115c890086cf54ca3e7c2b21dcbfd1250ed1d925810970f17dbf48\
+    2d1784f296adee9ace6979075c1e12f5580cfb322e8737db9d127d38e1b99ed8\
+    7ec49448a18a6fee650d3c27e4a2a86a3d6e3ce4fe64120be60872fa07a3f78a\
+    112715c167fb6c900698ba1afd824087a4cf733335c4a6d5120e3b29bc42f3b3\
+    d5db79973e4e321e0910a288d18cdba172d060283c4f4c6656e9175a18b756b7\
+    d06251e9060bbfcab04978853eec6032850a0e757bc0c61ad38aa4eb6bb6d907";
+const WYCH_MSG_87: &str = "    e0e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff";
+const WYCH_MHASH_87: &str = "    9432c1a7d343fcfacb164bdc44ff71c1281c004886b1c428419088d06cd3561a";
+const WYCH_SIG_87: &str = "    2ae8d95b19cbd64d0e343ff413fffb85d8e6713c06ac8a1ceba7f3924fa740f8\
+    d2b3e120fd71f22711e795cd6468c5e263b1a5ba6ac6b8fa9e23d2d6e7243f51\
+    0592a61d134e68b8ead00612dbf38c5b7302abc3bf33f23e6d4816a6e3ddcea6\
+    482566e84f57464f7d56de4cef0b2256ef21874dda4c131a47292ff8ef853f93\
+    804483c8e6373d39ca3a22552e75427b812b861de6a310ff4c366f6f6604116e\
+    fd9770170aa423554c4ebbd2b5c0698950e66bb5b7c5c346285d9f5c35146255\
+    736b6e818e8e77983c93b21e7f60b04a7a525598e7fd8049b181000bffc7f375\
+    3a504370f6bb70617ac8e914deb05a198a5758a459c9fcd2fce1aede48e8a852";
+const WYCH_MSG_88: &str = "    0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f20\
+    2122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f40\
+    4142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f60\
+    6162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f80\
+    8182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9fa0\
+    a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebfc0\
+    c1c2c3c4c5c6c7c8c9cacbcccdcecfd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0\
+    e1e2e3e4e5e6e7e8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff00\
+    0102030405060708090a0b0c0d0e0f1011121314151617";
+const WYCH_MHASH_88: &str = "    33b394b5df02cbb7f9c9bfb373d8756db43131d077abace74b23f2aed5a31f0e";
+const WYCH_SIG_88: &str = "    7aad44a36610ac147835efc623e3aeec0d5d8acbd7f469f92142592c7b843c93\
+    26e2015c4bf3843678d2e183ec9ed568e5dd8d535ea77a6d7fe804222e6208d0\
+    160bd6cf2744cdb56bce0ed7269cc5f2bcc25d3474c0fb5bc7d20ebf3664bad8\
+    58dc6e86dabfa5f39a70e23344ab4f8d5edc6397d9d1b54fda4216e0b93d37b9\
+    06384f82d36666d526939e0f917344208aadf05416c656a11a307ce210191276\
+    3728cfc0bd237017d36b8566c6c366b13f142c93edde181146ec63e49a57335b\
+    5d9295b85aa4c00d49cae7930653a5651c21371a4b3ec8a6e0f371d005e8b4f1\
+    631f7466b767b4789e75e1d2bc63ce4c46e5e7baf0b801ef785fd07ae79bbeef";
+
+// ---- deterministic 2048-bit key (run-11 recipe) + openssl/python cross-check ----
+const FROZEN_N: &str = "    ce5cfd1b5796eee33940a876045e2a9308b8496489e26ac4e2cb91e3be0bc8da\
+    2288790027d304a7082d02d068a7d96f87f4e5dc53b1c0c16aee645edc308f28\
+    5072e5dbd63cd4fd3264d852d1b951ff4ae19379e0c8cf967abf793f2672e5d7\
+    b949121b0dc72f6043d0737d0612195749debb3a23265045f1bb6fb4ff1eb17a\
+    83e4d9d9cf84d26e38ce7384a6469e972e307c52d00679bbd87faf98df34caef\
+    f15e26479c6dcf8f02a45546f3bee8726360bed8ed905de90b2cd51b4e866bff\
+    a6ed75ee9e9b026d6eef2c90abc44fa8b60e720c9759c675d2d7c5db2f752255\
+    ca7c93e27b0cb81419c1a7afc6370005e96c7fab8fbccf1090d8ea3e463a933d";
+const FROZEN_E: &str = "010001";
+const FROZEN_D: &str = "    1062e9e645ea4245e0c1f59e897240c734260e0de1b50ced5d64f4ccb4c692c8\
+    5f7d9ebe186b752f1e4314ba1fd5543abafd03539f81b9e0a1f1141f4434c6e9\
+    589a070e91d07ac9303b39c239cd1169c83469558037f1e3ed134f3968802f28\
+    161a6b49a2aa72649e7deaedbe91a95979102aa5cf2cb7ab162ae00feb4230ad\
+    7944ed9cd903df5d365c059c6f22087e142d8cdea5fd11e4b766e62e8b5c1749\
+    e4dbdf152e0c3644c35a8756b600c388576c403cb46f59c82a3b5b05cf7a6e4e\
+    b7f559139d8c9f9ff07b13d3ce6a132d916738ca0d3645c0228193440c39a441\
+    937261ddc5b5324369584a60e936e09fde6226f11df25641376a282b0842de31";
+const FROZEN_MSG: &str = "    000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f\
+    202122232425262728292a2b2c2d2e2f";
+const FROZEN_MHASH: &str = "    4dbdc2b2b62cb00749785bc84202236dbc3777d74660611b8e58812f0cfde6c3";
+const FROZEN_SIG_V15: &str = "    c788536a4290c31ead1417371144fe723c6b817db375c060c0cad77b6c5467ca\
+    0db7d9c89e05af37fb2f4df4707e2308fd934ee491f8889b644ba8cbf0c3055d\
+    ebaf632fcd967b6cbffdda05d62d56dafcc7d2ae7f7c86bf3cbb00d1a4711205\
+    53d76eadace4c0ec3ef11a57e14ca6eaa5200374da547cb900282da2c3b6431c\
+    2b565d7b0acb320472a566d88de73e33ca1465142c5cbac222b37cc1985d9643\
+    19bf3119d2aef318195a8efd1118bda01d9faf6344ac37ab03bbde234c5f2189\
+    8c7eff1efcdb329a44bdc5445737439f2a90fdb78933bdb947ccd4790e6211dd\
+    6b9dd8539daafd3879b3eb7d82743ffe79f4aac9521615b2cd31d1353af05d6e";
+const FROZEN_PSS_SALT: &str = "    a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5";
+const FROZEN_SIG_PSS: &str = "    ca15871f1087474b089aa0ac7f5b318b6873a315310dfa180651e5b04a72f100\
+    e954eccbe7d5ca4b83a1a7bcd66628b45bdbd2ca3fd67ae3543c3491447321f1\
+    f725720cb6148d4f72ff85961cf39ccf2a42fb6f093a397335926cafc5d38739\
+    45e57a663c712c4e640e742f73f964c164ddc39e920d436a300e54d8912f281b\
+    5e40d70d5e14a45c1a80eced1a18caee3a31e824e8843b9dfd354cc5fe853c67\
+    8224e539b20dfacf93471a5a3cfdbf40b5b23bff71733039f2aae4b45c274fba\
+    254eba4bc8d0288cb1b710863c061c116781d18b3fb439d94ea7c392ef44febd\
+    ca4c2793867f968e1eb6891f7363cc4c36cf408c5f1b3c7f7d3b19866348b50a";
+
+    // ------------------------------------------------------------------
+    // 1. DigestInfo prefixes (RFC 8017 §9.2 note 1) — self-contained copies
+    //    pinned against crate::rsa and against hand-assembled DER.
+    // ------------------------------------------------------------------
+    #[test]
+    fn rsa_sign_digestinfo_prefixes_match_crate_rsa() {
+        // SHA-256 prefix must be byte-identical to the verify-side const.
+        assert_eq!(&DIGEST_INFO_SHA256[..], &rsa::DIGEST_INFO_SHA256[..]);
+        // SHA-1 prefix = hand-assembled DER:
+        // SEQUENCE(0x30, len 0x21){ SEQUENCE(0x30, len 0x09){ OID(06 05)
+        // 1.3.14.3.2.26 = 2b 0e 03 02 1a, NULL(05 00) }, OCTET STRING
+        // (04 14) — i.e. "30 21 30 09 06 05 2b 0e 03 02 1a 05 00 04 14",
+        // exactly the §9.2 note 1 line.
+        let oid = [0x2bu8, 0x0e, 0x03, 0x02, 0x1a];
+        let mut expect = vec![0x30, 0x21, 0x30, 0x09, 0x06, 0x05];
+        expect.extend_from_slice(&oid);
+        expect.extend_from_slice(&[0x05, 0x00, 0x04, 0x14]);
+        assert_eq!(&DIGEST_INFO_SHA1[..], &expect[..]);
+    }
+
+    // ------------------------------------------------------------------
+    // 2. RSASP1 (§5.2.1) input validation — distinct errors, plus the
+    //    m = 0 edge (0 ≤ m is required by the spec).
+    // ------------------------------------------------------------------
+    #[test]
+    fn rsa_sign_rsasp1_range_and_input_errors() {
+        let n = from_hex(NIST15_N);
+        let d = from_hex(NIST15_D);
+        // m = n → "message representative out of range" (§5.2.1 step 1)
+        assert_eq!(
+            rsa_sign::rsasp1(&n, &d, &n).unwrap_err(),
+            "rsa_sign: representative out of range"
+        );
+        // m > n (one extra octet) → same distinct error
+        let mut big = n.clone();
+        big.push(0x01);
+        assert_eq!(
+            rsa_sign::rsasp1(&n, &d, &big).unwrap_err(),
+            "rsa_sign: representative out of range"
+        );
+        // m = 0 is IN range (0 ≤ m): s = 0^d mod n = 0 → k zero octets.
+        let zero = vec![0u8; n.len()];
+        let s0 = rsa_sign::rsasp1(&n, &d, &zero).unwrap();
+        assert_eq!(s0.len(), n.len());
+        assert!(s0.iter().all(|&b| b == 0));
+        // even modulus (n−1) → Montgomery requirement error, BEFORE range check
+        let mut n_even = n.clone();
+        let ni = n_even.len() - 1;
+        n_even[ni] &= 0xfe;
+        assert_eq!(
+            rsa_sign::rsasp1(&n_even, &d, &n).unwrap_err(),
+            "rsa_sign: modulus must be odd (Montgomery requirement)"
+        );
+        // empty modulus / empty private exponent
+        assert_eq!(
+            rsa_sign::rsasp1(&[], &d, &zero).unwrap_err(),
+            "rsa_sign: empty modulus"
+        );
+        assert_eq!(
+            rsa_sign::rsasp1(&n, &[], &zero).unwrap_err(),
+            "rsa_sign: empty private exponent"
+        );
+        // §9.2 step 3: emLen ≥ tLen + 11 (FF run ≥ 8) — a 24-octet modulus
+        // cannot hold the SHA-256 DigestInfo (tLen = 51) → distinct error.
+        let tiny_n = vec![0x03u8; 24];
+        let tiny_d = vec![0x01u8; 24];
+        let h = [0u8; 32];
+        assert_eq!(
+            rsa_sign::sign_pkcs1_v1_5_sha256(&tiny_n, &tiny_d, &h).unwrap_err(),
+            "rsa_sign: modulus too short for PKCS#1 v1.5 encoding (FF run < 8)"
+        );
+    }
+
+    // ------------------------------------------------------------------
+    // 3. NIST CAVS SigGen15_186-2, 1024-bit, SHA-1: byte-exact reproduction
+    //    of the published S via sign_pkcs1_v1_5_generic + DIGEST_INFO_SHA1.
+    // ------------------------------------------------------------------
+    #[test]
+    fn rsa_sign_nist1024_pkcs1_v15_sha1_byte_exact() {
+        let n = from_hex(NIST15_N);
+        let d = from_hex(NIST15_D);
+        for (i, (msg, want)) in [(NIST15_MSG0, NIST15_SIG0), (NIST15_MSG1, NIST15_SIG1)]
+            .iter()
+            .enumerate()
+        {
+            let h = sha1::digest(&from_hex(msg));
+            let s = rsa_sign::sign_pkcs1_v1_5_generic(&n, &d, &DIGEST_INFO_SHA1, &h)
+                .unwrap_or_else(|e| panic!("vector {i}: sign failed: {e}"));
+            assert_eq!(s.len(), n.len(), "S is exactly k = 128 octets");
+            assert_eq!(s, from_hex(want), "NIST SigGen15 vector[{i}] byte-exact");
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // 4. NIST CAVS SigGenPSS_186-2, 1024-bit, SHA-1, salt len 20: byte-exact
+    //    reproduction of the published S via sign_pss_generic (hash = MGF1
+    //    hash = SHA-1, the CAVS 186-2 configuration).
+    // ------------------------------------------------------------------
+    #[test]
+    fn rsa_sign_nist1024_pss_sha1_salt20_byte_exact() {
+        let n = from_hex(NISTPSS_N);
+        let d = from_hex(NISTPSS_D);
+        for (i, (msg, salt, want)) in [
+            (NISTPSS_MSG0, NISTPSS_SALT0, NISTPSS_SIG0),
+            (NISTPSS_MSG1, NISTPSS_SALT1, NISTPSS_SIG1),
+        ]
+        .iter()
+        .enumerate()
+        {
+            let mh = sha1::digest(&from_hex(msg));
+            let s = rsa_sign::sign_pss_generic(
+                &n,
+                &d,
+                &mh,
+                sha1_v,
+                20,
+                &from_hex(salt),
+            )
+            .unwrap_or_else(|e| panic!("PSS vector {i}: sign failed: {e}"));
+            assert_eq!(s, from_hex(want), "NIST SigGenPSS vector[{i}] byte-exact");
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // 5. Wycheproof RSASSA-PKCS1-v1_5 2048-bit SHA-256 SigGen, tcIds 81–88:
+    //    hash the vector's message in-test (sha256), sign with the vector's
+    //    n/d, assert the published signature bytes exactly.
+    // ------------------------------------------------------------------
+    #[test]
+    fn rsa_sign_wycheproof_2048_sha256_siggen_tc81_88() {
+        let n = from_hex(WYCH_N);
+        let d = from_hex(WYCH_D);
+        for tc in [81u32, 82, 83, 84, 85, 86, 87, 88] {
+            let msg = from_hex(wych_msg(tc));
+            let mhash = sha256::digest(&msg);
+            // cross-check the pinned hash (it was derived from the vector's
+            // msg by the dev-time extraction script)
+            assert_eq!(
+                &mhash[..],
+                &from_hex(wych_mhash(tc))[..],
+                "tcId {tc}: sha256(msg) matches the published-hash pin"
+            );
+            let s = rsa_sign::sign_pkcs1_v1_5_sha256(&n, &d, &mhash)
+                .unwrap_or_else(|e| panic!("tcId {tc}: sign failed: {e}"));
+            assert_eq!(s, from_hex(wych_sig(tc)), "tcId {tc}: signature byte-exact");
+        }
+    }
+
+    const fn wych_msg(tc: u32) -> &'static str {
+        match tc {
+            81 => WYCH_MSG_81,
+            82 => WYCH_MSG_82,
+            83 => WYCH_MSG_83,
+            84 => WYCH_MSG_84,
+            85 => WYCH_MSG_85,
+            86 => WYCH_MSG_86,
+            87 => WYCH_MSG_87,
+            _ => WYCH_MSG_88,
+        }
+    }
+    const fn wych_mhash(tc: u32) -> &'static str {
+        match tc {
+            81 => WYCH_MHASH_81,
+            82 => WYCH_MHASH_82,
+            83 => WYCH_MHASH_83,
+            84 => WYCH_MHASH_84,
+            85 => WYCH_MHASH_85,
+            86 => WYCH_MHASH_86,
+            87 => WYCH_MHASH_87,
+            _ => WYCH_MHASH_88,
+        }
+    }
+    const fn wych_sig(tc: u32) -> &'static str {
+        match tc {
+            81 => WYCH_SIG_81,
+            82 => WYCH_SIG_82,
+            83 => WYCH_SIG_83,
+            84 => WYCH_SIG_84,
+            85 => WYCH_SIG_85,
+            86 => WYCH_SIG_86,
+            87 => WYCH_SIG_87,
+            _ => WYCH_SIG_88,
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // 6. v1.5 sign→verify roundtrips: 32 signatures (16 on the NIST 1024-bit
+    //    key, 16 on the Wycheproof 2048-bit key) verified with the existing
+    //    crate::rsa::verify_pkcs1_v1_5_sha256, plus the determinism check.
+    // ------------------------------------------------------------------
+    #[test]
+    fn rsa_sign_pkcs1_v15_sha256_roundtrip_32() {
+        let keys = [
+            (from_hex(NIST15_N), from_hex(NIST15_E), from_hex(NIST15_D)),
+            (from_hex(WYCH_N), from_hex(WYCH_E), from_hex(WYCH_D)),
+        ];
+        let mut count = 0u32;
+        for (n, e, d) in &keys {
+            for i in 0..16u64 {
+                let h = counter_hash(i);
+                let s = rsa_sign::sign_pkcs1_v1_5_sha256(n, d, &h)
+                    .unwrap_or_else(|e| panic!("roundtrip {i}: {e}"));
+                assert_eq!(s.len(), n.len());
+                rsa::verify_pkcs1_v1_5_sha256(n, e, &h, &s)
+                    .unwrap_or_else(|e| panic!("roundtrip {i}: verify failed: {e}"));
+                // v1.5 is deterministic (§8.2.1 note): same inputs ⇒ same S
+                let s2 = rsa_sign::sign_pkcs1_v1_5_sha256(n, d, &h).unwrap();
+                assert_eq!(s, s2, "v1.5 must be deterministic");
+                count += 1;
+            }
+        }
+        assert_eq!(count, 32);
+    }
+
+    // ------------------------------------------------------------------
+    // 7. PSS sign→verify roundtrips: 32 signatures with random 32-byte
+    //    salts (SplitMix64, seed 0x5EED_1DE5_0000_0042 — documented choice)
+    //    verified with crate::rsa::verify_pss_sha256; also shows two salts
+    //    ⇒ two different signatures (randomized signing).
+    // ------------------------------------------------------------------
+    #[test]
+    fn rsa_sign_pss_sha256_roundtrip_32() {
+        let keys = [
+            (from_hex(NISTPSS_N), from_hex(NISTPSS_E), from_hex(NISTPSS_D)),
+            (from_hex(WYCH_N), from_hex(WYCH_E), from_hex(WYCH_D)),
+        ];
+        let mut prng = SplitMix64::new(SplitMix64::SEED);
+        let mut count = 0u32;
+        for (n, e, d) in &keys {
+            for i in 0..16u64 {
+                let h = counter_hash(i);
+                let salt = prng.bytes(32);
+                let s = rsa_sign::sign_pss_sha256(n, d, &h, &salt)
+                    .unwrap_or_else(|e| panic!("roundtrip {i}: {e}"));
+                assert_eq!(s.len(), n.len());
+                rsa::verify_pss_sha256(n, e, 32, &h, &s)
+                    .unwrap_or_else(|e| panic!("roundtrip {i}: verify failed: {e}"));
+                count += 1;
+            }
+        }
+        assert_eq!(count, 32);
+        // randomized: a fresh salt must change the signature
+        let (n, _e, d) = &keys[1];
+        let h = counter_hash(999);
+        let s1 = rsa_sign::sign_pss_sha256(n, d, &h, &prng.bytes(32)).unwrap();
+        let s2 = rsa_sign::sign_pss_sha256(n, d, &h, &prng.bytes(32)).unwrap();
+        assert_ne!(s1, s2, "different salts must give different signatures");
+        rsa::verify_pss_sha256(n, _e, 32, &h, &s1).unwrap();
+        rsa::verify_pss_sha256(n, _e, 32, &h, &s2).unwrap();
+    }
+
+    // ------------------------------------------------------------------
+    // 8. Salt-length boundary (§9.1.1 step 3): distinct "encoding error"
+    //    when emLen < hLen + sLen + 2; the boundary salt (PS empty) works.
+    // ------------------------------------------------------------------
+    #[test]
+    fn rsa_sign_pss_salt_too_long_distinct_error() {
+        // NISTPSS key: 1024 bits ⇒ emBits 1023, emLen 128 ⇒ max salt 94.
+        let n = from_hex(NISTPSS_N);
+        let d = from_hex(NISTPSS_D);
+        let e = from_hex(NISTPSS_E);
+        let h = [0u8; 32];
+        assert_eq!(
+            rsa_sign::sign_pss_sha256(&n, &d, &h, &vec![0u8; 95]).unwrap_err(),
+            "rsa_sign/pss: emLen (128) < hLen (32) + sLen (95) + 2 — salt too long for this modulus"
+        );
+        // sLen = 94: PS is empty (emLen − sLen − hLen − 2 = 0) — legal.
+        let s = rsa_sign::sign_pss_sha256(&n, &d, &h, &vec![0x11u8; 94]).unwrap();
+        rsa::verify_pss_sha256(&n, &e, 94, &h, &s).unwrap();
+        // Wycheproof key: 2048 bits ⇒ emLen 256 ⇒ max salt 222; 223 fails.
+        let n2 = from_hex(WYCH_N);
+        let d2 = from_hex(WYCH_D);
+        let err = rsa_sign::sign_pss_sha256(&n2, &d2, &h, &vec![0u8; 223]).unwrap_err();
+        assert!(
+            err.starts_with("rsa_sign/pss: emLen (256) < hLen (32) + sLen (223) + 2"),
+            "unexpected error text: {err}"
+        );
+        // zero-length salt is also legal (sLen = 0, §9.1.1 step 4 note)
+        let s0 = rsa_sign::sign_pss_sha256(&n2, &d2, &h, &[]).unwrap();
+        rsa::verify_pss_sha256(&n2, &from_hex(WYCH_E), 0, &h, &s0).unwrap();
+    }
+
+    // ------------------------------------------------------------------
+    // 9. Negatives: bit-flipped signatures are rejected with the distinct
+    //    verifier-stage errors of the existing crate::rsa module.
+    // ------------------------------------------------------------------
+    #[test]
+    fn rsa_sign_bitflipped_signatures_rejected() {
+        let n = from_hex(WYCH_N);
+        let e = from_hex(WYCH_E);
+        let d = from_hex(WYCH_D);
+        let h = counter_hash(4242);
+        // v1.5: flip the LAST byte ⇒ recovered EM ≠ EM' ⇒ EM-compare stage
+        let s = rsa_sign::sign_pkcs1_v1_5_sha256(&n, &d, &h).unwrap();
+        let mut bad = s.clone();
+        let last = bad.len() - 1;
+        bad[last] ^= 0x01;
+        assert_eq!(
+            rsa::verify_pkcs1_v1_5_sha256(&n, &e, &h, &bad).unwrap_err(),
+            "rsa: PKCS#1 v1.5 encoded message mismatch"
+        );
+        // PSS: flip the trailer byte ⇒ trailer stage
+        let p = rsa_sign::sign_pss_sha256(&n, &d, &h, &vec![0x33u8; 32]).unwrap();
+        let mut badp = p.clone();
+        let bi = badp.len() - 1;
+        badp[bi] ^= 0x01;
+        assert_eq!(
+            rsa::verify_pss_sha256(&n, &e, 32, &h, &badp).unwrap_err(),
+            "rsa/pss: bad trailer byte (not 0xbc)"
+        );
+        // PSS: flip a maskedDB byte ⇒ some downstream stage rejects (any)
+        let mut badm = p.clone();
+        badm[10] ^= 0x80;
+        assert!(rsa::verify_pss_sha256(&n, &e, 32, &h, &badm).is_err());
+        // v1.5: signature for a DIFFERENT hash must not verify for this hash
+        let h2 = counter_hash(4243);
+        assert!(rsa::verify_pkcs1_v1_5_sha256(&n, &e, &h2, &s).is_err());
+    }
+
+    // ------------------------------------------------------------------
+    // 10. OpenSSL cross-check, frozen: the deterministic RSA-2048 key
+    //     (run-11 recipe) whose v1.5 signature is the OpenSSL 3.5.7 CLI
+    //     output byte-for-byte, and whose PSS (salt 0xA5×32) signature was
+    //     "Verified OK" under the openssl PSS verify with saltlen 32.
+    // ------------------------------------------------------------------
+    #[test]
+    fn rsa_sign_openssl_crosscheck_frozen_2048() {
+        let n = from_hex(FROZEN_N);
+        let d = from_hex(FROZEN_D);
+        let e = from_hex(FROZEN_E);
+        let msg = from_hex(FROZEN_MSG);
+        let mhash = sha256::digest(&msg);
+        assert_eq!(&mhash[..], &from_hex(FROZEN_MHASH)[..]);
+        // v1.5: byte-exact vs `openssl dgst -sha256 -sign frozen_key.pem`
+        let s = rsa_sign::sign_pkcs1_v1_5_sha256(&n, &d, &mhash).unwrap();
+        assert_eq!(s, from_hex(FROZEN_SIG_V15), "v1.5 == OpenSSL 3.5.7 output");
+        rsa::verify_pkcs1_v1_5_sha256(&n, &e, &mhash, &s).unwrap();
+        // PSS salt 0xA5×32: byte-exact vs the Python pow() ground truth; the
+        // openssl CLI verified this exact signature ("Verified OK", saltlen 32)
+        let p = rsa_sign::sign_pss_sha256(&n, &d, &mhash, &from_hex(FROZEN_PSS_SALT)).unwrap();
+        assert_eq!(p, from_hex(FROZEN_SIG_PSS), "PSS == Python ground truth");
+        rsa::verify_pss_sha256(&n, &e, 32, &mhash, &p).unwrap();
     }
 }

@@ -545,3 +545,23 @@
   roadmap is exhausted. Chain-integrity rule: NEVER delete before the
   replacement exists — a duplicate firing is recoverable, a broken
   chain is not.
+- **D-0037 (2026-11-26, run 12 stage 1 — CFB audit matcher: hex-data
+  exception):** merging the S2 batch-1 holo-tls crate tripped
+  `cfb_usage_audit` on FALSE POSITIVES: three DER certificate fixtures
+  embedded as hex `&str` constants in `crates/holo-tls/src/spki.rs`
+  (merged-tree lines 436/439/444) contain "cfb" by pure nibble chance
+  inside multi-hundred-char hex runs (DER bytes are arbitrary). The
+  audit's purpose is UNCHANGED — no raw CFB128 consumer outside the
+  single-file allowlist — but a raw substring match cannot distinguish
+  DATA from CODE. The matcher now classifies each case-insensitive
+  "cfb" occurrence: if the ENTIRE occurrence sits inside a run of hex
+  characters ≥ 12 long, it is fixture data and does not count; every
+  other occurrence (imports, paths, `mod cfb128`, comments) still
+  trips with file:line. Sensitivity evidence: the negative demo was
+  RE-RUN — a planted `crates/holo-socks/src/cfb_probe_scratch.rs`
+  whose comment references `crate::cfb128::encrypt_block` FAILED the
+  audit naming both lines (comments are code context), removed →
+  green. Threshold rationale: no real Rust identifier is a 12+-char
+  hex-only token; real fixture hex runs are hundreds of chars.
+  ALLOWLIST unchanged (exactly one entry). The three false-positive
+  lines are quoted in the run-12 journal.

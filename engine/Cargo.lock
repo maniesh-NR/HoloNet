@@ -59,6 +59,13 @@ name = "holo-theme"
 version = "0.3.0"
 
 [[package]]
+name = "holo-tls"
+version = "0.3.0"
+dependencies = [
+ "holo-crypto",
+]
+
+[[package]]
 name = "holo-util"
 version = "0.3.0"
 
