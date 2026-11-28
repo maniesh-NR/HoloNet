@@ -4,6 +4,7 @@
 #include "materialyou.h"
 
 #include <QtGlobal>
+#include <QRegularExpression>
 #include <cmath>
 
 namespace holonet {
@@ -232,10 +233,30 @@ QVariantMap Theme::dark() const {
 }
 
 void Theme::setSeedHex(const QString &hex) {
-    const holonet::Argb parsed = holonet::Argb::fromHex(hex);
-    // Re-serialize for canonical form; invalid input keeps the current seed.
-    const QByteArray canonical = parsed.hex().toLatin1();
+    const QString normalized = hex.trimmed();
+    static const QRegularExpression validHex(QStringLiteral("^#?[0-9A-Fa-f]{6}$"));
+    if (!validHex.match(normalized).hasMatch()) return;
+
+    QString prefixed = normalized;
+    if (!prefixed.startsWith(QLatin1Char('#'))) prefixed.prepend(QLatin1Char('#'));
+    const QByteArray canonical = holonet::Argb::fromHex(prefixed).hex().toLatin1();
     if (canonical == m_seedHex) return;
     m_seedHex = canonical;
+    emit changed();
+}
+
+void Theme::setThemeMode(const QString &mode) {
+    const QString normalized = mode.trimmed().toLower();
+    if (normalized != QStringLiteral("system") &&
+        normalized != QStringLiteral("light") &&
+        normalized != QStringLiteral("dark")) return;
+    if (m_themeMode == normalized) return;
+    m_themeMode = normalized;
+    emit changed();
+}
+
+void Theme::setDynamicColor(bool enabled) {
+    if (m_dynamicColor == enabled) return;
+    m_dynamicColor = enabled;
     emit changed();
 }
