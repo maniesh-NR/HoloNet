@@ -69,10 +69,10 @@ class Theme : public QObject {
     Q_PROPERTY(QString seedHex READ seedHex WRITE setSeedHex NOTIFY changed)
     Q_PROPERTY(QString themeMode READ themeMode WRITE setThemeMode NOTIFY changed)
     Q_PROPERTY(bool dynamicColor READ dynamicColor WRITE setDynamicColor NOTIFY changed)
-    Q_PROPERTY(int shapeSmall CONSTANT)
-    Q_PROPERTY(int shapeMedium CONSTANT)
-    Q_PROPERTY(int shapeLarge CONSTANT)
-    Q_PROPERTY(int shapeExtraLarge CONSTANT)
+    Q_PROPERTY(int shapeSmall READ shapeSmall CONSTANT)
+    Q_PROPERTY(int shapeMedium READ shapeMedium CONSTANT)
+    Q_PROPERTY(int shapeLarge READ shapeLarge CONSTANT)
+    Q_PROPERTY(int shapeExtraLarge READ shapeExtraLarge CONSTANT)
 
 public:
     explicit Theme(QObject *parent = nullptr);
