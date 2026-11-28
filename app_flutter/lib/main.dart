@@ -552,7 +552,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     children: [
                       for (final hex in [
                         '#6750A4', '#B3261E', '#0061A4', '#006E1C', '#7D5260',
-                        '#8C4E00', '#006493', '#984061', '#3F6978',
+                        '#8C4E00', '#984061', '#3F6978',
                       ])
                         _SeedSwatch(
                           hex: hex,
