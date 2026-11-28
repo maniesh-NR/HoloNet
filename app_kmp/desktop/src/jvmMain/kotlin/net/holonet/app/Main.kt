@@ -225,106 +225,109 @@ fun HoloNetApp(
                         ConnectOrb(scheme)
                     }
                 } else {
-                    Column(
-                        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(28.dp),
-                    ) {
-                        Text("Settings", fontSize = 28.sp, fontWeight = FontWeight.Bold)
-                        Spacer(Modifier.height(20.dp))
-                        Text("Appearance", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                        Text(
-                            "Choose how HoloNet looks. Your seed color is shared across platforms.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Spacer(Modifier.height(20.dp))
-
-                        Text("Theme mode", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                        Spacer(Modifier.height(8.dp))
-                        Row(
-                            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+                        Column(
+                            Modifier.widthIn(max = 760.dp).fillMaxWidth().fillMaxHeight()
+                                .verticalScroll(rememberScrollState()).padding(28.dp),
                         ) {
-                            listOf("system" to "System", "light" to "Light", "dark" to "Dark").forEach { (mode, label) ->
-                                FilterChip(
-                                    selected = themeMode == mode,
-                                    onClick = { onThemeModeChange(mode) },
-                                    label = { Text(label) },
-                                )
-                            }
-                        }
-
-                        Spacer(Modifier.height(20.dp))
-                        Row(
-                            Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Column(Modifier.weight(1f)) {
-                                Text("Dynamic color", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                                Text(
-                                    "Uses Android 12+ wallpaper colors when available.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            Switch(checked = dynamicColor, onCheckedChange = onDynamicColorChange)
-                        }
-
-                        Spacer(Modifier.height(24.dp))
-                        Text("Seed color", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                        Text(
-                            "Choose a preset or enter a custom six-digit hex color.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Spacer(Modifier.height(12.dp))
-                        Row(
-                            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        ) {
-                            SEED_PRESETS.forEach { hex ->
-                                val argb = Argb.fromHex(hex) ?: return@forEach
-                                val selected = seedHex.equals(hex, ignoreCase = true)
-                                Box(
-                                    modifier = Modifier
-                                        .size(42.dp)
-                                        .clip(CircleShape)
-                                        .background(argb.toCompose())
-                                        .border(
-                                            width = if (selected) 3.dp else 0.dp,
-                                            color = MaterialTheme.colorScheme.primary,
-                                            shape = CircleShape,
-                                        )
-                                        .clickable { onSeedChange(hex) },
-                                )
-                            }
-                        }
-                        Spacer(Modifier.height(16.dp))
-                        Row(
-                            Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            val normalizedSeed = normalizeSeedHex(customSeed)
-                            OutlinedTextField(
-                                value = customSeed,
-                                onValueChange = { customSeed = it },
-                                label = { Text("Custom hex") },
-                                singleLine = true,
-                                isError = customSeed.isNotBlank() && normalizedSeed == null,
-                                modifier = Modifier.weight(1f),
+                            Text("Settings", fontSize = 28.sp, fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.height(20.dp))
+                            Text("Appearance", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                "Choose how HoloNet looks. Your seed color is shared across platforms.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
-                            Button(
-                                onClick = { normalizedSeed?.let(onSeedChange) },
-                                enabled = normalizedSeed != null,
+                            Spacer(Modifier.height(20.dp))
+
+                            Text("Theme mode", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                            Spacer(Modifier.height(8.dp))
+                            Row(
+                                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
-                                Text("Apply")
+                                listOf("system" to "System", "light" to "Light", "dark" to "Dark").forEach { (mode, label) ->
+                                    FilterChip(
+                                        selected = themeMode == mode,
+                                        onClick = { onThemeModeChange(mode) },
+                                        label = { Text(label) },
+                                    )
+                                }
                             }
+
+                            Spacer(Modifier.height(20.dp))
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text("Dynamic color", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                                    Text(
+                                        "Uses Android 12+ wallpaper colors when available.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                Switch(checked = dynamicColor, onCheckedChange = onDynamicColorChange)
+                            }
+
+                            Spacer(Modifier.height(24.dp))
+                            Text("Seed color", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                "Choose a preset or enter a custom six-digit hex color.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Spacer(Modifier.height(12.dp))
+                            Row(
+                                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                SEED_PRESETS.forEach { hex ->
+                                    val argb = Argb.fromHex(hex) ?: return@forEach
+                                    val selected = seedHex.equals(hex, ignoreCase = true)
+                                    Box(
+                                        modifier = Modifier
+                                            .size(42.dp)
+                                            .clip(CircleShape)
+                                            .background(argb.toCompose())
+                                            .border(
+                                                width = if (selected) 3.dp else 0.dp,
+                                                color = MaterialTheme.colorScheme.primary,
+                                                shape = CircleShape,
+                                            )
+                                            .clickable { onSeedChange(hex) },
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.height(16.dp))
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                val normalizedSeed = normalizeSeedHex(customSeed)
+                                OutlinedTextField(
+                                    value = customSeed,
+                                    onValueChange = { customSeed = it },
+                                    label = { Text("Custom hex") },
+                                    singleLine = true,
+                                    isError = customSeed.isNotBlank() && normalizedSeed == null,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                Button(
+                                    onClick = { normalizedSeed?.let(onSeedChange) },
+                                    enabled = normalizedSeed != null,
+                                ) {
+                                    Text("Apply")
+                                }
+                            }
+                            Text(
+                                "Example: #6750A4. The selected seed updates HoloNet across platforms.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
-                        Text(
-                            "Example: #6750A4. The selected seed updates HoloNet across platforms.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
                     }
                 }
             }

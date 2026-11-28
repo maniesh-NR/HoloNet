@@ -148,9 +148,9 @@ ApplicationWindow {
 
                     ColumnLayout {
                         id: settingsColumn
-                        x: 20
+                        x: Math.max(20, (parent.width - width) / 2)
                         y: 20
-                        width: Math.max(0, parent.width - 40)
+                        width: Math.min(Math.max(0, parent.width - 40), 720)
                         spacing: 14
 
                         Label {

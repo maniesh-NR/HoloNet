@@ -316,26 +316,32 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
           SliverToBoxAdapter(
-            child: Column(
-              children: [
-                if (_error != null) Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Card(
-                      color: cs.errorContainer,
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Row(children: [
-                          Icon(Icons.error_outline, color: cs.onErrorContainer),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(_error!, style: TextStyle(color: cs.onErrorContainer)),
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 760),
+                child: Column(
+                  children: [
+                    if (_error != null) Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Card(
+                          color: cs.errorContainer,
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Row(children: [
+                              Icon(Icons.error_outline, color: cs.onErrorContainer),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(_error!, style: TextStyle(color: cs.onErrorContainer)),
+                              ),
+                            ]),
                           ),
-                        ]),
+                        ),
                       ),
-                    ),
-                  ),
-                pages[_navIndex],
-              ],
+                    pages[_navIndex],
+                  ],
+                ),
+              ),
             ),
           ),
         ],
