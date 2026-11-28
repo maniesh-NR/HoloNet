@@ -87,7 +87,7 @@ fun main() {
                     val mode = Regex(""""_mode":"(\w+)"""").find(it)?.groupValues?.get(1)
                     if (seed != null) seedHex = seed
                     if (mode != null) themeMode = mode
-                    val dynamic = Regex("""\\"_dynamic\\":\\"(true|false)\\"""").find(it)?.groupValues?.get(1)
+                    val dynamic = Regex(""""_dynamic":"(true|false)"""").find(it)?.groupValues?.get(1)
                     if (dynamic != null) dynamicColor = dynamic == "true"
                 }
             }
