@@ -3,6 +3,7 @@
 // Flutter and KMP frontends); M3 expressive: large title, container-scale
 // cards, FAB, pill switches, the M3 shape scale.
 import QtQuick
+import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Layouts
 import HoloNet 1.0
