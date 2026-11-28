@@ -10,6 +10,7 @@
 #include <QObject>
 #include <QString>
 #include <QVariantMap>
+#include <QByteArray>
 #include <QColor>
 #include <array>
 
@@ -66,10 +67,12 @@ class Theme : public QObject {
     Q_PROPERTY(QVariantMap light READ light NOTIFY changed)
     Q_PROPERTY(QVariantMap dark READ dark NOTIFY changed)
     Q_PROPERTY(QString seedHex READ seedHex WRITE setSeedHex NOTIFY changed)
-    Q_PROPERTY(int shapeSmall CONSTANT)
-    Q_PROPERTY(int shapeMedium CONSTANT)
-    Q_PROPERTY(int shapeLarge CONSTANT)
-    Q_PROPERTY(int shapeExtraLarge CONSTANT)
+    Q_PROPERTY(QString themeMode READ themeMode WRITE setThemeMode NOTIFY changed)
+    Q_PROPERTY(bool dynamicColor READ dynamicColor WRITE setDynamicColor NOTIFY changed)
+    Q_PROPERTY(int shapeSmall READ shapeSmall CONSTANT)
+    Q_PROPERTY(int shapeMedium READ shapeMedium CONSTANT)
+    Q_PROPERTY(int shapeLarge READ shapeLarge CONSTANT)
+    Q_PROPERTY(int shapeExtraLarge READ shapeExtraLarge CONSTANT)
 
 public:
     explicit Theme(QObject *parent = nullptr);
@@ -84,6 +87,16 @@ public:
     int shapeLarge() const { return 16; }
     int shapeExtraLarge() const { return 28; }
 
+    QString themeMode() const { return m_themeMode; }
+    void setThemeMode(const QString &mode);
+    bool dynamicColor() const { return m_dynamicColor; }
+    void setDynamicColor(bool enabled);
+
 signals:
     void changed();
+
+private:
+    QByteArray m_seedHex = "#6750A4";
+    QString m_themeMode = "system";
+    bool m_dynamicColor = true;
 };

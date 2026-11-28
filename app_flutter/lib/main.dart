@@ -299,7 +299,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final pages = [
       _connectPage(cs),
       _serversPage(cs),
-      _themePage(cs),
+      _settingsPage(cs),
     ];
     return Scaffold(
       body: CustomScrollView(
@@ -309,31 +309,40 @@ class _HomeScreenState extends State<HomeScreen> {
             title: const Text('HoloNet'),
             actions: [
               IconButton(
-                tooltip: 'Material You',
-                icon: const Icon(Icons.palette_outlined),
+                tooltip: 'Settings',
+                icon: const Icon(Icons.settings_outlined),
                 onPressed: () => setState(() => _navIndex = 2),
               ),
             ],
           ),
           SliverToBoxAdapter(
-            child: _error != null
-                ? Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Card(
-                      color: cs.errorContainer,
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Row(children: [
-                          Icon(Icons.error_outline, color: cs.onErrorContainer),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(_error!, style: TextStyle(color: cs.onErrorContainer)),
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 760),
+                child: Column(
+                  children: [
+                    if (_error != null) Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Card(
+                          color: cs.errorContainer,
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Row(children: [
+                              Icon(Icons.error_outline, color: cs.onErrorContainer),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(_error!, style: TextStyle(color: cs.onErrorContainer)),
+                              ),
+                            ]),
                           ),
-                        ]),
+                        ),
                       ),
-                    ),
-                  )
-                : pages[_navIndex],
+                    pages[_navIndex],
+                  ],
+                ),
+              ),
+            ),
           ),
         ],
       ),
@@ -344,7 +353,7 @@ class _HomeScreenState extends State<HomeScreen> {
         destinations: const [
           NavigationDestination(icon: Icon(Icons.shield_outlined), selectedIcon: Icon(Icons.shield), label: 'Home'),
           NavigationDestination(icon: Icon(Icons.dns_outlined), selectedIcon: Icon(Icons.dns), label: 'Servers'),
-          NavigationDestination(icon: Icon(Icons.palette_outlined), selectedIcon: Icon(Icons.palette), label: 'Theme'),
+          NavigationDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: 'Settings'),
         ],
       ),
       // M3 FAB (extended while disconnected).
@@ -408,7 +417,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: ListTile(
                 leading: Icon(Icons.vpn_key_outlined, color: cs.primary),
                 title: Text('${_profiles.first['name']}'),
-                subtitle: Text('${_profiles.first['driver']} · ${_profiles.first['source']}'),
+                subtitle: Text('${_profiles.first['driver']} · ${_profiles.first['source']}', maxLines: 1, overflow: TextOverflow.ellipsis),
                 trailing: Icon(Icons.chevron_right, color: cs.onSurfaceVariant),
                 onTap: () => setState(() => _navIndex = 1),
               ),
@@ -450,7 +459,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: ListTile(
                 leading: Icon(Icons.language, color: cs.tertiary),
                 title: Text('${p['name']}'),
-                subtitle: Text('${p['driver']} · ${p['server']}:${p['port']}'),
+                subtitle: Text('${p['driver']} · ${p['server']}:${p['port']}', maxLines: 1, overflow: TextOverflow.ellipsis),
                 trailing: IconButton(
                   icon: const Icon(Icons.play_arrow),
                   onPressed: () async {
@@ -476,16 +485,18 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // The Material You control page: theme mode, dynamic color, seed picker.
-  Widget _themePage(ColorScheme cs) {
+  Widget _settingsPage(ColorScheme cs) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Material You', style: Theme.of(context).textTheme.headlineSmall),
+          Text('Settings', style: Theme.of(context).textTheme.headlineSmall),
+          const SizedBox(height: 16),
+          Text('Appearance', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 4),
           Text(
-            'One seed colors every HoloNet surface — on every OS.',
+            'Choose how HoloNet looks. Your seed color is shared across platforms.',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
           ),
           const SizedBox(height: 16),
@@ -494,32 +505,26 @@ class _HomeScreenState extends State<HomeScreen> {
             color: cs.surfaceContainerLow,
             child: Column(
               children: [
-                ListTile(
-                  leading: const Icon(Icons.brightness_auto),
+                RadioListTile<String>(
+                  secondary: const Icon(Icons.brightness_auto),
                   title: const Text('Follow system'),
-                  trailing: Radio<String>(
-                    value: 'system',
-                    groupValue: widget.themeMode,
-                    onChanged: (v) => widget.onThemeChanged(v!, widget.seedHex, widget.dynamicColor),
-                  ),
+                  value: 'system',
+                  groupValue: widget.themeMode,
+                  onChanged: (v) => widget.onThemeChanged(v!, widget.seedHex, widget.dynamicColor),
                 ),
-                ListTile(
-                  leading: const Icon(Icons.light_mode),
+                RadioListTile<String>(
+                  secondary: const Icon(Icons.light_mode),
                   title: const Text('Light'),
-                  trailing: Radio<String>(
-                    value: 'light',
-                    groupValue: widget.themeMode,
-                    onChanged: (v) => widget.onThemeChanged(v!, widget.seedHex, widget.dynamicColor),
-                  ),
+                  value: 'light',
+                  groupValue: widget.themeMode,
+                  onChanged: (v) => widget.onThemeChanged(v!, widget.seedHex, widget.dynamicColor),
                 ),
-                ListTile(
-                  leading: const Icon(Icons.dark_mode),
+                RadioListTile<String>(
+                  secondary: const Icon(Icons.dark_mode),
                   title: const Text('Dark'),
-                  trailing: Radio<String>(
-                    value: 'dark',
-                    groupValue: widget.themeMode,
-                    onChanged: (v) => widget.onThemeChanged(v!, widget.seedHex, widget.dynamicColor),
-                  ),
+                  value: 'dark',
+                  groupValue: widget.themeMode,
+                  onChanged: (v) => widget.onThemeChanged(v!, widget.seedHex, widget.dynamicColor),
                 ),
               ],
             ),
@@ -553,7 +558,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     children: [
                       for (final hex in [
                         '#6750A4', '#B3261E', '#0061A4', '#006E1C', '#7D5260',
-                        '#8C4E00', '#6750A4', '#006493', '#984061', '#3F6978',
+                        '#8C4E00', '#984061', '#3F6978',
                       ])
                         _SeedSwatch(
                           hex: hex,
